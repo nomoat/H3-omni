@@ -1,0 +1,104 @@
+name, clocks.current.sm [MHz], power.draw [W]
+NVIDIA H200, 345 MHz, 78.13 W
+rows 29700 width 5376 ffn 14336 heads 56 rope_half 48
+  adaln                        identical (0 of 159667200 differ)
+  adaln                        generated 0.524 ms, fast 0.236 ms (2.22x), fast 2707 GB/s
+  gate (in place)              identical (0 of 159667200 differ)
+  gate                         generated 0.617 ms, fast 0.225 ms (2.74x), fast 4252 GB/s
+  gate_adaln residual          identical (0 of 159667200 differ)
+  gate_adaln output            identical (0 of 159667200 differ)
+  adaln (CHUNKS 16)            identical (0 of 159667200 differ)
+  gate+adaln                   generated 1.142 ms, fast 0.393 ms (2.90x), fast 3248 GB/s
+  swiglu                       identical (0 of 425779200 differ)
+  swiglu                       generated 1.432 ms, fast 0.647 ms (2.21x), fast 3950 GB/s
+  qkv_rope plain q             identical (0 of 212889600 differ)
+  qkv_rope plain k             identical (0 of 212889600 differ)
+  qkv_rope plain v             identical (0 of 212889600 differ)
+  qkv_rope grouped q           identical (0 of 212889600 differ)
+  qkv_rope grouped k           identical (0 of 212889600 differ)
+  qkv_rope grouped v           identical (0 of 212889600 differ)
+  qkv_rope grouped             generated 1.983 ms, fast 0.841 ms (2.36x), fast 3039 GB/s
+rows 7 width 5376 ffn 14336 heads 56 rope_half 48
+  adaln                        identical (0 of 37632 differ)
+  gate (in place)              identical (0 of 37632 differ)
+  gate_adaln residual          identical (0 of 37632 differ)
+  gate_adaln output            identical (0 of 37632 differ)
+  adaln (CHUNKS 16)            identical (0 of 37632 differ)
+  swiglu                       identical (0 of 100352 differ)
+  qkv_rope plain q             identical (0 of 50176 differ)
+  qkv_rope plain k             identical (0 of 50176 differ)
+  qkv_rope plain v             identical (0 of 50176 differ)
+  qkv_rope grouped q           identical (0 of 50176 differ)
+  qkv_rope grouped k           identical (0 of 50176 differ)
+  qkv_rope grouped v           identical (0 of 50176 differ)
+rows 1001 width 3072 ffn 8192 heads 24 rope_half 32
+  adaln                        identical (0 of 3075072 differ)
+  gate (in place)              identical (0 of 3075072 differ)
+  gate_adaln residual          identical (0 of 3075072 differ)
+  gate_adaln output            identical (0 of 3075072 differ)
+  adaln (CHUNKS 16)            identical (0 of 3075072 differ)
+  swiglu                       identical (0 of 8200192 differ)
+  qkv_rope plain q             identical (0 of 3075072 differ)
+  qkv_rope plain k             identical (0 of 3075072 differ)
+  qkv_rope plain v             identical (0 of 3075072 differ)
+  qkv_rope grouped q           identical (0 of 3075072 differ)
+  qkv_rope grouped k           identical (0 of 3075072 differ)
+  qkv_rope grouped v           identical (0 of 3075072 differ)
+rows 333 width 5384 ffn 1032 heads 5 rope_half 64
+  adaln                        identical (0 of 1792872 differ)
+  gate (in place)              identical (0 of 1792872 differ)
+  gate_adaln residual          identical (0 of 1792872 differ)
+  gate_adaln output            identical (0 of 1792872 differ)
+  adaln (CHUNKS 16)            identical (0 of 1792872 differ)
+  swiglu                       identical (0 of 343656 differ)
+  qkv_rope plain q             identical (0 of 213120 differ)
+  qkv_rope plain k             identical (0 of 213120 differ)
+  qkv_rope plain v             identical (0 of 213120 differ)
+  qkv_rope grouped q           identical (0 of 213120 differ)
+  qkv_rope grouped k           identical (0 of 213120 differ)
+  qkv_rope grouped v           identical (0 of 213120 differ)
+ALL IDENTICAL
+ptxas info    : Compiling entry function '_Z23h3_fast_gate_adaln_bf16ILi16ELb0EEvPKtS1_S1_PtS1_S1_PKjS2_20fast_gate_adaln_args' for 'sm_90'
+ptxas info    : Function properties for _Z23h3_fast_gate_adaln_bf16ILi16ELb0EEvPKtS1_S1_PtS1_S1_PKjS2_20fast_gate_adaln_args
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+--
+ptxas info    : Compiling entry function '_Z23h3_fast_gate_adaln_bf16ILi16ELb1EEvPKtS1_S1_PtS1_S1_PKjS2_20fast_gate_adaln_args' for 'sm_90'
+ptxas info    : Function properties for _Z23h3_fast_gate_adaln_bf16ILi16ELb1EEvPKtS1_S1_PtS1_S1_PKjS2_20fast_gate_adaln_args
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+--
+ptxas info    : Compiling entry function '_Z23h3_fast_gate_adaln_bf16ILi11ELb0EEvPKtS1_S1_PtS1_S1_PKjS2_20fast_gate_adaln_args' for 'sm_90'
+ptxas info    : Function properties for _Z23h3_fast_gate_adaln_bf16ILi11ELb0EEvPKtS1_S1_PtS1_S1_PKjS2_20fast_gate_adaln_args
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+--
+ptxas info    : Compiling entry function '_Z23h3_fast_gate_adaln_bf16ILi11ELb1EEvPKtS1_S1_PtS1_S1_PKjS2_20fast_gate_adaln_args' for 'sm_90'
+ptxas info    : Function properties for _Z23h3_fast_gate_adaln_bf16ILi11ELb1EEvPKtS1_S1_PtS1_S1_PKjS2_20fast_gate_adaln_args
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+--
+ptxas info    : Compiling entry function '_Z23h3_fast_gate_adaln_bf16ILi8ELb0EEvPKtS1_S1_PtS1_S1_PKjS2_20fast_gate_adaln_args' for 'sm_90'
+ptxas info    : Function properties for _Z23h3_fast_gate_adaln_bf16ILi8ELb0EEvPKtS1_S1_PtS1_S1_PKjS2_20fast_gate_adaln_args
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+--
+ptxas info    : Compiling entry function '_Z23h3_fast_gate_adaln_bf16ILi8ELb1EEvPKtS1_S1_PtS1_S1_PKjS2_20fast_gate_adaln_args' for 'sm_90'
+ptxas info    : Function properties for _Z23h3_fast_gate_adaln_bf16ILi8ELb1EEvPKtS1_S1_PtS1_S1_PKjS2_20fast_gate_adaln_args
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+--
+ptxas info    : Compiling entry function '_Z23h3_fast_gate_adaln_bf16ILi4ELb0EEvPKtS1_S1_PtS1_S1_PKjS2_20fast_gate_adaln_args' for 'sm_90'
+ptxas info    : Function properties for _Z23h3_fast_gate_adaln_bf16ILi4ELb0EEvPKtS1_S1_PtS1_S1_PKjS2_20fast_gate_adaln_args
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+--
+ptxas info    : Compiling entry function '_Z23h3_fast_gate_adaln_bf16ILi4ELb1EEvPKtS1_S1_PtS1_S1_PKjS2_20fast_gate_adaln_args' for 'sm_90'
+ptxas info    : Function properties for _Z23h3_fast_gate_adaln_bf16ILi4ELb1EEvPKtS1_S1_PtS1_S1_PKjS2_20fast_gate_adaln_args
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+--
+ptxas info    : Compiling entry function '_Z21h3_fast_qkv_rope_bf16PKtS0_S0_S0_S0_PtS1_S1_8qkv_args' for 'sm_90'
+ptxas info    : Function properties for _Z21h3_fast_qkv_rope_bf16PKtS0_S0_S0_S0_PtS1_S1_8qkv_args
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+--
+ptxas info    : Compiling entry function '_Z19h3_fast_swiglu_bf16PKtPt11swiglu_args' for 'sm_90'
+ptxas info    : Function properties for _Z19h3_fast_swiglu_bf16PKtPt11swiglu_args
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+--
+ptxas info    : Compiling entry function '_Z17h3_fast_gate_bf16PKtS0_S0_PKjPt9gate_args' for 'sm_90'
+ptxas info    : Function properties for _Z17h3_fast_gate_bf16PKtS0_S0_PKjPt9gate_args
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+build ok

@@ -194,7 +194,10 @@ for m, header, body in blocks(host, r"int (h3_gpu_\w+)\("):
     if name.replace("h3_gpu_", "h3_", 1) not in selected:
         continue
     # Specialized host wrappers are handled by the native backend explicitly.
-    if name in {"h3_gpu_adaln_bf16", "h3_gpu_qkv_rope_bf16", "h3_gpu_euler_bf16", "h3_gpu_head_rms_norm_bf16"}:
+    # The gate and SwiGLU wrappers are hand-written in h3_gpu_cuda.cu because
+    # they select the hand-written fast kernels in fast_primitives.cuh.
+    if name in {"h3_gpu_adaln_bf16", "h3_gpu_qkv_rope_bf16", "h3_gpu_euler_bf16", "h3_gpu_head_rms_norm_bf16",
+                "h3_gpu_gate_bf16", "h3_gpu_swiglu_bf16"}:
         continue
     if "h3_gpu_dispatch_" not in body or "@autoreleasepool" in body:
         continue

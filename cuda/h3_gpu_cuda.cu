@@ -4,6 +4,7 @@
 #include <climits>
 #include <cmath>
 #include <cstdarg>
+#include <cstdint>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -101,6 +102,15 @@ struct Binding {
     }
 };
 #include "primitives.cuh"
+#include "fast_primitives.cuh"
+// Hand-written fast elementwise kernels (fast_primitives.cuh) are bit-identical
+// to the generated ones. H3_GENERATED_ELEMENTWISE=1 selects the generated
+// kernels for A/B comparisons.
+static bool fast_elementwise() {
+    static const bool fast = !getenv("H3_GENERATED_ELEMENTWISE");
+    return fast;
+}
+static bool aligned_to(const void *p, size_t bytes) { return (uintptr_t)p % bytes == 0; }
 static dim3 MTLSizeMake(size_t x, size_t y, size_t z) { return dim3(x, y, z); }
 template <class F>
 static int dispatch(h3_gpu *gpu, const char *name, dim3 grid, dim3 block, F bind) {
@@ -411,6 +421,92 @@ extern "C" int h3_metal_probe(h3_device_info *i, char *e, size_t z) {
 }
 extern "C" {
 #include "primitive_wrappers.inc"
+}
+// h3_gpu_gate_bf16 and h3_gpu_swiglu_bf16 are written by hand (the generator
+// skips them) so they can use the vectorized kernels in fast_primitives.cuh.
+// The checks and the fallback dispatch are the generated wrappers' code.
+extern "C" int h3_gpu_gate_bf16(h3_gpu *gpu, h3_gpu_tensor *output, const h3_gpu_tensor *residual,
+                                const h3_gpu_tensor *branch, const h3_gpu_tensor *modulation,
+                                const h3_gpu_tensor *row_map, uint32_t rows, uint32_t width,
+                                uint32_t slots, uint32_t gate_slot) {
+    size_t count = (size_t)rows * width;
+    if (!h3_gpu_require_bf16(gpu, residual, count, "gate residual") ||
+        !h3_gpu_require_bf16(gpu, branch, count, "gate branch") ||
+        !h3_gpu_require_bf16(gpu, modulation, 1, "gate modulation") ||
+        !h3_gpu_require_elements(gpu, row_map, rows, "gate row map") ||
+        row_map->dtype != H3_GPU_U32 ||
+        !h3_gpu_require_bf16(gpu, output, count, "gate output") ||
+        gate_slot >= slots) return 0;
+    gate_args args = {rows, width, slots, gate_slot};
+    if (fast_elementwise() && count && width % 8 == 0 && aligned_to(residual->data, 16) &&
+        aligned_to(branch->data, 16) && aligned_to(modulation->data, 16) &&
+        aligned_to(output->data, 16)) {
+        size_t threads = count / 8;
+        h3_fast_gate_bf16<<<dim3((unsigned)((threads + 255) / 256)), dim3(256), 0, gpu->stream>>>(
+            (const ushort *)residual->data, (const ushort *)branch->data,
+            (const ushort *)modulation->data, (const uint *)row_map->data, (ushort *)output->data,
+            args);
+        return launch_ok(gpu);
+    }
+    return h3_gpu_dispatch_2d(gpu, "h3_gate_bf16", width, rows,
+        [&](Binding &encoder) {
+            encoder.buffer(0, residual, 0);
+            encoder.buffer(1, branch, 0);
+            encoder.buffer(2, modulation, 0);
+            encoder.buffer(3, row_map, 0);
+            encoder.buffer(4, output, 0);
+            encoder.arg(5, &args, sizeof(args));
+        });
+}
+extern "C" int h3_gpu_swiglu_bf16(h3_gpu *gpu, h3_gpu_tensor *output, const h3_gpu_tensor *fused,
+                                  uint32_t rows, uint32_t width) {
+    if (!h3_gpu_require_bf16(gpu, fused, (size_t)rows * width * 2, "SwiGLU input") ||
+        !h3_gpu_require_bf16(gpu, output, (size_t)rows * width, "SwiGLU output")) return 0;
+    swiglu_args args = {rows, width};
+    size_t count = (size_t)rows * width;
+    if (fast_elementwise() && count && width % 8 == 0 && aligned_to(fused->data, 16) &&
+        aligned_to(output->data, 16)) {
+        size_t threads = count / 8;
+        h3_fast_swiglu_bf16<<<dim3((unsigned)((threads + 255) / 256)), dim3(256), 0, gpu->stream>>>(
+            (const ushort *)fused->data, (ushort *)output->data, args);
+        return launch_ok(gpu);
+    }
+    return h3_gpu_dispatch_2d(gpu, "h3_swiglu_bf16", width, rows,
+        [&](Binding &encoder) {
+            encoder.buffer(0, fused, 0);
+            encoder.buffer(1, output, 0);
+            encoder.arg(2, &args, sizeof(args));
+        });
+}
+// Fused gate + AdaLN (gate = true) or AdaLN alone, see fast_primitives.cuh.
+// Returns -1 when the shape or alignment does not fit; the caller then uses
+// the generated kernels.
+template <int C>
+static void launch_fast_gate_adaln(h3_gpu *g, bool gate, ushort *res, const ushort *x,
+                                   const ushort *branch, const ushort *gm, const ushort *w,
+                                   const ushort *m, const uint *map, ushort *y,
+                                   fast_gate_adaln_args a) {
+    if (gate)
+        h3_fast_gate_adaln_bf16<C, true><<<dim3(a.rows), dim3(128), 0, g->stream>>>(
+            x, branch, gm, res, w, m, map, y, a);
+    else
+        h3_fast_gate_adaln_bf16<C, false><<<dim3(a.rows), dim3(128), 0, g->stream>>>(
+            x, branch, gm, res, w, m, map, y, a);
+}
+static int fast_gate_adaln(h3_gpu *g, bool gate, ushort *res, const ushort *x, const ushort *branch,
+                           const ushort *gm, const ushort *w, const ushort *m, const uint *map,
+                           ushort *y, fast_gate_adaln_args a) {
+    if (!fast_elementwise() || !a.rows || !a.width || a.width % 4 || a.width > 512 * 16)
+        return -1;
+    const void *ptrs[] = {res, x, branch, gm, w, m, y};
+    for (const void *p : ptrs)
+        if (!aligned_to(p, 8)) return -1;
+    unsigned chunks = (a.width + 511) / 512;
+    if (chunks <= 4) launch_fast_gate_adaln<4>(g, gate, res, x, branch, gm, w, m, map, y, a);
+    else if (chunks <= 8) launch_fast_gate_adaln<8>(g, gate, res, x, branch, gm, w, m, map, y, a);
+    else if (chunks <= 11) launch_fast_gate_adaln<11>(g, gate, res, x, branch, gm, w, m, map, y, a);
+    else launch_fast_gate_adaln<16>(g, gate, res, x, branch, gm, w, m, map, y, a);
+    return launch_ok(g);
 }
 // Qwen uses separate FP32 square, mean, rsqrt and multiply operations.
 // Preserve Reduce.cuh's four accumulators and ascending shuffle order.
@@ -845,6 +941,13 @@ extern "C" int h3_gpu_adaln_bf16(h3_gpu *g, h3_gpu_tensor *y, const h3_gpu_tenso
                                  const h3_gpu_tensor *map, uint r, uint width, uint slots, uint sh,
                                  uint sc, float eps) {
     adaln_args a{r, width, slots, sh, sc, eps};
+    if (x && w && m && map && y) {
+        int fast = fast_gate_adaln(g, false, nullptr, (const ushort *)x->data, nullptr, nullptr,
+                                   (const ushort *)w->data, (const ushort *)m->data,
+                                   (const uint *)map->data, (ushort *)y->data,
+                                   fast_gate_adaln_args{r, width, slots, 0, sh, sc, eps});
+        if (fast >= 0) return fast;
+    }
     return h3_gpu_dispatch_rows(g, "h3_adaln_bf16", r, [&](Binding &b) {
         b.buffer(0, x, 0);
         b.buffer(1, w, 0);
@@ -870,6 +973,17 @@ static int qkv_rope(h3_gpu *g, h3_gpu_tensor *q, h3_gpu_tensor *k, h3_gpu_tensor
                     const h3_gpu_tensor *co, const h3_gpu_tensor *si, uint seq, uint heads,
                     uint dim, uint half, float eps, uint grouped) {
     qkv_args a{seq, heads, dim, half, grouped, eps};
+    size_t items = (size_t)seq * heads;
+    if (fast_elementwise() && dim == 128 && half % 4 == 0 && half * 2 <= dim && items && q && k &&
+        v && x && qn && kn && co && si && aligned_to(co->data, 8) && aligned_to(si->data, 8) &&
+        aligned_to(x->data, 8) && aligned_to(qn->data, 8) && aligned_to(kn->data, 8) &&
+        aligned_to(q->data, 8) && aligned_to(k->data, 8) && aligned_to(v->data, 8)) {
+        h3_fast_qkv_rope_bf16<<<dim3((unsigned)((items + 7) / 8)), dim3(256), 0, g->stream>>>(
+            (const ushort *)x->data, (const ushort *)qn->data, (const ushort *)kn->data,
+            (const ushort *)co->data, (const ushort *)si->data, (ushort *)q->data,
+            (ushort *)k->data, (ushort *)v->data, a);
+        return launch_ok(g);
+    }
     return h3_gpu_dispatch_3d(g, "h3_qkv_rope_bf16", dim3(dim, heads, seq), [&](Binding &b) {
         b.buffer(0, x, 0);
         b.buffer(1, qn, 0);
@@ -1240,6 +1354,22 @@ extern "C" int h3_gpu_gate_adaln_bf16(h3_gpu *g, h3_gpu_tensor *res, h3_gpu_tens
                                       const h3_gpu_tensor *nm, const h3_gpu_tensor *map, uint r,
                                       uint width, uint slots, uint gate, uint sh, uint sc,
                                       float eps) {
+    size_t count = (size_t)r * width;
+    // Same checks as h3_gpu_gate_bf16; if one fails, the unfused calls below
+    // report the error.
+    if (fast_elementwise() && w && nm && y &&
+        h3_gpu_require_bf16(g, x, count, "gate residual") &&
+        h3_gpu_require_bf16(g, branch, count, "gate branch") &&
+        h3_gpu_require_bf16(g, gm, 1, "gate modulation") &&
+        h3_gpu_require_elements(g, map, r, "gate row map") && map->dtype == H3_GPU_U32 &&
+        h3_gpu_require_bf16(g, res, count, "gate output") && gate < slots) {
+        int fast = fast_gate_adaln(g, true, (ushort *)res->data, (const ushort *)x->data,
+                                   (const ushort *)branch->data, (const ushort *)gm->data,
+                                   (const ushort *)w->data, (const ushort *)nm->data,
+                                   (const uint *)map->data, (ushort *)y->data,
+                                   fast_gate_adaln_args{r, width, slots, gate, sh, sc, eps});
+        if (fast >= 0) return fast;
+    }
     return h3_gpu_gate_bf16(g, res, x, branch, gm, map, r, width, slots, gate) &&
            h3_gpu_adaln_bf16(g, y, res, w, nm, map, r, width, slots, sh, sc, eps);
 }

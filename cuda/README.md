@@ -302,6 +302,19 @@ benchmark or evidence of a speedup. The standalone CLI took
 from the pinned Metal code. Explicit BF16 rounding adjustments are recorded in
 the generator. Regenerate with `python3 cuda/translate_primitives.py`.
 
+`cuda/fast_primitives.cuh` is hand-written and is not touched by the
+generator. It holds bit-identical fast versions of the DiT elementwise kernels
+(AdaLN, gate, gate fused into the next AdaLN, SwiGLU, q/k RMS norm + RoPE):
+vector loads and stores, one warp per attention head, and the same per-element
+operations, rounding points and reduction order as the generated kernels. The
+host wrappers in `h3_gpu_cuda.cu` select them when shape and alignment fit and
+otherwise call the generated kernels; `H3_GENERATED_ELEMENTWISE=1` forces the
+generated kernels. The generator skips the `h3_gpu_gate_bf16` and
+`h3_gpu_swiglu_bf16` wrappers for this reason. If the generator changes the
+arithmetic of one of these kernels, change the matching fast kernel too, then
+run `tests/serving/profile/elementwise.sbatch`, which compares every fast
+kernel bit for bit with the generated one.
+
 Optional Metal/int8/token-reduction entry points return explicit errors. They
 are not fallback implementations and are outside this phase's numerical scope.
 

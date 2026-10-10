@@ -1,0 +1,61 @@
+name, clocks.current.sm [MHz], power.draw [W]
+NVIDIA H200, 345 MHz, 77.98 W
+rows 29700 width 5376 ffn 14336 heads 56
+  adaln                        identical (0 of 159667200 differ)
+  adaln                        generated 0.524 ms, fast 0.235 ms (2.23x), fast 2716 GB/s
+  gate (in place)              identical (0 of 159667200 differ)
+  gate                         generated 0.618 ms, fast 0.225 ms (2.74x), fast 4254 GB/s
+  gate_adaln residual          identical (0 of 159667200 differ)
+  gate_adaln output            identical (0 of 159667200 differ)
+  adaln (CHUNKS 16)            identical (0 of 159667200 differ)
+  gate+adaln                   generated 1.142 ms, fast 0.394 ms (2.90x), fast 3245 GB/s
+  swiglu                       identical (0 of 425779200 differ)
+  swiglu                       generated 1.432 ms, fast 0.647 ms (2.21x), fast 3950 GB/s
+  qkv_rope plain q             identical (0 of 212889600 differ)
+  qkv_rope plain k             identical (0 of 212889600 differ)
+  qkv_rope plain v             identical (0 of 212889600 differ)
+  qkv_rope grouped q           identical (0 of 212889600 differ)
+  qkv_rope grouped k           identical (0 of 212889600 differ)
+  qkv_rope grouped v           identical (0 of 212889600 differ)
+  qkv_rope grouped             generated 1.983 ms, fast 1.325 ms (1.50x), fast 1929 GB/s
+rows 7 width 5376 ffn 14336 heads 56
+  adaln                        identical (0 of 37632 differ)
+  gate (in place)              identical (0 of 37632 differ)
+  gate_adaln residual          identical (0 of 37632 differ)
+  gate_adaln output            identical (0 of 37632 differ)
+  adaln (CHUNKS 16)            identical (0 of 37632 differ)
+  swiglu                       identical (0 of 100352 differ)
+  qkv_rope plain q             identical (0 of 50176 differ)
+  qkv_rope plain k             identical (0 of 50176 differ)
+  qkv_rope plain v             identical (0 of 50176 differ)
+  qkv_rope grouped q           identical (0 of 50176 differ)
+  qkv_rope grouped k           identical (0 of 50176 differ)
+  qkv_rope grouped v           identical (0 of 50176 differ)
+rows 1001 width 3072 ffn 8192 heads 24
+  adaln                        identical (0 of 3075072 differ)
+  gate (in place)              identical (0 of 3075072 differ)
+  gate_adaln residual          identical (0 of 3075072 differ)
+  gate_adaln output            identical (0 of 3075072 differ)
+  adaln (CHUNKS 16)            identical (0 of 3075072 differ)
+  swiglu                       identical (0 of 8200192 differ)
+  qkv_rope plain q             identical (0 of 3075072 differ)
+  qkv_rope plain k             identical (0 of 3075072 differ)
+  qkv_rope plain v             identical (0 of 3075072 differ)
+  qkv_rope grouped q           identical (0 of 3075072 differ)
+  qkv_rope grouped k           identical (0 of 3075072 differ)
+  qkv_rope grouped v           identical (0 of 3075072 differ)
+rows 333 width 5384 ffn 1032 heads 5
+  adaln                        identical (0 of 1792872 differ)
+  gate (in place)              identical (0 of 1792872 differ)
+  gate_adaln residual          identical (0 of 1792872 differ)
+  gate_adaln output            identical (0 of 1792872 differ)
+  adaln (CHUNKS 16)            identical (0 of 1792872 differ)
+  swiglu                       identical (0 of 343656 differ)
+  qkv_rope plain q             identical (0 of 213120 differ)
+  qkv_rope plain k             identical (0 of 213120 differ)
+  qkv_rope plain v             identical (0 of 213120 differ)
+  qkv_rope grouped q           identical (0 of 213120 differ)
+  qkv_rope grouped k           identical (0 of 213120 differ)
+  qkv_rope grouped v           identical (0 of 213120 differ)
+ALL IDENTICAL
+build ok

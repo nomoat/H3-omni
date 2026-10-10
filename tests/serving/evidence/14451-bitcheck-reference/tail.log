@@ -1,0 +1,10 @@
+nvcc warning : Support for offline compilation for architectures prior to '<compute/sm/lto>_75' will be removed in a future release (Use -Wno-deprecated-gpu-targets to suppress warning).
+r1-boat 104.81 denoise 13.6
+r2-fox 27.48 denoise 13.5
+r3-boat 27.65 denoise 13.71
+r4-cat 5.82 denoise 2.76
+r5-fox 27.66 denoise 13.62
+r6-city 8.02 denoise 0.54
+r7-fox 34.1 denoise 13.5
+ 99161 MiB
+{"passed": true, "requests": {"r1-boat": true, "r2-fox": true, "r3-boat": true, "r4-cat": true, "r5-fox": true, "r6-city": true, "r7-fox": true}}

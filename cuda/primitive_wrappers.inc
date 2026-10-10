@@ -646,50 +646,6 @@ int h3_gpu_vision_qkv_rope_bf16(
         });
 }
 
-int h3_gpu_gate_bf16(h3_gpu *opaque, h3_gpu_tensor *output,
-                     const h3_gpu_tensor *residual,
-                     const h3_gpu_tensor *branch,
-                     const h3_gpu_tensor *modulation,
-                     const h3_gpu_tensor *row_map, uint32_t rows,
-                     uint32_t width, uint32_t slots, uint32_t gate_slot) {
-    h3_gpu *gpu = opaque;
-    size_t count = (size_t)rows * width;
-    if (!h3_gpu_require_bf16(gpu, residual, count, "gate residual") ||
-        !h3_gpu_require_bf16(gpu, branch, count, "gate branch") ||
-        !h3_gpu_require_bf16(gpu, modulation, 1, "gate modulation") ||
-        !h3_gpu_require_elements(gpu, row_map, rows, "gate row map") ||
-        row_map->dtype != H3_GPU_U32 ||
-        !h3_gpu_require_bf16(gpu, output, count, "gate output") ||
-        gate_slot >= slots) return 0;
-    gate_args args = {rows, width, slots, gate_slot};
-    return h3_gpu_dispatch_2d(gpu, "h3_gate_bf16", width, rows,
-        [&](Binding &encoder) {
-            encoder.buffer(0, residual, 0);
-            encoder.buffer(1, branch, 0);
-            encoder.buffer(2, modulation, 0);
-            encoder.buffer(3, row_map, 0);
-            encoder.buffer(4, output, 0);
-            encoder.arg(5, &args, sizeof(args));
-        });
-}
-
-int h3_gpu_swiglu_bf16(h3_gpu *opaque, h3_gpu_tensor *output,
-                       const h3_gpu_tensor *fused, uint32_t rows,
-                       uint32_t width) {
-    h3_gpu *gpu = opaque;
-    if (!h3_gpu_require_bf16(gpu, fused, (size_t)rows * width * 2,
-                              "SwiGLU input") ||
-        !h3_gpu_require_bf16(gpu, output, (size_t)rows * width,
-                              "SwiGLU output")) return 0;
-    swiglu_args args = {rows, width};
-    return h3_gpu_dispatch_2d(gpu, "h3_swiglu_bf16", width, rows,
-        [&](Binding &encoder) {
-            encoder.buffer(0, fused, 0);
-            encoder.buffer(1, output, 0);
-            encoder.arg(2, &args, sizeof(args));
-        });
-}
-
 int h3_gpu_embedding_bf16(h3_gpu *opaque, h3_gpu_tensor *output,
                           const h3_gpu_tensor *weight,
                           const h3_gpu_tensor *token_ids, uint32_t tokens,

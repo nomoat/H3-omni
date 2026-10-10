@@ -1,0 +1,7 @@
+node gpu-h200x8-1 model /data0/models/h3-cuda/42ed227ee7df40d41602854ae760620d6eb651fe
+name, clocks.max.sm [MHz], power.limit [W], enforced.power.limit [W]
+NVIDIA H200, 1980 MHz, 700.00 W, 700.00 W
+generated p10a request 119.2 s denoise 78.51 s denoise samples 784 SM MHz median 1515.0 power median 691.29 W
+generated p10b request 119.2 s denoise 78.51 s denoise samples 783 SM MHz median 1515.0 power median 691.56 W
+fast      p10a request 116.3 s denoise 75.51 s denoise samples 754 SM MHz median 1485.0 power median 690.93 W
+fast      p10b request 116.1 s denoise 75.46 s denoise samples 754 SM MHz median 1485.0 power median 690.76 W

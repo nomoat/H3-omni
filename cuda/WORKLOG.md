@@ -71,6 +71,11 @@ width 5376 instead of the attention width 56 x 128 = 7168.
 | 7a | #7 in the video VAE | Decoded error against PyTorch about 1e-4 (FP32 path 1e-6); 99.7% of 8-bit pixels identical, the rest differ by 1; +10 GB | Worked | 14435-vae-3xtf32 |
 | 7b | #7 end to end | 5 s 62.2 -> 51.0 s, 10 s 140.9 -> 118.7 s; peak 114 GB | Worked | 14436-duration |
 | 8 | Measure SM clock and power every 100 ms, FA3 and FA2 on one GPU | FA3: median 690 W, SM 1530 MHz, power-cap throttling; FA2: 633 W, 1920 MHz. FA3 still wins (10 s denoise 128 -> 78 s) | Finding: the default mode is power-bound | 14445 log |
+| 9 | Hand-written DiT elementwise kernels (`cuda/fast_primitives.cuh`): 8/16-byte vector loads and stores, AdaLN with one 128-thread block per row and no unused second reduction, the gate fused into the following AdaLN (gated row kept in registers), one warp per (row, head) for q/k RMS + RoPE. Same per-element operations, rounding points and reduction order as the generated kernels | Microbenchmark at 29700 rows, unthrottled clock: AdaLN 0.524 -> 0.236 ms, gate 0.617 -> 0.225 ms, gate + AdaLN 1.142 -> 0.393 ms (fused), SwiGLU 1.432 -> 0.647 ms (3.95 TB/s), qkv_rope 1.983 -> 0.841 ms. All outputs bit-identical on four shapes, including in-place gate and odd tails | Worked | 14450-elementwise |
+| 9a | First qkv_rope version: RoPE partner value re-read with scalar loads, as in the generated kernel | 1.983 -> 1.325 ms only (1.9 TB/s). The partner value bf16(x[pair] * inverse * w[pair]) is the partner lane's own rounded value, so #9 takes it with a warp shuffle (0.841 ms) | Replaced by #9 | 14447-elementwise-v1 |
+| 9b | #9 bit-exactness gates | Reference mode (against 14416) and default mode (against 14438): all 7 requests bit-identical | Passed | 14451-bitcheck-reference, 14452-bitcheck-default |
+| 9c | #9 CUPTI profile, 10 s and short sets | 10 s denoise elementwise kernels 7.21 -> 2.47 s (qkv_rope 2.69 -> 0.94, SwiGLU 1.79 -> 0.78, gate 1.56 + AdaLN 1.17 -> fused 0.75 s); request 119.4 -> 116.8 s. 2.3 s request 20.7 -> 19.9 s, 5 s 50.9 -> 49.3 s. Baselines 14441/14442 ran on another node (attention and GEMM 1-3% slower on this one), so see 9d for the clean comparison | Worked | 14457-profile-10s, 14458-profile-short |
+| 9d | Same-GPU A/B, generated (`H3_GENERATED_ELEMENTWISE=1`) against #9, two warm 10 s requests each, clock sampled in denoise | Request 119.2 -> 116.2 s (-2.5%), denoise 78.51 -> 75.49 s. Denoise SM clock median 1515 -> 1485 MHz at 691 W: the clock did not rise, the faster memory-bound kernels draw the same power cap | Worked (-3.0 s); clock-gain hypothesis not confirmed | 14465-elementwise-ab |
 
 Why 3xTF32 is not as accurate as FP32 here: the Hopper tensor-core FP32
 accumulator is not a full IEEE accumulator; the error grows with K (K=8192
@@ -95,15 +100,16 @@ passes them. Visual check: `/home/homo/model/h3-samples/compare/`, user review
 ## Open items and ideas
 
 - The default mode runs at the 700 W power cap (experiment 8), so all
-  kernels run about 20% below the maximum clock. Changes that cut memory
-  traffic or energy (fusion, vectorized elementwise kernels) may gain more
-  than their kernel time suggests.
+  kernels run about 20% below the maximum clock. Faster elementwise kernels
+  (experiment 9d) did not raise the clock; denoise power stays at the cap.
 
 - FA3 exits the process on a launch error (`CHECK_CUDA` in upstream
   `cuda_check.h`). Inputs are checked before the call; replace with an error
   return before long-running serving.
-- DiT elementwise fusion: about 6.5 s of 132 s at 10 s; can be bit-exact if
-  the operation order is kept.
+- DiT elementwise kernels (done, experiment 9): 2.5 s left at 10 s. More
+  needs fusion into GEMM epilogues (gate into the output projections, SwiGLU
+  into fc1), which changes the GEMM path. qkv_rope runs at about 3 TB/s and
+  gate + AdaLN at about 3.2 TB/s (unthrottled); up to about 0.4 s is left there.
 - Video VAE attention: fused FP32 attention instead of GEMM + softmax + pack
   (about 6 s at 10 s).
 - Remaining GPU idle time in the video VAE; overlap VAE decode with MP4
