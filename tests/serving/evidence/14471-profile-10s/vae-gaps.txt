@@ -1,0 +1,11 @@
+gap        0-        5 us: n= 399732 total=  0.731 s
+gap        5-       20 us: n=    116 total=  0.001 s
+gap       20-      100 us: n=      4 total=  0.000 s
+gap      100-     1000 us: n=      0 total=  0.000 s
+gap     1000-    10000 us: n=      0 total=  0.000 s
+gap    10000-   100000 us: n=      1 total=  0.081 s
+gap   100000-100000000 us: n=      1 total=  0.192 s
+window 32.963189 idle 1.0050242
+   0.000 s  gap    80.56 ms  after None  before ('M', '172032 1')
+   0.081 s  gap     0.05 ms  after ('M', '172032 1')  before ('S', '448')
+  32.771 s  gap   192.29 ms  after ('M', '22081536 2')  before None

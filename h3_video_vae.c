@@ -7,6 +7,9 @@
 
 #include <errno.h>
 #include <math.h>
+#ifdef H3_CUDA
+#include <pthread.h>
+#endif
 #include <stdarg.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -84,6 +87,12 @@ typedef struct {
     h3_gpu_tensor *rope_cos;
     h3_gpu_tensor *rope_sin;
     h3_gpu_tensor *projected;
+    /* CUDA 3xTF32 fusions: TF32 high/low parts of the normalized and SwiGLU
+     * activations (NULL in the FP32 reference mode). */
+    h3_gpu_tensor *norm_parts;
+    h3_gpu_tensor *act_parts;
+    h3_gpu_tensor *zero;           /* resident suffix token */
+    h3_gpu_tensor *projected_next; /* second readback slot of the tile pipeline */
     uint32_t patches;
     uint32_t sequence;
     int latent_h;
@@ -91,6 +100,10 @@ typedef struct {
     int latent_t;
     int output_frames;
 } vae_context;
+
+#ifdef H3_CUDA
+enum { PIPELINE_SLOTS = 2 };
+#endif
 
 struct h3_video_vae_decoder {
     vae_context vae;
@@ -100,6 +113,15 @@ struct h3_video_vae_decoder {
     int latent_w;
     float latent_mean[LATENT_CHANNELS];
     float latent_std[LATENT_CHANNELS];
+#ifdef H3_CUDA
+    /* Tile pipeline: page-locked latent inputs and output patches, and the
+     * events that mark each slot's readback as complete. */
+    float *pinned_latent[PIPELINE_SLOTS];
+    float *pinned_rows[PIPELINE_SLOTS];
+    size_t pinned_latent_count;
+    size_t pinned_rows_count;
+    h3_gpu_event *readback[PIPELINE_SLOTS];
+#endif
 };
 
 static void fail(char *error, size_t error_size, const char *format, ...) {
@@ -164,10 +186,19 @@ static void cleanup(vae_context *vae) {
     free_tensor(&vae->branch); free_tensor(&vae->ff1);
     free_tensor(&vae->activated); free_tensor(&vae->rope_cos);
     free_tensor(&vae->rope_sin); free_tensor(&vae->projected);
+    free_tensor(&vae->norm_parts); free_tensor(&vae->act_parts);
+    free_tensor(&vae->zero); free_tensor(&vae->projected_next);
     h3_gpu_free(vae->gpu);
     h3_weight_store_free(vae->weights);
     memset(vae, 0, sizeof(*vae));
 }
+
+#ifdef H3_CUDA
+static int use_3xtf32(void) {
+    const char *x3 = getenv("H3_VAE_3XTF32");
+    return !x3 || strcmp(x3, "0");
+}
+#endif
 
 static int load_block(vae_context *vae, int index, char *error,
                       size_t error_size) {
@@ -203,8 +234,7 @@ static int load_block(vae_context *vae, int index, char *error,
      * of FP32 SIMT GEMMs: 2.5x faster, decoded relative error about 1e-4
      * against the FP32 reference, and twice the memory for these weights.
      * H3_VAE_3XTF32=0 restores the FP32 path that matches PyTorch. */
-    const char *x3 = getenv("H3_VAE_3XTF32");
-    if (!x3 || strcmp(x3, "0")) {
+    if (use_3xtf32()) {
         h3_gpu_tensor *split[] = {block->qkv_w, block->out_w, block->w1, block->w2};
         for (size_t item = 0; item < sizeof(split) / sizeof(split[0]); item++)
             if (!h3_gpu_tensor_split_tf32(vae->gpu, split[item])) {
@@ -336,15 +366,9 @@ static int load_latent_normalization(const char *weight_directory,
     return ok;
 }
 
-static int prepare_input(vae_context *vae, const float *input,
-                         const float *mean, const float *deviation,
-                         char *error, size_t error_size) {
-    size_t patch_elements = (size_t)vae->patches * LATENT_CHANNELS;
-    float *rows = malloc(patch_elements * sizeof(*rows));
-    if (!rows) {
-        fail(error, error_size, "out of memory padding video latent");
-        return 0;
-    }
+static void fill_input_rows(const vae_context *vae, const float *input,
+                            const float *mean, const float *deviation,
+                            float *rows) {
     size_t row = 0;
     for (int time = 0; time < CHUNK_LATENT_TIME; time++) {
         int source_t = time < vae->latent_t ? time : vae->latent_t - 1;
@@ -359,6 +383,18 @@ static int prepare_input(vae_context *vae, const float *input,
                                   mean[channel];
                 }
     }
+}
+
+static int prepare_input(vae_context *vae, const float *input,
+                         const float *mean, const float *deviation,
+                         char *error, size_t error_size) {
+    size_t patch_elements = (size_t)vae->patches * LATENT_CHANNELS;
+    float *rows = malloc(patch_elements * sizeof(*rows));
+    if (!rows) {
+        fail(error, error_size, "out of memory padding video latent");
+        return 0;
+    }
+    fill_input_rows(vae, input, mean, deviation, rows);
     vae->latent = h3_gpu_tensor_from_f32(vae->gpu, rows, patch_elements);
     free(rows);
     return vae->latent != NULL;
@@ -436,6 +472,17 @@ static int allocate_activations(vae_context *vae, char *error,
                  h3_gpu_error(vae->gpu));
             return 0;
         }
+#ifdef H3_CUDA
+    if (use_3xtf32()) {
+        vae->norm_parts = h3_gpu_tensor_new_f32(vae->gpu, 2 * sequence * HIDDEN);
+        vae->act_parts = h3_gpu_tensor_new_f32(vae->gpu, 2 * sequence * FFN);
+        if (!vae->norm_parts || !vae->act_parts) {
+            fail(error, error_size, "cannot allocate video VAE TF32 parts: %s",
+                 h3_gpu_error(vae->gpu));
+            return 0;
+        }
+    }
+#endif
     return 1;
 }
 
@@ -446,6 +493,43 @@ static int run_block(vae_context *vae, int index, char *error,
 #define OP(call, label) do {                                                    \
     if (!gpu_op(vae, (call), error, error_size, label)) return 0;               \
 } while (0)
+#ifdef H3_CUDA
+    /* 3xTF32: the norms and SwiGLU write TF32 parts for the next product, and
+     * each bias is added where its product is consumed. Same values as the
+     * unfused path below with split weights. */
+    if (vae->norm_parts && vae->act_parts &&
+        h3_gpu_tensor_is_split_tf32(weight->qkv_w) &&
+        h3_gpu_tensor_is_split_tf32(weight->w1) &&
+        h3_gpu_tensor_is_split_tf32(weight->w2)) {
+        OP(h3_gpu_rms_norm_split_tf32(vae->gpu, vae->norm_parts, vae->hidden,
+            weight->norm1, rows, HIDDEN, 1e-5f), "video VAE attention norm");
+        OP(h3_gpu_linear_split_input_f32(vae->gpu, vae->qkv, vae->norm_parts,
+            weight->qkv_w, rows, HIDDEN, INNER * 3), "video VAE QKV");
+        OP(h3_gpu_video_qkv_rope_bias_f32(vae->gpu, vae->query, vae->key,
+            vae->value, vae->qkv, weight->qkv_b, vae->rope_cos, vae->rope_sin,
+            rows, HEADS, HEAD_DIM, ROPE_HALF, 1e-5f), "video VAE QK norm/RoPE");
+        OP(h3_gpu_sdpa_f32(vae->gpu, vae->heads, vae->query, vae->key,
+            vae->value, rows, HEADS, HEAD_DIM, 1.0f / sqrtf((float)HEAD_DIM)),
+           "video VAE attention");
+        OP(h3_gpu_linear_f32(vae->gpu, vae->branch, vae->heads, weight->out_w,
+            NULL, rows, INNER, HIDDEN), "video VAE attention output");
+        OP(h3_gpu_scale_add_bias_f32(vae->gpu, vae->hidden, vae->hidden,
+            vae->branch, weight->out_b, weight->scale1, rows, HIDDEN),
+           "video VAE attention residual");
+        OP(h3_gpu_rms_norm_split_tf32(vae->gpu, vae->norm_parts, vae->hidden,
+            weight->norm2, rows, HIDDEN, 1e-5f), "video VAE MLP norm");
+        OP(h3_gpu_linear_split_input_f32(vae->gpu, vae->ff1, vae->norm_parts,
+            weight->w1, rows, HIDDEN, FFN * 2), "video VAE MLP input");
+        OP(h3_gpu_swiglu_bias_split_tf32(vae->gpu, vae->act_parts, vae->ff1,
+            weight->w1_b, rows, FFN), "video VAE SwiGLU");
+        OP(h3_gpu_linear_split_input_f32(vae->gpu, vae->branch, vae->act_parts,
+            weight->w2, rows, FFN, HIDDEN), "video VAE MLP output");
+        OP(h3_gpu_scale_add_bias_f32(vae->gpu, vae->hidden, vae->hidden,
+            vae->branch, weight->w2_b, weight->scale2, rows, HIDDEN),
+           "video VAE MLP residual");
+        return 1;
+    }
+#endif
     OP(h3_gpu_rms_norm_f32(vae->gpu, vae->norm, vae->hidden, weight->norm1,
         rows, HIDDEN, 1e-5f), "video VAE attention norm");
     OP(h3_gpu_linear_f32(vae->gpu, vae->qkv, vae->norm, weight->qkv_w,
@@ -549,18 +633,23 @@ static int load_resident_weights(vae_context *vae,
 /* Tiled decoding keeps every VAE weight resident for the duration of the phase.
  * This uses about 9 GiB after the DiT has been retired, avoids rereading 9 GiB
  * per spatial tile, and permits one command-buffer chain per tile. */
-static int run_resident_tile(vae_context *vae, char *error,
+static int run_resident_tile(vae_context *vae, h3_gpu_tensor *projected,
+                             int synchronous, char *error,
                              size_t error_size) {
-    float zeros[HIDDEN];
-    memset(zeros, 0, sizeof(zeros));
-    h3_gpu_tensor *zero = h3_gpu_tensor_from_f32(vae->gpu, zeros, HIDDEN);
+    h3_gpu_tensor *zero = vae->zero;
+    if (!zero) {
+        float zeros[HIDDEN];
+        memset(zeros, 0, sizeof(zeros));
+        zero = h3_gpu_tensor_from_f32(vae->gpu, zeros, HIDDEN);
+    }
     if (!zero) {
         fail(error, error_size, "cannot allocate video VAE suffix token");
         return 0;
     }
+#define RELEASE_ZERO() do { if (zero != vae->zero) h3_gpu_tensor_free(zero); } while (0)
 #define OP(call, label) do {                                                    \
     if (!gpu_op(vae, (call), error, error_size, label)) {                       \
-        h3_gpu_tensor_free(zero); return 0;                                    \
+        RELEASE_ZERO(); return 0;                                               \
     }                                                                           \
 } while (0)
     OP(h3_gpu_begin(vae->gpu), "begin tiled video VAE decoder");
@@ -580,44 +669,41 @@ static int run_resident_tile(vae_context *vae, char *error,
        "pack tiled video VAE suffix");
     for (int index = 0; index < LAYERS; index++)
         if (!run_block(vae, index, error, error_size)) {
-            h3_gpu_tensor_free(zero);
+            RELEASE_ZERO();
             return 0;
         }
     OP(h3_gpu_layer_norm_f32(vae->gpu, vae->norm, vae->hidden,
         vae->norm_out_w, vae->norm_out_b, vae->sequence, HIDDEN, 1e-5f),
        "tiled video VAE output LayerNorm");
-    OP(h3_gpu_linear_f32(vae->gpu, vae->projected, vae->norm, vae->proj_w,
+    OP(h3_gpu_linear_f32(vae->gpu, projected, vae->norm, vae->proj_w,
         vae->proj_b, vae->sequence, HIDDEN, OUTPUT_PATCH),
        "tiled video VAE output projection");
-    OP(h3_gpu_submit(vae->gpu), "submit tiled video VAE decoder");
-    h3_gpu_tensor_free(zero);
+    if (synchronous)
+        OP(h3_gpu_submit(vae->gpu), "submit tiled video VAE decoder");
+    RELEASE_ZERO();
 #undef OP
+#undef RELEASE_ZERO
     return 1;
 }
 
-static int unpack_frame_range(vae_context *vae, int first_frame,
-                              int frame_count, h3_video_frames *output,
-                              char *error, size_t error_size) {
+/* Rearrange output patches (sequence x OUTPUT_PATCH) into RGB frames.
+ * Touches no GPU state, so the CUDA tile pipeline runs it on a host thread. */
+static int unpack_rows(const vae_context *vae, const float *rows,
+                       int first_frame, int frame_count,
+                       h3_video_frames *output, char *error,
+                       size_t error_size) {
     if (first_frame < 0 || frame_count < 1 ||
         first_frame > vae->output_frames - frame_count) {
         fail(error, error_size, "invalid video VAE output frame range");
         return 0;
     }
-    size_t projected_count = (size_t)vae->sequence * OUTPUT_PATCH;
-    float *rows = malloc(projected_count * sizeof(*rows));
     int pixel_h = vae->latent_h * 16;
     int pixel_w = vae->latent_w * 16;
     size_t rgb_count = (size_t)frame_count * (size_t)pixel_h *
                        (size_t)pixel_w * 3;
     float *rgb = malloc(rgb_count * sizeof(*rgb));
-    if (!rows || !rgb) {
-        free(rows); free(rgb);
+    if (!rgb) {
         fail(error, error_size, "out of memory unpacking video VAE frames");
-        return 0;
-    }
-    if (!h3_gpu_tensor_read_f32(vae->projected, rows, projected_count)) {
-        free(rows); free(rgb);
-        fail(error, error_size, "cannot read video VAE output patches");
         return 0;
     }
 #ifndef H3_CUDA
@@ -659,12 +745,31 @@ static int unpack_frame_range(vae_context *vae, int first_frame,
             }
         }
     }
-    free(rows);
     output->frames = frame_count;
     output->height = pixel_h;
     output->width = pixel_w;
     output->rgb = rgb;
-    return h3_gpu_get_stats(vae->gpu, &output->gpu_stats);
+    return 1;
+}
+
+static int unpack_frame_range(vae_context *vae, int first_frame,
+                              int frame_count, h3_video_frames *output,
+                              char *error, size_t error_size) {
+    size_t projected_count = (size_t)vae->sequence * OUTPUT_PATCH;
+    float *rows = malloc(projected_count * sizeof(*rows));
+    if (!rows) {
+        fail(error, error_size, "out of memory unpacking video VAE frames");
+        return 0;
+    }
+    if (!h3_gpu_tensor_read_f32(vae->projected, rows, projected_count)) {
+        free(rows);
+        fail(error, error_size, "cannot read video VAE output patches");
+        return 0;
+    }
+    int ok = unpack_rows(vae, rows, first_frame, frame_count, output,
+                         error, error_size);
+    free(rows);
+    return ok && h3_gpu_get_stats(vae->gpu, &output->gpu_stats);
 }
 
 static int unpack_frames(vae_context *vae, h3_video_frames *output,
@@ -674,18 +779,33 @@ static int unpack_frames(vae_context *vae, h3_video_frames *output,
 }
 
 #ifdef H3_CUDA
-static void finalize_video_pixels(h3_video_frames *output) {
+/* rgb holds whole pixels (count is a multiple of 3). */
+static void finalize_pixel_range(float *rgb, size_t count) {
     /* The reference blends raw decoder values before pixel normalization
      * and clipping. Clipping individual tiles changes overlap pixels. */
     static const float mean[] = {0.485f, 0.456f, 0.406f};
     static const float deviation[] = {0.229f, 0.224f, 0.225f};
-    size_t count = (size_t)output->frames * output->height * output->width * 3;
     for (size_t index = 0; index < count; ++index) {
-        float value = output->rgb[index] * deviation[index % 3] + mean[index % 3];
+        float value = rgb[index] * deviation[index % 3] + mean[index % 3];
         if (value < 0.0f) value = 0.0f;
         if (value > 1.0f) value = 1.0f;
-        output->rgb[index] = value;
+        rgb[index] = value;
     }
+}
+
+/* Same conversion as h3.c's RGB24 output. */
+static void pixels_to_rgb8(const float *rgb, uint8_t *output, size_t count) {
+    for (size_t index = 0; index < count; index++) {
+        float scaled = rgb[index] * 255.0f;
+        if (scaled < 0.0f) scaled = 0.0f;
+        if (scaled > 255.0f) scaled = 255.0f;
+        output[index] = (uint8_t)lrintf(scaled);
+    }
+}
+
+static void finalize_video_pixels(h3_video_frames *output) {
+    finalize_pixel_range(output->rgb,
+        (size_t)output->frames * output->height * output->width * 3);
 }
 #endif
 
@@ -807,6 +927,64 @@ static float *extract_latent_tile(const float *latent, int full_t,
     return tile;
 }
 
+/* Write the region of tile `index` that it owns, blended with the tiles
+ * above and to the left. It reads only those three tiles, so tiles can be
+ * stitched in row-major order as they arrive. */
+static void stitch_tile(float *const *tiles, const tile_axis *y_axis,
+                        const tile_axis *x_axis, int frame_count, int index,
+                        float *rgb) {
+    int full_h = y_axis->starts[y_axis->count - 1] + y_axis->length;
+    int full_w = x_axis->starts[x_axis->count - 1] + x_axis->length;
+    int tile_y = index / x_axis->count;
+    int tile_x = index % x_axis->count;
+    const float *current = tiles[index];
+    const float *above = tile_y ? tiles[index - x_axis->count] : NULL;
+    const float *left = tile_x ? tiles[index - 1] : NULL;
+    int overlap_y = tile_y ? y_axis->overlaps[tile_y - 1] : 0;
+    int overlap_x = tile_x ? x_axis->overlaps[tile_x - 1] : 0;
+    int keep_h = y_axis->length -
+        (tile_y + 1 < y_axis->count ? y_axis->overlaps[tile_y] : 0);
+    int keep_w = x_axis->length -
+        (tile_x + 1 < x_axis->count ? x_axis->overlaps[tile_x] : 0);
+    for (int frame = 0; frame < frame_count; frame++)
+        for (int y = 0; y < keep_h; y++)
+            for (int x = 0; x < keep_w; x++)
+                for (int channel = 0; channel < 3; channel++) {
+                    size_t local = (((size_t)frame *
+                        (size_t)y_axis->length + (size_t)y) *
+                        (size_t)x_axis->length + (size_t)x) * 3 +
+                        (size_t)channel;
+                    float value = current[local];
+                    if (above && y < overlap_y) {
+                        size_t top = (((size_t)frame *
+                            (size_t)y_axis->length +
+                            (size_t)(y_axis->length - overlap_y + y)) *
+                            (size_t)x_axis->length + (size_t)x) * 3 +
+                            (size_t)channel;
+                        float alpha = (float)y / (float)overlap_y;
+                        value = above[top] * (1.0f - alpha) +
+                                value * alpha;
+                    }
+                    if (left && x < overlap_x) {
+                        size_t prior = (((size_t)frame *
+                            (size_t)y_axis->length + (size_t)y) *
+                            (size_t)x_axis->length +
+                            (size_t)(x_axis->length - overlap_x + x)) *
+                            3 + (size_t)channel;
+                        float alpha = (float)x / (float)overlap_x;
+                        value = left[prior] * (1.0f - alpha) +
+                                value * alpha;
+                    }
+                    size_t destination = (((size_t)frame *
+                        (size_t)full_h +
+                        (size_t)(y_axis->starts[tile_y] + y)) *
+                        (size_t)full_w +
+                        (size_t)(x_axis->starts[tile_x] + x)) * 3 +
+                        (size_t)channel;
+                    rgb[destination] = value;
+                }
+}
+
 static int stitch_tiles(float **tiles, const tile_axis *y_axis,
                         const tile_axis *x_axis, int frame_count,
                         h3_video_frames *output,
@@ -820,56 +998,8 @@ static int stitch_tiles(float **tiles, const tile_axis *y_axis,
         fail(error, error_size, "out of memory stitching video VAE tiles");
         return 0;
     }
-    for (int tile_y = 0; tile_y < y_axis->count; tile_y++)
-        for (int tile_x = 0; tile_x < x_axis->count; tile_x++) {
-            int index = tile_y * x_axis->count + tile_x;
-            const float *current = tiles[index];
-            const float *above = tile_y ? tiles[index - x_axis->count] : NULL;
-            const float *left = tile_x ? tiles[index - 1] : NULL;
-            int overlap_y = tile_y ? y_axis->overlaps[tile_y - 1] : 0;
-            int overlap_x = tile_x ? x_axis->overlaps[tile_x - 1] : 0;
-            int keep_h = y_axis->length -
-                (tile_y + 1 < y_axis->count ? y_axis->overlaps[tile_y] : 0);
-            int keep_w = x_axis->length -
-                (tile_x + 1 < x_axis->count ? x_axis->overlaps[tile_x] : 0);
-            for (int frame = 0; frame < frame_count; frame++)
-                for (int y = 0; y < keep_h; y++)
-                    for (int x = 0; x < keep_w; x++)
-                        for (int channel = 0; channel < 3; channel++) {
-                            size_t local = (((size_t)frame *
-                                (size_t)y_axis->length + (size_t)y) *
-                                (size_t)x_axis->length + (size_t)x) * 3 +
-                                (size_t)channel;
-                            float value = current[local];
-                            if (above && y < overlap_y) {
-                                size_t top = (((size_t)frame *
-                                    (size_t)y_axis->length +
-                                    (size_t)(y_axis->length - overlap_y + y)) *
-                                    (size_t)x_axis->length + (size_t)x) * 3 +
-                                    (size_t)channel;
-                                float alpha = (float)y / (float)overlap_y;
-                                value = above[top] * (1.0f - alpha) +
-                                        value * alpha;
-                            }
-                            if (left && x < overlap_x) {
-                                size_t prior = (((size_t)frame *
-                                    (size_t)y_axis->length + (size_t)y) *
-                                    (size_t)x_axis->length +
-                                    (size_t)(x_axis->length - overlap_x + x)) *
-                                    3 + (size_t)channel;
-                                float alpha = (float)x / (float)overlap_x;
-                                value = left[prior] * (1.0f - alpha) +
-                                        value * alpha;
-                            }
-                            size_t destination = (((size_t)frame *
-                                (size_t)full_h +
-                                (size_t)(y_axis->starts[tile_y] + y)) *
-                                (size_t)full_w +
-                                (size_t)(x_axis->starts[tile_x] + x)) * 3 +
-                                (size_t)channel;
-                            rgb[destination] = value;
-                        }
-        }
+    for (int index = 0; index < y_axis->count * x_axis->count; index++)
+        stitch_tile(tiles, y_axis, x_axis, frame_count, index, rgb);
     output->frames = frame_count;
     output->height = full_h;
     output->width = full_w;
@@ -877,6 +1007,342 @@ static int stitch_tiles(float **tiles, const tile_axis *y_axis,
     return 1;
 }
 
+#ifdef H3_CUDA
+/* Tile pipeline. The main thread queues tile k+1 on the GPU while a host
+ * thread rearranges, stitches, blends and finalizes tile k. Each tile's
+ * output patches go to a page-locked buffer through an asynchronous copy on a
+ * separate stream. Two slots alternate; a slot is reused only after the host
+ * thread has released the tile that used it. The GPU and host operations are
+ * the same as in the serial path, in the same order per value, so the output
+ * is bit-identical. */
+typedef struct vae_pipeline vae_pipeline;
+typedef int (*vae_chunk_sink)(vae_pipeline *pipeline, int chunk,
+                              h3_video_frames *stitched, char *error,
+                              size_t error_size);
+
+struct vae_pipeline {
+    h3_video_vae_decoder *decoder;
+    const float *latent;
+    int latent_time;
+    int first_chunk;
+    int chunk_count;
+    int selected_frame;  /* -1: all FIRST_CHUNK_FRAMES frames per tile */
+    int frame_count;
+    int tile_count;
+    int items;
+    vae_chunk_sink sink;  /* runs on the host thread; owns `stitched` */
+    void *sink_state;
+    float **tiles;
+    h3_video_frames stitched;  /* chunk being stitched (host thread) */
+    pthread_mutex_t lock;
+    pthread_cond_t changed;
+    int posted;    /* tiles queued on the GPU */
+    int released;  /* tiles whose slot the host thread has finished reading */
+    int stop;
+    int failed;
+    char error[512];
+};
+
+static void pipeline_set(vae_pipeline *pipeline, int *field, int value,
+                         const char *error) {
+    pthread_mutex_lock(&pipeline->lock);
+    *field = value;
+    if (error && !pipeline->failed) {
+        pipeline->failed = 1;
+        snprintf(pipeline->error, sizeof(pipeline->error), "%s", error);
+    }
+    pthread_cond_broadcast(&pipeline->changed);
+    pthread_mutex_unlock(&pipeline->lock);
+}
+
+static void *pipeline_worker(void *opaque) {
+    vae_pipeline *pipeline = opaque;
+    h3_video_vae_decoder *decoder = pipeline->decoder;
+    char error[512] = "";
+    for (int item = 0; item < pipeline->items; item++) {
+        pthread_mutex_lock(&pipeline->lock);
+        while (pipeline->posted <= item && !pipeline->stop)
+            pthread_cond_wait(&pipeline->changed, &pipeline->lock);
+        int queued = pipeline->posted > item;
+        pthread_mutex_unlock(&pipeline->lock);
+        if (!queued) break;
+        int slot = item % PIPELINE_SLOTS;
+        h3_video_frames tile;
+        memset(&tile, 0, sizeof(tile));
+        int ok = h3_gpu_event_wait(decoder->readback[slot], error, sizeof(error)) &&
+            unpack_rows(&decoder->vae, decoder->pinned_rows[slot],
+                        pipeline->selected_frame >= 0 ? pipeline->selected_frame : 0,
+                        pipeline->frame_count, &tile, error, sizeof(error));
+        pipeline_set(pipeline, &pipeline->released, item + 1, ok ? NULL : error);
+        if (!ok) break;
+        int index = item % pipeline->tile_count;
+        pipeline->tiles[index] = tile.rgb;
+        const tile_axis *y_axis = &decoder->y_axis, *x_axis = &decoder->x_axis;
+        int full_h = y_axis->starts[y_axis->count - 1] + y_axis->length;
+        int full_w = x_axis->starts[x_axis->count - 1] + x_axis->length;
+        if (!index) {
+            memset(&pipeline->stitched, 0, sizeof(pipeline->stitched));
+            pipeline->stitched.rgb = malloc((size_t)pipeline->frame_count *
+                (size_t)full_h * (size_t)full_w * 3 * sizeof(float));
+            if (!pipeline->stitched.rgb) {
+                pipeline_set(pipeline, &pipeline->stop, 1,
+                             "out of memory stitching video VAE tiles");
+                break;
+            }
+        }
+        /* Stitch each tile as it arrives, so only the last tile's region
+         * is left when the GPU finishes the chunk. */
+        stitch_tile(pipeline->tiles, y_axis, x_axis, pipeline->frame_count,
+                    index, pipeline->stitched.rgb);
+        if (index + 1 < pipeline->tile_count) continue;
+        h3_video_frames stitched = pipeline->stitched;
+        memset(&pipeline->stitched, 0, sizeof(pipeline->stitched));
+        stitched.frames = pipeline->frame_count;
+        stitched.height = full_h;
+        stitched.width = full_w;
+        for (int tile_index = 0; tile_index < pipeline->tile_count; tile_index++) {
+            free(pipeline->tiles[tile_index]);
+            pipeline->tiles[tile_index] = NULL;
+        }
+        ok = pipeline->sink(pipeline,
+                            pipeline->first_chunk + item / pipeline->tile_count,
+                            &stitched, error, sizeof(error));
+        if (!ok) {
+            pipeline_set(pipeline, &pipeline->stop, 1, error);
+            break;
+        }
+    }
+    return NULL;
+}
+
+/* Resident buffers for the pipeline; reallocated only when the tile geometry
+ * changes. */
+static int pipeline_prepare(h3_video_vae_decoder *decoder, char *error,
+                            size_t error_size) {
+    vae_context *vae = &decoder->vae;
+    size_t latent_count = (size_t)vae->patches * LATENT_CHANNELS;
+    size_t rows_count = (size_t)vae->sequence * OUTPUT_PATCH;
+    if (decoder->pinned_latent_count != latent_count ||
+        decoder->pinned_rows_count != rows_count) {
+        for (int slot = 0; slot < PIPELINE_SLOTS; slot++) {
+            h3_gpu_host_free(decoder->pinned_latent[slot]);
+            h3_gpu_host_free(decoder->pinned_rows[slot]);
+            decoder->pinned_latent[slot] = NULL;
+            decoder->pinned_rows[slot] = NULL;
+        }
+        decoder->pinned_latent_count = decoder->pinned_rows_count = 0;
+        for (int slot = 0; slot < PIPELINE_SLOTS; slot++) {
+            decoder->pinned_latent[slot] =
+                h3_gpu_host_alloc(latent_count * sizeof(float));
+            decoder->pinned_rows[slot] =
+                h3_gpu_host_alloc(rows_count * sizeof(float));
+            if (!decoder->pinned_latent[slot] || !decoder->pinned_rows[slot]) {
+                fail(error, error_size, "cannot allocate page-locked video VAE buffers");
+                return 0;
+            }
+        }
+        decoder->pinned_latent_count = latent_count;
+        decoder->pinned_rows_count = rows_count;
+    }
+    for (int slot = 0; slot < PIPELINE_SLOTS; slot++)
+        if (!decoder->readback[slot] &&
+            !(decoder->readback[slot] = h3_gpu_event_new(vae->gpu))) {
+            fail(error, error_size, "cannot create video VAE readback event: %s",
+                 h3_gpu_error(vae->gpu));
+            return 0;
+        }
+    if (vae->latent && h3_gpu_tensor_elements(vae->latent) != latent_count)
+        free_tensor(&vae->latent);
+    if (!vae->latent) vae->latent = h3_gpu_tensor_new_f32(vae->gpu, latent_count);
+    if (!vae->projected_next)
+        vae->projected_next = h3_gpu_tensor_new_f32(vae->gpu, rows_count);
+    if (!vae->zero) {
+        float zeros[HIDDEN];
+        memset(zeros, 0, sizeof(zeros));
+        vae->zero = h3_gpu_tensor_from_f32(vae->gpu, zeros, HIDDEN);
+    }
+    if (!vae->latent || !vae->projected_next || !vae->zero) {
+        fail(error, error_size, "cannot allocate video VAE pipeline tensors: %s",
+             h3_gpu_error(vae->gpu));
+        return 0;
+    }
+    return 1;
+}
+
+static int pipeline_run(vae_pipeline *pipeline, char *error, size_t error_size) {
+    h3_video_vae_decoder *decoder = pipeline->decoder;
+    vae_context *vae = &decoder->vae;
+    pipeline->tile_count = decoder->y_axis.count * decoder->x_axis.count;
+    pipeline->items = pipeline->chunk_count * pipeline->tile_count;
+    if (!pipeline_prepare(decoder, error, error_size)) return 0;
+    pipeline->tiles = calloc((size_t)pipeline->tile_count, sizeof(*pipeline->tiles));
+    if (!pipeline->tiles) {
+        fail(error, error_size, "out of memory retaining video VAE tiles");
+        return 0;
+    }
+    pthread_mutex_init(&pipeline->lock, NULL);
+    pthread_cond_init(&pipeline->changed, NULL);
+    pthread_t worker;
+    if (pthread_create(&worker, NULL, pipeline_worker, pipeline)) {
+        pthread_cond_destroy(&pipeline->changed);
+        pthread_mutex_destroy(&pipeline->lock);
+        free(pipeline->tiles);
+        fail(error, error_size, "cannot start video VAE host thread");
+        return 0;
+    }
+    h3_gpu_tensor *outputs[PIPELINE_SLOTS] = {vae->projected, vae->projected_next};
+    size_t latent_count = decoder->pinned_latent_count;
+    size_t rows_count = decoder->pinned_rows_count;
+    int ok = gpu_op(vae, h3_gpu_begin(vae->gpu), error, error_size,
+                    "begin pipelined video VAE decoder");
+    for (int item = 0; item < pipeline->items && ok; item++) {
+        int slot = item % PIPELINE_SLOTS;
+        pthread_mutex_lock(&pipeline->lock);
+        while (pipeline->released < item - PIPELINE_SLOTS + 1 && !pipeline->failed)
+            pthread_cond_wait(&pipeline->changed, &pipeline->lock);
+        int failed = pipeline->failed;
+        pthread_mutex_unlock(&pipeline->lock);
+        if (failed) { ok = 0; break; }
+        int chunk = pipeline->first_chunk + item / pipeline->tile_count;
+        int tile = item % pipeline->tile_count;
+        int tile_y = tile / decoder->x_axis.count;
+        int tile_x = tile % decoder->x_axis.count;
+        float *input = extract_latent_tile(
+            pipeline->latent, pipeline->latent_time, decoder->latent_h,
+            decoder->latent_w, chunk * 5,
+            decoder->y_axis.starts[tile_y] / SPATIAL_RATIO,
+            decoder->x_axis.starts[tile_x] / SPATIAL_RATIO,
+            CHUNK_LATENT_TIME, vae->latent_h, vae->latent_w, error, error_size);
+        if (!input) { ok = 0; break; }
+        fill_input_rows(vae, input, decoder->latent_mean, decoder->latent_std,
+                        decoder->pinned_latent[slot]);
+        free(input);
+        ok = gpu_op(vae, h3_gpu_tensor_upload_f32_async(vae->gpu, vae->latent,
+                        decoder->pinned_latent[slot], latent_count),
+                    error, error_size, "upload video VAE tile latent") &&
+            /* The readback of this slot's previous tile must finish before the
+             * output projection overwrites the slot. */
+            (item < PIPELINE_SLOTS ||
+             gpu_op(vae, h3_gpu_stream_wait_event(vae->gpu, decoder->readback[slot]),
+                    error, error_size, "order video VAE readback")) &&
+            run_resident_tile(vae, outputs[slot], 0, error, error_size) &&
+            gpu_op(vae, h3_gpu_tensor_download_f32_async(vae->gpu, outputs[slot],
+                        decoder->pinned_rows[slot], rows_count,
+                        decoder->readback[slot]),
+                   error, error_size, "read video VAE output patches");
+        if (ok) pipeline_set(pipeline, &pipeline->posted, item + 1, NULL);
+    }
+    /* Wait for the compute stream (and close the timing interval) even after
+     * a failure, so no queued copy still targets the page-locked buffers. */
+    int submitted = h3_gpu_submit(vae->gpu);
+    if (ok && !submitted)
+        ok = gpu_op(vae, 0, error, error_size, "submit pipelined video VAE decoder");
+    if (!ok) pipeline_set(pipeline, &pipeline->stop, 1, NULL);
+    pthread_join(worker, NULL);
+    for (int slot = 0; slot < PIPELINE_SLOTS; slot++)
+        h3_gpu_event_wait(decoder->readback[slot], NULL, 0);
+    if (ok && pipeline->failed) {
+        fail(error, error_size, "%s", pipeline->error);
+        ok = 0;
+    }
+    for (int index = 0; index < pipeline->tile_count; index++)
+        free(pipeline->tiles[index]);
+    free(pipeline->tiles);
+    h3_video_frames_free(&pipeline->stitched);
+    pthread_cond_destroy(&pipeline->changed);
+    pthread_mutex_destroy(&pipeline->lock);
+    return ok;
+}
+
+static int single_chunk_sink(vae_pipeline *pipeline, int chunk,
+                             h3_video_frames *stitched, char *error,
+                             size_t error_size) {
+    (void)chunk; (void)error; (void)error_size;
+    *(h3_video_frames *)pipeline->sink_state = *stitched;
+    return 1;
+}
+
+static int decoder_decode_chunk(h3_video_vae_decoder *decoder,
+                                const float *normalized_latent,
+                                int latent_time, int chunk,
+                                int selected_frame,
+                                h3_video_frames *output,
+                                char *error, size_t error_size) {
+    if (output) memset(output, 0, sizeof(*output));
+    if (!decoder || !normalized_latent || !output || latent_time < 7 ||
+        chunk < 0 || chunk > (latent_time - CHUNK_LATENT_TIME) / 5 ||
+        selected_frame < -1 || selected_frame >= FIRST_CHUNK_FRAMES) {
+        fail(error, error_size, "invalid resident video VAE chunk arguments");
+        return 0;
+    }
+    vae_pipeline pipeline;
+    memset(&pipeline, 0, sizeof(pipeline));
+    pipeline.decoder = decoder;
+    pipeline.latent = normalized_latent;
+    pipeline.latent_time = latent_time;
+    pipeline.first_chunk = chunk;
+    pipeline.chunk_count = 1;
+    pipeline.selected_frame = selected_frame;
+    pipeline.frame_count = selected_frame >= 0 ? 1 : FIRST_CHUNK_FRAMES;
+    pipeline.sink = single_chunk_sink;
+    pipeline.sink_state = output;
+    int ok = pipeline_run(&pipeline, error, error_size);
+    if (!ok) h3_video_frames_free(output);
+    return ok;
+}
+
+/* Temporal blending of consecutive chunks, as in the serial decoder. Frames
+ * that are final are normalized and clipped here, on the host thread. */
+typedef struct {
+    float *final_rgb;
+    float *temporal_overlap;
+    size_t frame_elements;
+    int chunks;
+    uint8_t *rgb8;  /* optional RGB24 copy of the final frames */
+    h3_video_frames_ready ready;
+    void *ready_opaque;
+} video_sink_state;
+
+static void emit_final_frames(video_sink_state *state, int first_frame,
+                              int frame_count) {
+    if (!state->rgb8) return;
+    size_t offset = (size_t)first_frame * state->frame_elements;
+    pixels_to_rgb8(state->final_rgb + offset, state->rgb8 + offset,
+                   (size_t)frame_count * state->frame_elements);
+    if (state->ready)
+        state->ready(state->ready_opaque, state->rgb8 + offset, first_frame,
+                     frame_count);
+}
+
+static int video_chunk_sink(vae_pipeline *pipeline, int chunk,
+                            h3_video_frames *decoded, char *error,
+                            size_t error_size) {
+    (void)error; (void)error_size;
+    video_sink_state *state = pipeline->sink_state;
+    size_t frame_elements = state->frame_elements;
+    if (chunk) for (int frame = 0; frame < 5; frame++) {
+        float alpha = (float)frame / 5.0f;
+        size_t base = (size_t)frame * frame_elements;
+        for (size_t index = 0; index < frame_elements; index++)
+            decoded->rgb[base + index] = state->temporal_overlap[base + index] *
+                (1.0f - alpha) + decoded->rgb[base + index] * alpha;
+    }
+    float *final_frames = state->final_rgb + (size_t)chunk * 17 * frame_elements;
+    memcpy(final_frames, decoded->rgb, 17 * frame_elements * sizeof(float));
+    finalize_pixel_range(final_frames, 17 * frame_elements);
+    memcpy(state->temporal_overlap, decoded->rgb + 17 * frame_elements,
+           5 * frame_elements * sizeof(float));
+    h3_video_frames_free(decoded);
+    emit_final_frames(state, chunk * 17, 17);
+    if (chunk + 1 == state->chunks) {
+        float *tail = state->final_rgb + (size_t)state->chunks * 17 * frame_elements;
+        memcpy(tail, state->temporal_overlap, 5 * frame_elements * sizeof(float));
+        finalize_pixel_range(tail, 5 * frame_elements);
+        emit_final_frames(state, state->chunks * 17, 5);
+    }
+    return 1;
+}
+#else
 static int decoder_decode_chunk(h3_video_vae_decoder *decoder,
                                 const float *normalized_latent,
                                 int latent_time, int chunk,
@@ -915,7 +1381,8 @@ static int decoder_decode_chunk(h3_video_vae_decoder *decoder,
             ok = prepare_input(&decoder->vae, input,
                                decoder->latent_mean, decoder->latent_std,
                                error, error_size) &&
-                 run_resident_tile(&decoder->vae, error, error_size);
+                 run_resident_tile(&decoder->vae, decoder->vae.projected, 1,
+                                   error, error_size);
             free(input);
             if (!ok) break;
             h3_video_frames tile;
@@ -936,6 +1403,7 @@ static int decoder_decode_chunk(h3_video_vae_decoder *decoder,
     if (!ok) h3_video_frames_free(output);
     return ok;
 }
+#endif
 
 h3_video_vae_decoder *h3_video_vae_decoder_load(
                         const char *weight_directory,
@@ -1007,6 +1475,8 @@ static void free_tile_activations(vae_context *vae) {
     free_tensor(&vae->branch); free_tensor(&vae->ff1);
     free_tensor(&vae->activated); free_tensor(&vae->rope_cos);
     free_tensor(&vae->rope_sin); free_tensor(&vae->projected);
+    free_tensor(&vae->norm_parts); free_tensor(&vae->act_parts);
+    free_tensor(&vae->projected_next);
 }
 
 int h3_video_vae_decoder_reshape(h3_video_vae_decoder *decoder,
@@ -1093,11 +1563,13 @@ int h3_video_vae_decoder_preview(h3_video_vae_decoder *decoder,
     return ok;
 }
 
-int h3_video_vae_decoder_decode(h3_video_vae_decoder *decoder,
-                        const float *normalized_latent, int latent_time,
-                        h3_video_frames *output,
-                        char *error, size_t error_size) {
+static int decoder_decode_all(h3_video_vae_decoder *decoder,
+                              const float *normalized_latent, int latent_time,
+                              h3_video_frames *output, uint8_t **rgb8,
+                              h3_video_frames_ready ready, void *ready_opaque,
+                              char *error, size_t error_size) {
     if (output) memset(output, 0, sizeof(*output));
+    if (rgb8) *rgb8 = NULL;
     if (error && error_size) error[0] = '\0';
     if (!decoder || !normalized_latent || !output ||
         latent_time < CHUNK_LATENT_TIME || (latent_time - 2) % 5) {
@@ -1120,6 +1592,48 @@ int h3_video_vae_decoder_decode(h3_video_vae_decoder *decoder,
         return 0;
     }
     int ok = 1;
+#ifdef H3_CUDA
+    /* All chunks in one tile pipeline; the host thread blends and finalizes
+     * each chunk while the GPU decodes the next tiles. */
+    uint8_t *bytes = NULL;
+    if (rgb8 && !(bytes = malloc(output_elements))) {
+        free(final_rgb);
+        free(temporal_overlap);
+        fail(error, error_size, "out of memory converting decoded video frames");
+        return 0;
+    }
+    video_sink_state state = {final_rgb, temporal_overlap, frame_elements, chunks,
+                              bytes, ready, ready_opaque};
+    vae_pipeline pipeline;
+    memset(&pipeline, 0, sizeof(pipeline));
+    pipeline.decoder = decoder;
+    pipeline.latent = normalized_latent;
+    pipeline.latent_time = latent_time;
+    pipeline.first_chunk = 0;
+    pipeline.chunk_count = chunks;
+    pipeline.selected_frame = -1;
+    pipeline.frame_count = FIRST_CHUNK_FRAMES;
+    pipeline.sink = video_chunk_sink;
+    pipeline.sink_state = &state;
+    ok = pipeline_run(&pipeline, error, error_size);
+    if (ok) {
+        output->frames = output_frames;
+        output->height = pixel_h;
+        output->width = pixel_w;
+        output->rgb = final_rgb;
+        final_rgb = NULL;
+        ok = h3_gpu_get_stats(decoder->vae.gpu, &output->gpu_stats);
+    }
+    free(final_rgb);
+    free(temporal_overlap);
+    if (!ok) {
+        h3_video_frames_free(output);
+        free(bytes);
+    } else if (rgb8) {
+        *rgb8 = bytes;
+    }
+    return ok;
+#else
     for (int chunk = 0; chunk < chunks && ok; chunk++) {
         h3_video_frames decoded;
         memset(&decoded, 0, sizeof(decoded));
@@ -1152,14 +1666,58 @@ int h3_video_vae_decoder_decode(h3_video_vae_decoder *decoder,
     free(final_rgb);
     free(temporal_overlap);
     if (!ok) h3_video_frames_free(output);
-#ifdef H3_CUDA
-    if (ok) finalize_video_pixels(output);
-#endif
+    if (ok && rgb8) {
+        size_t count = (size_t)output->frames * output->height * output->width * 3;
+        *rgb8 = malloc(count);
+        if (!*rgb8) {
+            h3_video_frames_free(output);
+            fail(error, error_size, "out of memory converting decoded video frames");
+            return 0;
+        }
+        for (size_t index = 0; index < count; index++) {
+            float scaled = output->rgb[index] * 255.0f;
+            if (scaled < 0.0f) scaled = 0.0f;
+            if (scaled > 255.0f) scaled = 255.0f;
+            (*rgb8)[index] = (uint8_t)lrintf(scaled);
+        }
+        if (ready) ready(ready_opaque, *rgb8, 0, output->frames);
+    }
     return ok;
+#endif
+}
+
+int h3_video_vae_decoder_decode(h3_video_vae_decoder *decoder,
+                        const float *normalized_latent, int latent_time,
+                        h3_video_frames *output,
+                        char *error, size_t error_size) {
+    return decoder_decode_all(decoder, normalized_latent, latent_time, output,
+                              NULL, NULL, NULL, error, error_size);
+}
+
+int h3_video_vae_decoder_decode_rgb8(h3_video_vae_decoder *decoder,
+                        const float *normalized_latent, int latent_time,
+                        h3_video_frames *output, uint8_t **rgb8,
+                        h3_video_frames_ready ready, void *ready_opaque,
+                        char *error, size_t error_size) {
+    if (rgb8) *rgb8 = NULL;
+    if (!rgb8) {
+        if (output) memset(output, 0, sizeof(*output));
+        fail(error, error_size, "invalid resident video VAE RGB24 output");
+        return 0;
+    }
+    return decoder_decode_all(decoder, normalized_latent, latent_time, output,
+                              rgb8, ready, ready_opaque, error, error_size);
 }
 
 void h3_video_vae_decoder_free(h3_video_vae_decoder *decoder) {
     if (!decoder) return;
+#ifdef H3_CUDA
+    for (int slot = 0; slot < PIPELINE_SLOTS; slot++) {
+        h3_gpu_event_free(decoder->readback[slot]);
+        h3_gpu_host_free(decoder->pinned_latent[slot]);
+        h3_gpu_host_free(decoder->pinned_rows[slot]);
+    }
+#endif
     cleanup(&decoder->vae);
     tile_axis_free(&decoder->y_axis);
     tile_axis_free(&decoder->x_axis);
@@ -1245,7 +1803,7 @@ static int decode_chunked(const char *weight_directory,
                 free_tensor(&vae.latent);
                 ok = prepare_input(&vae, input, latent_mean, latent_std,
                                    error, error_size) &&
-                     run_resident_tile(&vae, error, error_size);
+                     run_resident_tile(&vae, vae.projected, 1, error, error_size);
                 free(input);
                 if (!ok) break;
                 h3_video_frames tile;

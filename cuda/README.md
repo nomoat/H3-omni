@@ -197,6 +197,12 @@ in both modes. Default-mode peak memory is 114 GB: the video VAE keeps a
 TF32 high and low part of its four block projections. Details, profiles and
 rejected experiments: [WORKLOG.md](WORKLOG.md).
 
+The resident video VAE decodes its tiles as a pipeline: the GPU works on the
+next tile while a host thread rearranges, blends and normalizes the previous
+one, and FFmpeg encodes each finished chunk during the decode. Both modes
+give the same bytes as the serial path (job 14473/14474 bit checks); a warm
+10 s request spends 32.1 of its 33.0 s video VAE on the GPU (job 14476).
+
 ## Reference environment and tests
 
 `tests/pytorch/prepare.sh` installs the pinned Diffusers source and Transformers

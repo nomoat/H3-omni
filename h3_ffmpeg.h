@@ -46,4 +46,22 @@ int h3_ffmpeg_write_av_rgb24_f32(const char *path, const uint8_t *frames,
                                  int channels, int sample_rate,
                                  char *error, size_t error_size);
 
+/* The same encoding with the video supplied in segments while FFmpeg runs.
+ * open() starts FFmpeg in the background and streams the whole PCM, which
+ * must stay valid until finish() or abort(); push() queues the next
+ * bytes of RGB24 video (the caller keeps them valid until finish or abort)
+ * and may be called from another thread; finish() waits for FFmpeg after all
+ * frame_count frames were pushed. abort() stops FFmpeg and removes the file.
+ * finish() and abort() free the stream. */
+typedef struct h3_ffmpeg_av_stream h3_ffmpeg_av_stream;
+h3_ffmpeg_av_stream *h3_ffmpeg_av_stream_open(
+    const char *path, int frame_count, int width, int height, int fps,
+    const float *pcm, int samples, int channels, int sample_rate,
+    char *error, size_t error_size);
+int h3_ffmpeg_av_stream_push(h3_ffmpeg_av_stream *stream,
+                             const uint8_t *frames, size_t bytes);
+int h3_ffmpeg_av_stream_finish(h3_ffmpeg_av_stream *stream,
+                               char *error, size_t error_size);
+void h3_ffmpeg_av_stream_abort(h3_ffmpeg_av_stream *stream);
+
 #endif

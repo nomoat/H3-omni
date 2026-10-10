@@ -924,6 +924,21 @@ static uint8_t *h3_rgb_f32_to_u8(const float *rgb, size_t count) {
     return output;
 }
 
+/* Hands each finished range of decoded frames to the running FFmpeg encoder. */
+typedef struct {
+    h3_ffmpeg_av_stream *stream;
+    size_t frame_bytes;
+} h3_frame_stream;
+
+static void h3_stream_frames(void *opaque, const uint8_t *rgb8,
+                             int first_frame, int frame_count) {
+    h3_frame_stream *target = opaque;
+    (void)first_frame;
+    /* A failed push is recorded in the stream and reported by finish(). */
+    h3_ffmpeg_av_stream_push(target->stream, rgb8,
+                             (size_t)frame_count * target->frame_bytes);
+}
+
 typedef struct {
     h3_generation_progress *progress;
     h3_video_vae_decoder *decoder;
@@ -1100,6 +1115,7 @@ h3_result *h3_generate(h3_ctx *ctx, const char *prompt,
     h3_audio_waveform waveform;
     memset(&waveform, 0, sizeof(waveform));
     uint8_t *rgb8 = NULL;
+    h3_ffmpeg_av_stream *av_stream = NULL;
     h3_result *result = NULL;
     char *conditioning_key = NULL;
     char *prepared_key = NULL;
@@ -1917,10 +1933,36 @@ h3_result *h3_generate(h3_ctx *ctx, const char *prompt,
             goto cleanup;
         }
     }
+    /* With the resident decoder and no resize, FFmpeg starts now and encodes
+     * each chunk of frames as soon as it is final, overlapping the rest of
+     * the decode. It receives the same bytes as after a complete decode. */
+    int stream_width = latent_w * H3_VAE_SPATIAL_RATIO;
+    int stream_height = latent_h * H3_VAE_SPATIAL_RATIO;
+    h3_frame_stream frame_stream = {
+        NULL, (size_t)stream_width * (size_t)stream_height * 3
+    };
+    if (preview_decoder && params->output_path && *params->output_path &&
+        stream_width == params->width && stream_height == params->height &&
+        temporal.video_t >= 7 && (temporal.video_t - 2) % 5 == 0) {
+        av_stream = h3_ffmpeg_av_stream_open(
+            params->output_path, (temporal.video_t - 2) / 5 * 17 + 5,
+            stream_width, stream_height, H3_FPS, waveform.pcm,
+            waveform.samples, waveform.channels, waveform.sample_rate,
+            detail, sizeof(detail));
+        if (!av_stream) {
+            h3_set_error(ctx, "%s", detail);
+            goto cleanup;
+        }
+        frame_stream.stream = av_stream;
+    }
     int video_ok = preview_decoder ?
-        h3_video_vae_decoder_decode(
+        (av_stream ?
+         h3_video_vae_decoder_decode_rgb8(
+            preview_decoder, video, temporal.video_t, &frames, &rgb8,
+            h3_stream_frames, &frame_stream, detail, sizeof(detail)) :
+         h3_video_vae_decoder_decode(
             preview_decoder, video, temporal.video_t, &frames,
-            detail, sizeof(detail)) :
+            detail, sizeof(detail))) :
         h3_video_vae_decode(
             vae_path, "h3_shaders.metal", video,
             temporal.video_t, latent_h, latent_w,
@@ -1940,7 +1982,7 @@ h3_result *h3_generate(h3_ctx *ctx, const char *prompt,
     if (progress.cancelled) goto cleanup;
     size_t rgb_count = (size_t)frames.frames * (size_t)frames.height *
                        (size_t)frames.width * 3;
-    rgb8 = h3_rgb_f32_to_u8(frames.rgb, rgb_count);
+    if (!rgb8) rgb8 = h3_rgb_f32_to_u8(frames.rgb, rgb_count);
     if (!rgb8) {
         h3_set_error(ctx, "out of memory converting generated RGB frames");
         goto cleanup;
@@ -1973,7 +2015,16 @@ h3_result *h3_generate(h3_ctx *ctx, const char *prompt,
             }
         }
     }
-    if (params->output_path && *params->output_path) {
+    if (av_stream) {
+        h3_progress_emit(&progress, "FFmpeg", 0, frames.frames);
+        int encoded = h3_ffmpeg_av_stream_finish(av_stream, detail, sizeof(detail));
+        av_stream = NULL;
+        if (!encoded) {
+            h3_set_error(ctx, "%s", detail);
+            goto cleanup;
+        }
+        h3_progress_emit(&progress, "FFmpeg", frames.frames, frames.frames);
+    } else if (params->output_path && *params->output_path) {
         h3_progress_emit(&progress, "FFmpeg", 0, frames.frames);
         if (!h3_ffmpeg_write_av_rgb24_f32(
                 params->output_path, rgb8, frames.frames, output_width,
@@ -2029,6 +2080,7 @@ cleanup:
     h3_layout_free(&layout);
     if (!dit_is_cached) h3_dit_free(dit);
     if (!decoder_is_cached) h3_video_vae_decoder_free(preview_decoder);
+    h3_ffmpeg_av_stream_abort(av_stream);
     free(video); free(audio); free(rgb8);
     h3_video_frames_free(&frames);
     h3_audio_waveform_free(&waveform);
