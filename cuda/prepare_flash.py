@@ -1,7 +1,10 @@
-"""Prepare the FlashAttention revision bundled with the pinned PyTorch oracle.
+"""Prepare the FlashAttention sources used by the CUDA backend.
 
-Run before requesting a GPU. Only the dropout-free BF16/128 forward kernel is
-compiled. Remove its unused ATen RNG plumbing; retain the numerical kernel.
+flash-cuda is the revision bundled with the pinned PyTorch oracle; only its
+dropout-free BF16/128 forward kernel is compiled, with the unused ATen RNG
+plumbing removed. flash3-hopper is the FlashAttention-3 Hopper forward used
+for non-causal DiT attention; its headers are used unchanged.
+Run before requesting a GPU.
 """
 import hashlib
 import io
@@ -16,6 +19,11 @@ SOURCES = (
      "ea1ec2e43422a2b910ecad9df7d4fd58f09ff39036e03d037888147f784ca407", "flash-cuda"),
     ("NVIDIA/cutlass", "e51efbfe18fe4f4cbb66ab814c55bf4aa0185491",
      "1fc686a38edacbb5b7416c2835efb6801d2a583a7942bb5b78ac6f4999cd73a1", "cutlass-flash"),
+    # FlashAttention-3 Hopper forward (flash-attention v2.8.3) and its CUTLASS.
+    ("Dao-AILab/flash-attention", "060c9188beec3a8b62b33a3bfa6d5d2d44975fab",
+     "64391cfec73fc5a25932b2c0c2fb3b4d9f97af001164e5220af21049fc17e04e", "flash3-hopper"),
+    ("NVIDIA/cutlass", "dc4817921edda44a549197ff3a9dcf5df0636e7b",
+     "f2a3a9df5e6f010c8b02716aa2644a6f071827fafa606fac5f5241cab6a1ab56", "cutlass-flash3"),
 )
 
 
@@ -35,7 +43,13 @@ def main():
                 relative = Path(*Path(member.name).parts[1:])
                 if ".." in relative.parts:
                     raise ValueError("Unsafe archive path")
-                if repository.endswith("flash-attention"):
+                if folder == "flash3-hopper":
+                    hopper = relative.parent == Path("hopper") and relative.suffix in (".h", ".hpp")
+                    if not hopper and (relative.name != "LICENSE" or len(relative.parts) != 1):
+                        continue
+                    if hopper:
+                        relative = Path(relative.name)
+                elif repository.endswith("flash-attention"):
                     prefix = Path("csrc/flash_attn/src")
                     if relative.is_relative_to(prefix) and relative.suffix in (".h", ".cuh"):
                         relative = relative.relative_to(prefix)
@@ -46,7 +60,7 @@ def main():
                 target = destination / relative
                 target.parent.mkdir(parents=True, exist_ok=True)
                 target.write_bytes(source.extractfile(member).read())
-        if repository.endswith("flash-attention"):
+        if folder == "flash-cuda":
             substitutions = {
                 "flash.h": {
                     "#include <ATen/cuda/CUDAGeneratorImpl.h> // For at::Generator and at::PhiloxCudaState":

@@ -1,0 +1,35 @@
+p2 denoise: window 17.30 s, GPU idle 4.01 s in 15321 gaps, idle not inside any runtime call 0.07 s
+API time overlapping GPU idle (s) | all time in API (s) | calls
+     2.904 |   14.189 |    3140  R:cudaFree_v3020
+     1.009 |    2.932 |    3140  R:cudaMalloc_v3020
+     0.011 |    0.023 |    4000  D:cuLaunchKernelEx
+     0.009 |    0.036 |    7100  R:cudaLaunchKernel_v7000
+     0.008 |    0.014 |    4000  R:cudaMemsetAsync_v3020
+     0.004 |    0.009 |      80  R:cudaMemcpy_v3020
+     0.002 |    0.003 |    8086  R:cudaGetDevice_v3020
+     0.001 |    0.002 |   20000  D:cuStreamGetCaptureInfo_v2
+     0.001 |    0.003 |    4040  R:cudaEventRecord_v3020
+     0.000 |    0.000 |     100  R:cudaStreamSynchronize_v3020
+     0.000 |    0.001 |    8000  D:cuKernelGetAttribute
+     0.000 |    0.001 |      80  R:cudaLaunchKernelExC_v11060
+     0.000 |    0.000 |      20  R:cudaEventElapsedTime_v3020
+     0.000 |    0.001 |      60  R:cudaMemcpyAsync_v3020
+     0.000 |    0.001 |   11200  R:cudaGetLastError_v3020
+     0.000 |    0.000 |       1  D:cuLibraryLoadData
+     0.000 |    0.001 |    1000  R:cudaFuncSetAttribute_v9000
+     0.000 |    0.000 |       2  D:cuKernelSetAttribute
+     0.000 |    0.000 |       1  D:cuLibraryGetKernel
+p2 video VAE load: window 14.95 s, GPU idle 2.57 s in 62146 gaps, idle not inside any runtime call 0.86 s
+API time overlapping GPU idle (s) | all time in API (s) | calls
+     1.675 |   11.763 |    1710  R:cudaFree_v3020
+     0.011 |    0.124 |   30870  R:cudaLaunchKernelExC_v11060
+     0.010 |    1.583 |    1710  R:cudaMalloc_v3020
+     0.007 |    0.089 |     135  R:cudaMemcpy_v3020
+     0.003 |    0.115 |   30960  R:cudaLaunchKernel_v7000
+     0.002 |    0.231 |     180  R:cudaStreamSynchronize_v3020
+     0.001 |    0.006 |   30870  R:cudaGetDevice_v3020
+     0.001 |    0.001 |      45  R:cudaEventElapsedTime_v3020
+     0.000 |    0.000 |      45  R:cudaMemsetAsync_v3020
+     0.000 |    0.005 |   60345  R:cudaGetLastError_v3020
+     0.000 |    0.001 |     135  R:cudaMemcpyAsync_v3020
+     0.000 |    0.000 |      90  R:cudaEventRecord_v3020

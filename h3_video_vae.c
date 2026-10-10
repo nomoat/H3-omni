@@ -1,6 +1,9 @@
 #include "h3_video_vae.h"
 
 #include "h3_weights.h"
+#ifdef H3_CUDA
+#include "cuda/h3_cuda.h"
+#endif
 
 #include <errno.h>
 #include <math.h>
@@ -195,6 +198,22 @@ static int load_block(vae_context *vae, int index, char *error,
     F1(scale2, "scale2", HIDDEN);
 #undef F1
 #undef F2
+#ifdef H3_CUDA
+    /* The four block projections run as 3xTF32 tensor-core products instead
+     * of FP32 SIMT GEMMs: 2.5x faster, decoded relative error about 1e-4
+     * against the FP32 reference, and twice the memory for these weights.
+     * H3_VAE_3XTF32=0 restores the FP32 path that matches PyTorch. */
+    const char *x3 = getenv("H3_VAE_3XTF32");
+    if (!x3 || strcmp(x3, "0")) {
+        h3_gpu_tensor *split[] = {block->qkv_w, block->out_w, block->w1, block->w2};
+        for (size_t item = 0; item < sizeof(split) / sizeof(split[0]); item++)
+            if (!h3_gpu_tensor_split_tf32(vae->gpu, split[item])) {
+                fail(error, error_size, "cannot split video VAE weight for 3xTF32: %s",
+                     h3_gpu_error(vae->gpu));
+                return 0;
+            }
+    }
+#endif
     return 1;
 }
 

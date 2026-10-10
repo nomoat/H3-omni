@@ -11,6 +11,13 @@ baseline; performance optimization is a separate stage. The standalone executabl
 also produced a valid 22-frame MP4 with audio. Its runtime dependencies contain
 neither libtorch nor libpython.
 
+**Two modes.** The default mode is for serving: FlashAttention-3 for the DiT
+attention and 3xTF32 tensor-core GEMMs in the video VAE. The reference mode,
+`H3_FLASH3=0 H3_VAE_3XTF32=0`, is the phase-one backend that matches PyTorch
+bit for bit; it must keep passing the contract below. The default mode passes
+the calibrated acceptance described in [WORKLOG.md](WORKLOG.md), which also
+records every latency experiment, what worked and what did not.
+
 | Check | Result |
 | --- | --- |
 | CUDA primitives | 69 passed |
@@ -40,6 +47,9 @@ cluster directory. The current 96 implementation/build/test files match the
 archived build source. Documentation and compact reports are added afterward.
 
 ## Contract
+
+This contract is for the reference mode. The default mode deviates only in
+the two kernels named above.
 
 - Original FL2VA weights; text-to-video/audio; 50 DiT blocks; all requested
   model evaluations. Image/keyframe conditioning and Ref2VA are outside the
@@ -118,26 +128,74 @@ across requests by default (`--resident-weights off` or
 | --- | --- | --- |
 | Tokenizer | parsed `tokenizer.json` | token IDs |
 | Qwen text encoder | 50 layers and the token embedding | prompt activations |
-| DiT | 50 blocks, patch/final heads, token refiner, timestep embedder and AdaLN projections | refined text, AdaLN table for the step count, RoPE, row maps, activations |
+| DiT | 50 blocks, patch/final heads, token refiner, last AdaLN table | refined text, RoPE, row maps, activations; AdaLN table only when the step count or condition kinds change |
 | Video VAE decoder | all weights | tile plan, RoPE and tile activations when the canvas changes |
 | Audio VAE decoder | weight-normalized convolutions | activations |
 
 A new prompt, seed, canvas, frame count or step count runs the same request
 preparation code as a fresh load (`h3_dit_rebind` reuses it), so results do not
-depend on what the process served before. Peak use on one H200 is about 100 GB.
+depend on what the process served before. The AdaLN table depends only on the
+sigma schedule, the condition kinds and the active blocks. Its projections are
+26 GB, so the table (0.4 GB at 20 steps) is cached instead of the weights; a
+new step count re-reads them once. Peak use on one H200 is about 100 GB.
 Image/video/audio-conditioned requests still stream their Qwen vision and
 encoder weights; only their DiT and decoders are resident.
 
-`tests/serving/serve.sbatch` checks this. One process serves six requests:
+`tests/serving/serve.sbatch` checks this. One process serves seven requests:
 two prompts at 864x480/56 frames, the first prompt again after the second,
-512x512/22 frames, the second prompt again after the canvas change, and a
-Chinese prompt at 256x256. Each distinct request is also run as a fresh
-one-shot process. The denoised video/audio latents, decoded RGB and PCM
+512x512/22 frames, the second prompt again after the canvas change, a Chinese
+prompt at 256x256 with 12 steps, and the second prompt again at 20 steps. Each
+distinct request is also run as a fresh one-shot process. The denoised video/audio latents, decoded RGB and PCM
 (`H3_DUMP_DIR`, diagnostic only) and MP4 bytes must be identical. The same job
 reruns the full acceptance above on the new build and compares the one-shot
 MP4 with release 14274.
 
-SERVING_RESULTS_PLACEHOLDER
+Slurm job 14416 (2026-10-10, one H200, this source) passed every check:
+all 7 serving requests were bit-identical to their fresh one-shot references;
+the one-shot MP4 equals release 14274's MP4; and the PyTorch acceptance, the
+held-out 864x480/56-frame case and the CLI smoke test passed unchanged. GPU
+memory peaked at 99,169 MiB. Compact reports are in
+[`tests/serving/evidence/14416`](../tests/serving/evidence/14416).
+
+| Request | Fresh process (s) | Resident process (s) |
+| --- | --- | --- |
+| 864x480, 56 frames, 20 steps, first request | 88.5 | 94.0 (loads every weight) |
+| 864x480, 56 frames, 20 steps, new prompt | 89.4 | 33.0 |
+| 512x512, 22 frames, 20 steps | 63.6 | 9.6 |
+| 256x256, 22 frames, 12 steps (new AdaLN table) | 55.8 | 10.6 |
+| 864x480, 56 frames, back to 20 steps (new AdaLN table) | — | 40.3 |
+
+A warm 864x480 request is now 17.4 s of denoising and about 15 s of video VAE
+decoding; text, refinement and audio take less than 0.3 s together. Times
+include MP4 encoding. Fresh-process times include process start, weight
+loading and the same work.
+
+Longer videos, Slurm job 14419 (`tests/serving/duration.sbatch`, one
+resident process, 864x480, 20 steps, three prompts each, warm):
+
+| Requested | Output | Mean (s) | Denoise (s) | Audio+video VAE+MP4 (s) |
+| --- | --- | --- | --- | --- |
+| 5 s (120 frames) | 124 frames, 5.17 s | 81.7 | 46.1 | 35.4 |
+| 10 s (240 frames) | 243 frames, 10.13 s | 201.3 | 130.7 | 70.4 |
+
+Peak GPU memory was 104 GB. Frame counts align up to 5 + 17k. Before this
+run, audio longer than about 8.2 s failed with "invalid configuration
+argument": `h3_gpu_dispatch_3d` put the sample axis in grid y, which CUDA
+limits to 65535 blocks. Taller grids now use taller blocks. Grids inside the
+limit keep the old shape, and the 5 s MP4s are byte-identical to job 14418
+from before the change.
+
+## Serving latency
+
+| Request (warm, 864x480, 20 steps) | Reference mode, job 14419 | Default mode, job 14436 |
+| --- | --- | --- |
+| 5 s video | 81.7 s | 51.0 s |
+| 10 s video | 201.3 s | 118.7 s |
+
+Job 14419 predates the stream-ordered memory pool, which is bit-exact and on
+in both modes. Default-mode peak memory is 114 GB: the video VAE keeps a
+TF32 high and low part of its four block projections. Details, profiles and
+rejected experiments: [WORKLOG.md](WORKLOG.md).
 
 ## Reference environment and tests
 

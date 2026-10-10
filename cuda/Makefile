@@ -8,10 +8,12 @@ CUDNN_ROOT ?= /opt/conda/lib/python3.11/site-packages/nvidia/cudnn
 ICU_ROOT ?= /usr
 FLASH_ROOT ?= $(ROOT)/.deps/flash-cuda
 CUTLASS_ROOT ?= $(ROOT)/.deps/cutlass-flash
+FLASH3_ROOT ?= $(ROOT)/.deps/flash3-hopper
+CUTLASS3_ROOT ?= $(ROOT)/.deps/cutlass-flash3
 CFLAGS := -O2 -g -std=c11 -ffp-contract=off -D_GNU_SOURCE -DH3_CUDA -I$(ROOT) -fPIC -MMD -MP
 NVFLAGS := -O2 -lineinfo -std=c++17 -arch=$(CUDA_ARCH) --fmad=false -Xcompiler=-fPIC -I$(ROOT) -I$(ROOT)/cuda -I$(CUDNN_ROOT)/include
 LIB_C := h3 h3_host h3_safetensors h3_weights h3_text_encoder h3_dit_schedule h3_dit h3_video_vae h3_video_encoder h3_audio_vae h3_ffmpeg h3_terminal h3_vision_encoder h3_multimodal
-GPU_OBJ := $(BUILD)/h3_gpu_cuda.o $(BUILD)/flash_attention.o
+GPU_OBJ := $(BUILD)/h3_gpu_cuda.o $(BUILD)/flash_attention.o $(BUILD)/flash3_attention.o
 OBJ := $(addprefix $(BUILD)/,$(addsuffix .o,$(LIB_C))) $(GPU_OBJ)
 LDLIBS := -lcublas -lcublasLt -L$(CUDNN_ROOT)/lib -Xlinker=-rpath=$(CUDNN_ROOT)/lib -l:libcudnn.so.9 -lpthread -lm
 .PHONY: all primitives clean
@@ -25,6 +27,13 @@ $(BUILD)/h3_gpu_cuda.o: $(ROOT)/cuda/h3_gpu_cuda.cu $(ROOT)/cuda/h3_cuda.h $(ROO
 	$(NVCC) $(NVFLAGS) -c $< -o $@
 $(BUILD)/flash_attention.o: $(ROOT)/cuda/flash_attention.cu $(ROOT)/cuda/h3_flash.h $(FLASH_ROOT)/flash_fwd_kernel.h | $(BUILD)
 	$(NVCC) -O3 -std=c++17 -arch=$(CUDA_ARCH) --expt-relaxed-constexpr --expt-extended-lambda -DUNFUSE_FMA -DFLASHATTENTION_DISABLE_ALIBI -DFLASHATTENTION_DISABLE_SOFTCAP -Xcompiler=-fPIC -I$(ROOT)/cuda -I$(FLASH_ROOT) -I$(CUTLASS_ROOT)/include -c $< -o $@
+# FlashAttention-3 needs sm_90a (WGMMA/TMA) and its own CUTLASS revision. All
+# symbols except the entry point are made local so the two CUTLASS revisions
+# cannot resolve to each other's inline functions.
+FLASH3_DISABLE := BACKWARD SPLIT PAGEDKV APPENDKV LOCAL SOFTCAP PACKGQA FP16 FP8 VARLEN SM8x HDIM64 HDIM96 HDIM192 HDIM256
+$(BUILD)/flash3_attention.o: $(ROOT)/cuda/flash3_attention.cu $(ROOT)/cuda/h3_flash.h $(FLASH3_ROOT)/flash_fwd_launch_template.h | $(BUILD)
+	$(NVCC) -O3 -std=c++17 -gencode arch=compute_90a,code=sm_90a --expt-relaxed-constexpr --expt-extended-lambda --use_fast_math -DCUTE_SM90_EXTENDED_MMA_SHAPES_ENABLED -DCUTLASS_ENABLE_GDC_FOR_SM90 -DCUTLASS_DEBUG_TRACE_LEVEL=0 -DNDEBUG $(addprefix -DFLASHATTENTION_DISABLE_,$(FLASH3_DISABLE)) -Xcompiler=-fPIC -I$(ROOT)/cuda -I$(FLASH3_ROOT) -I$(CUTLASS3_ROOT)/include -c $< -o $(BUILD)/flash3_attention.raw.o
+	objcopy --keep-global-symbol=h3_flash3_bf16 $(BUILD)/flash3_attention.raw.o $@
 $(BUILD)/libh3_cuda.so: $(GPU_OBJ)
 	$(NVCC) -shared -o $@ $^ $(LDLIBS)
 MODEL_C := h3_host h3_safetensors h3_weights h3_text_encoder h3_dit_schedule h3_dit h3_video_vae h3_audio_vae

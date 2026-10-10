@@ -4,6 +4,7 @@
  *
  * Usage: h3_serve_check MODEL_DIR OUTPUT_DIR REQUESTS_FILE
  * Each REQUESTS_FILE line: name|width|height|frames|steps|seed|prompt
+ * Set H3_SERVE_DUMP=0 to skip the float32 dumps (timing runs).
  * One JSON object per request is printed to stdout. */
 #include "h3.h"
 
@@ -70,6 +71,8 @@ int main(int argc, char **argv) {
     }
     h3_cache_set_enabled(ctx, 1);
     h3_cache_set_resident_weights(ctx, 1);
+    const char *dump = getenv("H3_SERVE_DUMP");
+    int dump_enabled = !dump || strcmp(dump, "0");
     printf("{\"event\":\"context\",\"seconds\":%.6f}\n", now() - load_started);
     fflush(stdout);
     char line[8192];
@@ -102,7 +105,7 @@ int main(int argc, char **argv) {
             status = 2;
             break;
         }
-        setenv("H3_DUMP_DIR", directory, 1);
+        if (dump_enabled) setenv("H3_DUMP_DIR", directory, 1);
         h3_params params = H3_PARAMS_DEFAULT;
         params.width = atoi(fields[1]);
         params.height = atoi(fields[2]);
@@ -125,10 +128,11 @@ int main(int argc, char **argv) {
         h3_result_free(result);
         h3_cache_info info;
         h3_cache_get_info(ctx, &info);
-        printf("{\"event\":\"request\",\"name\":\"%s\",\"seconds\":%.6f,"
+        printf("{\"event\":\"request\",\"name\":\"%s\",\"start\":%.6f,"
+               "\"seconds\":%.6f,"
                "\"text_encoder\":%d,\"audio_decoder\":%d,"
                "\"video_decoder\":%d,\"dit\":%d,\"phases\":[",
-               fields[0], seconds, info.text_encoder, info.audio_decoder,
+               fields[0], log.start, seconds, info.text_encoder, info.audio_decoder,
                info.video_decoder, info.prepared_dit);
         for (int index = 0; index < log.count; index++)
             printf("%s{\"phase\":\"%s\",\"first\":%.6f,\"last\":%.6f}",

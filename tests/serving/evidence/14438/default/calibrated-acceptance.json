@@ -1,0 +1,179 @@
+{
+ "passed": true,
+ "factor": 1.5,
+ "checks": [
+  {
+   "check": "all cases present",
+   "missing": [],
+   "passed": true
+  },
+  {
+   "check": "256x256x22-seed0 video_velocity step0 relative_l2",
+   "value": 0.018356086686253548,
+   "limit": 0.03,
+   "passed": true
+  },
+  {
+   "check": "256x256x22-seed0 video_velocity step0 normalized_max",
+   "value": 0.03148908540606499,
+   "limit": 0.1,
+   "passed": true
+  },
+  {
+   "check": "256x256x22-seed0 audio_velocity step0 relative_l2",
+   "value": 0.012368558906018734,
+   "limit": 0.03,
+   "passed": true
+  },
+  {
+   "check": "256x256x22-seed0 audio_velocity step0 normalized_max",
+   "value": 0.026380524039268494,
+   "limit": 0.1,
+   "passed": true
+  },
+  {
+   "check": "256x256x22-seed1 video_velocity step0 relative_l2",
+   "value": 0.01389293186366558,
+   "limit": 0.03,
+   "passed": true
+  },
+  {
+   "check": "256x256x22-seed1 video_velocity step0 normalized_max",
+   "value": 0.021033821627497673,
+   "limit": 0.1,
+   "passed": true
+  },
+  {
+   "check": "256x256x22-seed1 audio_velocity step0 relative_l2",
+   "value": 0.00787284504622221,
+   "limit": 0.03,
+   "passed": true
+  },
+  {
+   "check": "256x256x22-seed1 audio_velocity step0 normalized_max",
+   "value": 0.023219600319862366,
+   "limit": 0.1,
+   "passed": true
+  },
+  {
+   "check": "256x256x22-seed42 video_velocity step0 relative_l2",
+   "value": 0.01061616837978363,
+   "limit": 0.03,
+   "passed": true
+  },
+  {
+   "check": "256x256x22-seed42 video_velocity step0 normalized_max",
+   "value": 0.012680056504905224,
+   "limit": 0.1,
+   "passed": true
+  },
+  {
+   "check": "256x256x22-seed42 audio_velocity step0 relative_l2",
+   "value": 0.006188470870256424,
+   "limit": 0.03,
+   "passed": true
+  },
+  {
+   "check": "256x256x22-seed42 audio_velocity step0 normalized_max",
+   "value": 0.013577581383287907,
+   "limit": 0.1,
+   "passed": true
+  },
+  {
+   "check": "512x512x22-seed0 video_velocity step0 relative_l2",
+   "value": 0.007294436916708946,
+   "limit": 0.03,
+   "passed": true
+  },
+  {
+   "check": "512x512x22-seed0 video_velocity step0 normalized_max",
+   "value": 0.014344042167067528,
+   "limit": 0.1,
+   "passed": true
+  },
+  {
+   "check": "512x512x22-seed0 audio_velocity step0 relative_l2",
+   "value": 0.00931773241609335,
+   "limit": 0.03,
+   "passed": true
+  },
+  {
+   "check": "512x512x22-seed0 audio_velocity step0 normalized_max",
+   "value": 0.020759955048561096,
+   "limit": 0.1,
+   "passed": true
+  },
+  {
+   "check": "512x512x22-seed1 video_velocity step0 relative_l2",
+   "value": 0.008068136870861053,
+   "limit": 0.03,
+   "passed": true
+  },
+  {
+   "check": "512x512x22-seed1 video_velocity step0 normalized_max",
+   "value": 0.015514278784394264,
+   "limit": 0.1,
+   "passed": true
+  },
+  {
+   "check": "512x512x22-seed1 audio_velocity step0 relative_l2",
+   "value": 0.007513881660997868,
+   "limit": 0.03,
+   "passed": true
+  },
+  {
+   "check": "512x512x22-seed1 audio_velocity step0 normalized_max",
+   "value": 0.01942419447004795,
+   "limit": 0.1,
+   "passed": true
+  },
+  {
+   "check": "512x512x22-seed42 video_velocity step0 relative_l2",
+   "value": 0.005112526472657919,
+   "limit": 0.03,
+   "passed": true
+  },
+  {
+   "check": "512x512x22-seed42 video_velocity step0 normalized_max",
+   "value": 0.01458505168557167,
+   "limit": 0.1,
+   "passed": true
+  },
+  {
+   "check": "512x512x22-seed42 audio_velocity step0 relative_l2",
+   "value": 0.005669701378792524,
+   "limit": 0.03,
+   "passed": true
+  },
+  {
+   "check": "512x512x22-seed42 audio_velocity step0 normalized_max",
+   "value": 0.0073078894056379795,
+   "limit": 0.1,
+   "passed": true
+  },
+  {
+   "check": "video_latent final drift mean",
+   "value": 0.12007462109128635,
+   "limit": 0.21854790952056646,
+   "passed": true
+  },
+  {
+   "check": "video_latent final drift max",
+   "value": 0.30039674043655396,
+   "limit": 0.4720534086227417,
+   "passed": true
+  },
+  {
+   "check": "audio_latent final drift mean",
+   "value": 0.04820358194410801,
+   "limit": 0.06150448531843722,
+   "passed": true
+  },
+  {
+   "check": "audio_latent final drift max",
+   "value": 0.13948795199394226,
+   "limit": 0.18002225831151009,
+   "passed": true
+  }
+ ]
+}

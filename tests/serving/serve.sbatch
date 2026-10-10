@@ -8,12 +8,17 @@
 #SBATCH --mem=200G
 #SBATCH --time=02:00:00
 #SBATCH --output=/home/cj/h3-serve/serve-%j.log
-# Resident-weight serving check plus the unchanged phase-one acceptance.
-# 1. One process serves seven requests (new prompts, repeated prompts, other
-#    canvases, durations and step counts) with resident weights.
-# 2. Every distinct request is rerun as a fresh one-shot process.
-# 3. Latents, decoded RGB, PCM and MP4 must match bit for bit.
-# 4. The original PyTorch acceptance runs against the new build.
+# Serving check plus acceptance, in the default (fast) mode and in the
+# reference mode (H3_FLASH3=0 H3_VAE_3XTF32=0: FlashAttention-2 and the FP32
+# video VAE, which match PyTorch bit for bit).
+# 1. Default mode: one process serves seven requests (new prompts, repeated
+#    prompts, other canvases, durations and step counts) with resident
+#    weights; every distinct request is rerun as a fresh one-shot process;
+#    latents, decoded RGB, PCM and MP4 must match bit for bit.
+# 2. Reference mode: the one-shot MP4 equals the accepted release 14274, and
+#    the original PyTorch acceptance passes unchanged.
+# 3. Default mode: decoder acceptance on the same latents, and the calibrated
+#    trajectory acceptance (tests/pytorch/calibrated_accept.py).
 set -euo pipefail
 export PYTHONNOUSERSITE=1
 ROOT=/home/cj/h3-serve
@@ -24,6 +29,7 @@ mkdir -p "$STAGE/icu" "$STAGE/python" "$STAGE/diffusers" "$RESULT"
 tar -xf "$SOURCE" -C "$STAGE"
 mkdir -p "$STAGE/.deps"
 tar -xzf /home/cj/h3-cuda/flash-deps.tar.gz -C "$STAGE/.deps"
+tar -xzf /home/cj/h3-serve/flash3-deps-v2.tar.gz -C "$STAGE/.deps"
 tar -xf /home/cj/h3-cuda/icu.tar -C "$STAGE/icu"
 tar -xf /home/cj/h3-cuda/python-deps.tar -C "$STAGE/python"
 tar -xf /home/cj/h3-cuda/diffusers.tar -C "$STAGE/diffusers"
@@ -44,7 +50,7 @@ export PYTHONPATH="$1/python"
 export OMP_NUM_THREADS="${SLURM_CPUS_PER_TASK:-8}"
 export LD_LIBRARY_PATH="$1/icu/usr/lib/x86_64-linux-gnu${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
 export H3_FFMPEG=/home/cj/h3-cuda/releases/14274/bin/ffmpeg
-mkdir -p results/serve results/fresh results/release results/accept
+mkdir -p results/serve results/fresh results/release results/accept results/default
 echo "$MODEL" > results/model-path.txt
 nvidia-smi > results/device.txt
 nvcc --version > results/cuda-version.txt
@@ -88,7 +94,11 @@ while IFS='|' read -r name width height frames steps seed prompt; do
         | tee -a results/fresh/events.jsonl
 done < results/requests.txt
 
-# The accepted release binary for one request: the one-shot path is unchanged.
+# The accepted release binary for one request: the reference-mode one-shot
+# path is unchanged.
+H3_FLASH3=0 H3_VAE_3XTF32=0 build-cuda/h3 -d "$MODEL" -p "$BOAT" \
+    --width 864 --height 480 --frames 56 --steps 20 --layers 50 --reuse 1 \
+    --core-reuse 1 --seed 7 -o results/release/r1-boat-reference.mp4 2> results/release/reference.log
 start=$(date +%s.%N)
 LD_LIBRARY_PATH="/home/cj/h3-cuda/releases/14274/lib:$LD_LIBRARY_PATH" \
     /home/cj/h3-cuda/releases/14274/h3 -d "$MODEL" -p "$BOAT" \
@@ -97,14 +107,16 @@ LD_LIBRARY_PATH="/home/cj/h3-cuda/releases/14274/lib:$LD_LIBRARY_PATH" \
 end=$(date +%s.%N)
 echo "{\"event\":\"release\",\"name\":\"r1-boat\",\"seconds\":$(python3 -c "print($end-$start)")}" \
     | tee results/release/events.jsonl
-sha256sum results/release/r1-boat.mp4 results/fresh/r1-boat/output.mp4 \
+sha256sum results/release/r1-boat.mp4 results/release/r1-boat-reference.mp4 \
     | tee results/release/mp4-sha256.txt
+[ "$(cut -d' ' -f1 results/release/mp4-sha256.txt | uniq | wc -l)" = 1 ]
 
 python3 tests/serving/compare.py --serve results/serve --fresh results/fresh \
     --pairs r1-boat=r1-boat,r2-fox=r2-fox,r3-boat=r1-boat,r4-cat=r4-cat,r5-fox=r2-fox,r6-city=r6-city,r7-fox=r2-fox \
     --output results/serve/compare.json
 
-# Unchanged phase-one acceptance against the new build and shared weights.
+# Unchanged phase-one acceptance against the new build in reference mode.
+export H3_FLASH3=0 H3_VAE_3XTF32=0
 H3_WEIGHTS="$SHARED_MODEL/FL2VA"
 A=results/accept
 cp tests/pytorch/sources.json tests/pytorch/acceptance.json "$A/"
@@ -120,4 +132,13 @@ python3 tests/pytorch/cli_smoke.py --weights "$H3_WEIGHTS" --output "$A"
 python3 tests/pytorch/accept.py "$A"
 python3 tests/pytorch/extended.py --weights "$H3_WEIGHTS" --diffusers "$1/diffusers" \
     --output "$A/extended"
+unset H3_FLASH3 H3_VAE_3XTF32
+# Default mode: decoder acceptance on the reference-mode latents, then the
+# calibrated trajectory acceptance.
+python3 tests/pytorch/decoder_suite.py --weights "$H3_WEIGHTS" --diffusers "$1/diffusers" \
+    --trajectories "$A/trajectories" --output results/default/decoded
+python3 tests/pytorch/calibrate.py --weights "$H3_WEIGHTS" --diffusers "$1/diffusers" \
+    --text "$A/text/text-0.safetensors" --output results/default/trajectories | grep -v '^{"label"'
+python3 tests/pytorch/calibrated_accept.py --candidate results/default/trajectories/summary.json \
+    --output results/default/calibrated-acceptance.json
 RUN

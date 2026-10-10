@@ -1,0 +1,7 @@
+warmup|864|480|56|20|1|A red fox walks through fresh snow in a pine forest. Medium tracking shot, natural winter light, realistic fur, soft footsteps and wind.
+s5-boat|864|480|120|20|7|A small wooden fishing boat moves slowly across a calm mountain lake at sunrise. Mist drifts between pine trees, gentle waves touch the rocks, and birds call in the distance.
+s5-fox|864|480|120|20|11|A red fox walks through fresh snow in a pine forest. Medium tracking shot, natural winter light, realistic fur, soft footsteps and wind.
+s5-guitar|864|480|120|20|23|A street musician plays an acoustic guitar on a busy city corner at dusk. People walk past, car lights blur in the background, and the music mixes with traffic noise.
+s10-boat|864|480|240|20|7|A small wooden fishing boat moves slowly across a calm mountain lake at sunrise. Mist drifts between pine trees, gentle waves touch the rocks, and birds call in the distance.
+s10-fox|864|480|240|20|11|A red fox walks through fresh snow in a pine forest. Medium tracking shot, natural winter light, realistic fur, soft footsteps and wind.
+s10-guitar|864|480|240|20|23|A street musician plays an acoustic guitar on a busy city corner at dusk. People walk past, car lights blur in the background, and the music mixes with traffic noise.

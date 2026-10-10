@@ -58,6 +58,8 @@ def main():
     print(json.dumps(dict(passed=report['passed'],
                           requests={k: v['all_equal'] for k, v in report.items()
                                     if k != 'passed'})))
+    if not report['passed']:
+        raise SystemExit(1)
 
 
 if __name__ == '__main__':

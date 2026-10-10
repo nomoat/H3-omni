@@ -32,6 +32,10 @@ int h3_gpu_final_heads_f32(h3_gpu *gpu, h3_gpu_tensor *video_output,
                          const h3_gpu_tensor *audio_bias, uint32_t rows, uint32_t width,
                          uint32_t video_start, uint32_t video_rows,
                          uint32_t audio_start, uint32_t audio_rows);
+/* Split an FP32 weight into a TF32-exact high part (kept in place) and a
+ * low remainder stored beside it. FP32 linears with a split weight then run
+ * as three TF32 tensor-core products, xh*wh + xh*wl + xl*wh (3xTF32). */
+int h3_gpu_tensor_split_tf32(h3_gpu *gpu, h3_gpu_tensor *weight);
 #ifdef __cplusplus
 }
 #endif

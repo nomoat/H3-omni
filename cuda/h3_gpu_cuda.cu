@@ -37,6 +37,7 @@ struct h3_gpu_tensor {
     size_t elements{}, bytes{};
     h3_gpu_dtype dtype{};
     h3_gpu *owner{};
+    void *tf32_low{};  // FP32 remainder after the TF32-exact data (3xTF32 weights)
 };
 static void h3_gpu_set_error(h3_gpu *g, const char *format, ...) {
     if (!g)
@@ -117,10 +118,32 @@ static int h3_gpu_dispatch_2d(h3_gpu *g, const char *n, size_t x, size_t y, F f)
     return dispatch(g, n, dim3((x + 31) / 32, (y + 7) / 8), dim3(32, 8), f);
 }
 template <class F> static int h3_gpu_dispatch_3d(h3_gpu *g, const char *n, dim3 s, F f) {
-    return dispatch(g, n, dim3((s.x + 31) / 32, (s.y + 3) / 4, s.z), dim3(32, 4, 1), f);
+    // CUDA allows at most 65535 blocks in y and z (10 s audio has 320000
+    // samples in y). Taller grids use taller blocks. Every 3D primitive
+    // computes its own global index and checks bounds without shared memory,
+    // so the block shape does not change results.
+    unsigned by = 4, bz = 1;
+    while ((s.y + by - 1) / by > 65535 && 32 * by * bz < 1024) by *= 2;
+    while ((s.z + bz - 1) / bz > 65535 && 32 * by * bz < 1024) bz *= 2;
+    if ((s.y + by - 1) / by > 65535 || (s.z + bz - 1) / bz > 65535) {
+        h3_gpu_set_error(g, "%s: grid %u x %u x %u is too large", n, s.x, s.y, s.z);
+        return 0;
+    }
+    return dispatch(g, n, dim3((s.x + 31) / 32, (s.y + by - 1) / by, (s.z + bz - 1) / bz),
+                    dim3(32, by, bz), f);
 }
 template <class F> static int h3_gpu_dispatch_rows(h3_gpu *g, const char *n, size_t rows, F f) {
     return dispatch(g, n, dim3(rows), dim3(256), f);
+}
+// Without a release threshold the pool returns freed memory to the driver at
+// every synchronization, and the next allocation pays for mapping it again.
+static int keep_pool_memory(h3_gpu *g) {
+    int device = 0;
+    cudaMemPool_t pool{};
+    uint64_t threshold = UINT64_MAX;
+    return cuda_ok(g, cudaGetDevice(&device)) &&
+           cuda_ok(g, cudaDeviceGetDefaultMemPool(&pool, device)) &&
+           cuda_ok(g, cudaMemPoolSetAttribute(pool, cudaMemPoolAttrReleaseThreshold, &threshold));
 }
 extern "C" h3_gpu *h3_gpu_create(const char *, char *error, size_t size) {
     h3_gpu *g = new h3_gpu;
@@ -129,7 +152,8 @@ extern "C" h3_gpu *h3_gpu_create(const char *, char *error, size_t size) {
         !cuda_ok(g, cudaEventCreate(&g->stop_event)) ||
         !blas_ok(g, cublasSetStream(g->blas, g->stream)) ||
         !blas_ok(g, cublasSetMathMode(g->blas, CUBLAS_MATH_DISALLOW_REDUCED_PRECISION_REDUCTION)) ||
-        !dnn_ok(g, cudnnCreate(&g->dnn)) || !dnn_ok(g, cudnnSetStream(g->dnn, g->stream))) {
+        !dnn_ok(g, cudnnCreate(&g->dnn)) || !dnn_ok(g, cudnnSetStream(g->dnn, g->stream)) ||
+        !keep_pool_memory(g)) {
         if (error && size)
             snprintf(error, size, "%s", g->error);
         h3_gpu_free(g);
@@ -160,6 +184,28 @@ extern "C" int h3_gpu_is_m5(const h3_gpu *) { return 0; }
 extern "C" int h3_gpu_has_nax_mlp(const h3_gpu *) { return 0; }
 extern "C" int h3_gpu_has_int8_mlp(const h3_gpu *) { return 0; }
 static size_t item_size(h3_gpu_dtype d) { return d == H3_GPU_BF16 ? 2 : d == H3_GPU_I8 ? 1 : 4; }
+// Device memory comes from the stream-ordered pool. cudaFree synchronizes the
+// whole device, and per-operation temporaries made the GPU idle between
+// kernels. The pool keeps freed memory for reuse; when it cannot grow, idle
+// pool memory is returned to the driver and the allocation is retried.
+// Addresses change, values do not.
+static int device_alloc(h3_gpu *g, void **data, size_t bytes) {
+    cudaError_t e = cudaMallocAsync(data, bytes, g->stream);
+    if (e == cudaErrorMemoryAllocation) {
+        cudaGetLastError();
+        cudaMemPool_t pool{};
+        int device = 0;
+        if (cudaDeviceSynchronize() == cudaSuccess && cudaGetDevice(&device) == cudaSuccess &&
+            cudaDeviceGetDefaultMemPool(&pool, device) == cudaSuccess)
+            cudaMemPoolTrimTo(pool, 0);
+        e = cudaMallocAsync(data, bytes, g->stream);
+    }
+    return cuda_ok(g, e);
+}
+static void device_free(h3_gpu *g, void *data) {
+    if (data)
+        cudaFreeAsync(data, g->stream);
+}
 static h3_gpu_tensor *allocate(h3_gpu *g, size_t n, h3_gpu_dtype d) {
     if (!g || n > SIZE_MAX / item_size(d))
         return nullptr;
@@ -168,7 +214,7 @@ static h3_gpu_tensor *allocate(h3_gpu *g, size_t n, h3_gpu_dtype d) {
     t->bytes = n * item_size(d);
     t->dtype = d;
     t->owner = g;
-    if (!cuda_ok(g, cudaMalloc(&t->data, std::max(t->bytes, size_t(1))))) {
+    if (!device_alloc(g, &t->data, std::max(t->bytes, size_t(1)))) {
         delete t;
         return nullptr;
     }
@@ -190,8 +236,12 @@ extern "C" h3_gpu_tensor *h3_gpu_tensor_new_i8(h3_gpu *g, size_t n) {
 extern "C" void h3_gpu_tensor_free(h3_gpu_tensor *t) {
     if (!t)
         return;
-    cudaFree(t->data);
+    device_free(t->owner, t->data);
     t->owner->stats.live_bytes -= t->bytes;
+    if (t->tf32_low) {
+        device_free(t->owner, t->tf32_low);
+        t->owner->stats.live_bytes -= t->bytes;
+    }
     delete t;
 }
 extern "C" size_t h3_gpu_tensor_elements(const h3_gpu_tensor *t) { return t ? t->elements : 0; }
@@ -520,6 +570,57 @@ static int linear_bias_f32(h3_gpu *g, h3_gpu_tensor *y, const h3_gpu_tensor *x,
     ++g->stats.mps_linear_dispatches;
     return ok;
 }
+__global__ void split_tf32(const float *x, float *high, float *low, size_t n) {
+    size_t i = size_t(blockIdx.x) * blockDim.x + threadIdx.x;
+    if (i >= n) return;
+    uint bits;
+    asm("cvt.rna.tf32.f32 %0, %1;" : "=r"(bits) : "f"(x[i]));
+    float h = __uint_as_float(bits);
+    high[i] = h;
+    low[i] = x[i] - h;
+}
+extern "C" int h3_gpu_tensor_split_tf32(h3_gpu *g, h3_gpu_tensor *w) {
+    if (!h3_gpu_require_elements(g, w, w ? w->elements : 0, "TF32 split weight") ||
+        w->dtype != H3_GPU_F32 || w->tf32_low) return 0;
+    if (!device_alloc(g, &w->tf32_low, w->bytes)) return 0;
+    g->stats.live_bytes += w->bytes;
+    g->stats.peak_live_bytes = std::max(g->stats.peak_live_bytes, g->stats.live_bytes);
+    split_tf32<<<(w->elements + 255) / 256, 256, 0, g->stream>>>(
+        (const float *)w->data, (float *)w->data, (float *)w->tf32_low, w->elements);
+    return launch_ok(g);
+}
+// y = x w^T + b with 3xTF32: the activation is split per call, the weight at
+// load. Three Hopper TF32 products accumulate into y, then the bias is added.
+static int linear_3xtf32(h3_gpu *g, h3_gpu_tensor *y, const h3_gpu_tensor *x,
+                         const h3_gpu_tensor *w, const h3_gpu_tensor *b, uint rows, uint k,
+                         uint n) {
+    size_t count = size_t(rows) * k;
+    auto *parts = allocate(g, 2 * count, H3_GPU_F32);
+    if (!parts) return 0;
+    float *high = (float *)parts->data, *low = high + count;
+    split_tf32<<<(count + 255) / 256, 256, 0, g->stream>>>((const float *)x->data, high, low,
+                                                           count);
+    int ok = launch_ok(g);
+    const void *weights[3] = {w->tf32_low, w->data, w->data};
+    const float *inputs[3] = {high, low, high};
+    float one = 1, zero = 0;
+    for (int term = 0; ok && term < 3; term++)
+        ok = blas_ok(g, cublasGemmEx(g->blas, CUBLAS_OP_T, CUBLAS_OP_N, n, rows, k, &one,
+                                     weights[term], CUDA_R_32F, k, inputs[term], CUDA_R_32F, k,
+                                     term ? &one : &zero, y->data, CUDA_R_32F, n,
+                                     CUBLAS_COMPUTE_32F_FAST_TF32, CUBLAS_GEMM_DEFAULT));
+    if (ok && b) {
+        ok = h3_gpu_require_elements(g, b, n, "linear bias") && b->dtype == H3_GPU_F32;
+        if (ok) {
+            bias_f32<<<(size_t(rows) * n + 255) / 256, 256, 0, g->stream>>>(
+                (float *)y->data, (float *)b->data, size_t(rows) * n, n);
+            ok = launch_ok(g);
+        }
+    }
+    h3_gpu_tensor_free(parts);
+    ++g->stats.mps_linear_dispatches;
+    return ok;
+}
 static int linear(h3_gpu *g, h3_gpu_tensor *y, const h3_gpu_tensor *x, const h3_gpu_tensor *w,
                   const h3_gpu_tensor *b, uint rows, uint k, uint n, h3_gpu_dtype dtype) {
     if (!rows || !k || !n || rows > INT_MAX || k > INT_MAX || n > INT_MAX ||
@@ -528,6 +629,8 @@ static int linear(h3_gpu *g, h3_gpu_tensor *y, const h3_gpu_tensor *x, const h3_
         !h3_gpu_require_elements(g, y, (size_t)rows * n, "linear output") || x->dtype != dtype ||
         w->dtype != dtype || y->dtype != dtype)
         return 0;
+    if (dtype == H3_GPU_F32 && w->tf32_low)
+        return linear_3xtf32(g, y, x, w, b, rows, k, n);
     if (dtype == H3_GPU_F32 && b && k > 1 && n > 1) {
         if (!h3_gpu_require_elements(g, b, n, "linear bias") || b->dtype != dtype) return 0;
         return linear_bias_f32(g, y, x, w, b, rows, k, n);
@@ -863,6 +966,13 @@ __global__ void softmax_rows(float *x, int n, int qn, int start, bool causal) {
     for (int k = threadIdx.x; k < n; k += blockDim.x)
         v[k] /= sum;
 }
+static bool use_flash3() {
+    static const bool enabled = [] {
+        const char *value = getenv("H3_FLASH3");
+        return !value || strcmp(value, "0");
+    }();
+    return enabled;
+}
 static int sdpa(h3_gpu *g, h3_gpu_tensor *y, const h3_gpu_tensor *q, const h3_gpu_tensor *k,
                 const h3_gpu_tensor *v, uint batch, uint n, uint h, uint kh, uint d, float scale,
                 bool causal) {
@@ -872,9 +982,15 @@ static int sdpa(h3_gpu *g, h3_gpu_tensor *y, const h3_gpu_tensor *q, const h3_gp
         auto *lse = allocate(g, size_t(batch) * h * n, H3_GPU_F32);
         if (!lse)
             return 0;
-        int ok = cuda_ok(g, h3_flash_bf16(y->data, q->data, k->data, v->data,
-                                         static_cast<float *>(lse->data), batch, n, h, kh,
-                                         scale, causal, g->stream));
+        // Non-causal (DiT joint) attention uses the FlashAttention-3 Hopper
+        // kernel; H3_FLASH3=0 selects the FlashAttention-2 reference kernel.
+        int ok = cuda_ok(g, !causal && use_flash3()
+            ? h3_flash3_bf16(y->data, q->data, k->data, v->data,
+                             static_cast<float *>(lse->data), batch, n, h, kh, scale,
+                             g->stream)
+            : h3_flash_bf16(y->data, q->data, k->data, v->data,
+                            static_cast<float *>(lse->data), batch, n, h, kh,
+                            scale, causal, g->stream));
         h3_gpu_tensor_free(lse);
         ++g->stats.mps_sdpa_dispatches;
         return ok;
@@ -1046,7 +1162,7 @@ static int convolution(h3_gpu *g, h3_gpu_tensor *y, const h3_gpu_tensor *x, cons
                             g->dnn, dx, dw, dc, dy, CUDNN_CONVOLUTION_FWD_ALGO_IMPLICIT_GEMM, &ws));
     }
     if (ok && ws)
-        ok = cuda_ok(g, cudaMalloc(&workspace, ws));
+        ok = device_alloc(g, &workspace, ws);
     float one = 1, zero = 0;
     if (ok) {
         if (transpose)
@@ -1068,8 +1184,7 @@ static int convolution(h3_gpu *g, h3_gpu_tensor *y, const h3_gpu_tensor *x, cons
                                                           co);
         ok = launch_ok(g);
     }
-    if (workspace)
-        cudaFree(workspace);
+    device_free(g, workspace);
     h3_gpu_tensor_free(channel_first);
     if (dc)
         cudnnDestroyConvolutionDescriptor(dc);

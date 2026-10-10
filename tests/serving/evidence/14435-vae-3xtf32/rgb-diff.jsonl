@@ -1,0 +1,4 @@
+{"r1-boat": {"relative_l2": 2.6159476991877353e-05, "max_abs": 0.000736236572265625, "range": [0.0, 1.0], "pixels_equal": 0.9982636305390211, "pixels_off_by_1": 0.001736369460978836, "pixels_off_by_more": 0.0, "max_8bit": 1}}
+{"r2-fox": {"relative_l2": 2.048292096005839e-05, "max_abs": 0.00047132372856140137, "range": [0.0, 0.9492274522781372], "pixels_equal": 0.9981045444315844, "pixels_off_by_1": 0.0018954555684156378, "pixels_off_by_more": 0.0, "max_8bit": 1}}
+{"r4-cat": {"relative_l2": 5.7170996082161086e-05, "max_abs": 0.0004124939441680908, "range": [0.0, 1.0], "pixels_equal": 0.9969602642637311, "pixels_off_by_1": 0.0030397357362689395, "pixels_off_by_more": 0.0, "max_8bit": 1}}
+{"r6-city": {"relative_l2": 8.079219867339557e-05, "max_abs": 0.0005558133125305176, "range": [0.0, 1.0], "pixels_equal": 0.9968710234670928, "pixels_off_by_1": 0.003128976532907197, "pixels_off_by_more": 0.0, "max_8bit": 1}}

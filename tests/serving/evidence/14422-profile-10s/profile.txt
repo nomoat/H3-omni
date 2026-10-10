@@ -1,0 +1,56 @@
+== p10: 205.0 s
+  text encoder     wall    0.08  busy    0.03 (38%)  kernels     951 mean    30.2 us | gemm 0.01, h3 0.01, other 0.01, attention 0.00, memcpy 0.00
+         0.01 s      50x     144.8 us  [h3] _Z17h3_rope_text_bf16PtS_PKfS1_22text_rope_inplace_args
+         0.01 s     100x      69.9 us  [gemm] nvjet_tst_256x40_64x5_4x1_v_bz_TNT
+         0.01 s     200x      32.4 us  [other] _Z9qwen_normPtPKtS1_jfb
+         0.00 s      50x      68.6 us  [gemm] nvjet_tst_128x40_64x10_4x1_v_bz_splitK_TNT
+         0.00 s      50x      24.7 us  [gemm] nvjet_tst_64x40_64x16_2x1_v_bz_TNT
+         0.00 s      50x      24.5 us  [gemm] nvjet_tst_64x40_64x16_4x1_v_bz_TNT
+         0.00 s     100x       6.8 us  [gemm] nvjet_tst_64x24_64x16_4x2_v_bz_splitK_TNT
+         0.00 s      50x      11.9 us  [attention] _ZN16h3_flash_adapter14forward_kernelILb1ELb0EEEvN15h3_phase1_flash16Flash_fwd_paramsE
+         0.00 s     150x       2.4 us  [gemm] _ZN8cublasLt19splitKreduce_kernelILi32ELi16Eif13__nv_bfloat16fS1_Lb0EfS1_S1_Lb1ELb0ELb0EEEvNS_18cublasSplit...
+         0.00 s      50x       5.1 us  [h3] _Z16h3_silu_mul_bf16PKtS0_Ptj
+         0.00 s     100x       2.3 us  [h3] _Z11h3_add_bf16PKtS0_Ptj
+         0.00 s       1x      10.4 us  [memcpy] memcpy D2H
+  load transformer core wall    0.07  busy    0.00 (0%)  kernels       0 mean     0.0 us | memcpy 0.00
+         0.00 s       1x       4.6 us  [memcpy] memcpy H2D
+  denoise          wall  132.62  busy  127.44 (96%)  kernels   11180 mean 11395.8 us | attention 92.15, gemm 28.79, h3 6.46, memcpy 0.03, memset 0.00, other 0.00
+        92.15 s    1000x   92154.7 us  [attention] _ZN16h3_flash_adapter14forward_kernelILb0ELb0EEEvN15h3_phase1_flash16Flash_fwd_paramsE
+        20.08 s    3000x    6694.6 us  [gemm] nvjet_tst_192x208_64x4_2x1_v_bz_coopB_TNT
+         8.67 s    1000x    8665.2 us  [gemm] nvjet_tst_256x160_64x4_1x2_h_bz_coopA_TNT
+         2.34 s    1000x    2341.1 us  [h3] _Z16h3_qkv_rope_bf16PKtS0_S0_S0_S0_PtS1_S1_8qkv_args
+         1.59 s    1000x    1588.0 us  [h3] _Z14h3_swiglu_bf16PKtPt11swiglu_args
+         1.49 s    2000x     742.7 us  [h3] _Z12h3_gate_bf16PKtS0_S0_PKjPt9gate_args
+         1.02 s    2020x     505.8 us  [h3] _Z13h3_adaln_bf16PKtS0_S0_PKjPt10adaln_args
+         0.04 s      40x     908.0 us  [gemm] sm80_xmma_gemm_f32f32_f32f32_f32_tn_n_tilesize128x128x8_stage3_warpsize2x2x1_ffma_aligna4_alignc4_execute_k...
+         0.02 s      40x     404.3 us  [memcpy] memcpy D2H
+         0.01 s      40x     341.9 us  [memcpy] memcpy H2D
+         0.01 s      20x     525.1 us  [h3] _Z19h3_cast_bf16_to_f32PKtPfj
+         0.01 s      40x     254.2 us  [h3] _Z19h3_cast_f32_to_bf16PKfPtj
+  audio VAE        wall    0.38  busy    0.24 (65%)  kernels     492 mean   496.6 us | h3 0.15, gemm 0.09, conv 0.01, other 0.00, memcpy 0.00
+         0.14 s     127x    1138.2 us  [h3] _Z23h3_alias_free_snake_f32PKfS0_S0_S0_S0_Pf21audio_activation_args
+         0.05 s      77x     653.6 us  [gemm] _Z23implicit_convolve_sgemmIffLi1024ELi5ELi5ELi3ELi3ELi3ELi1ELb0ELb1ELb1EEviiiPKT_iPT0_S2_18kernel_conv_par...
+         0.03 s      38x     660.3 us  [gemm] _Z23implicit_convolve_sgemmIffLi1024ELi5ELi5ELi3ELi3ELi3ELi1ELb0ELb1ELb0EEviiiPKT_iPT0_S2_18kernel_conv_par...
+         0.01 s       9x    1102.6 us  [gemm] _Z23implicit_convolve_sgemmIffLi128ELi6ELi7ELi3ELi3ELi5ELi1ELb0ELb1ELb1EEviiiPKT_iPT0_S2_18kernel_conv_para...
+         0.00 s       4x     946.5 us  [gemm] _Z23implicit_convolve_sgemmIffLi128ELi6ELi7ELi3ELi3ELi5ELi1ELb0ELb1ELb0EEviiiPKT_iPT0_S2_18kernel_conv_para...
+         0.00 s       1x    3141.9 us  [conv] _ZN5cudnn6detail17dgrad_alg1_engineIfLi128ELi6ELi8ELi3ELi3ELi5ELb0ELb1EEEviiiPKT_iS4_iPS2_18kernel_grad_par...
+         0.00 s     135x      15.0 us  [other] _Z8bias_f32PfPKfmi
+         0.00 s       2x     841.2 us  [conv] _ZN5cudnn3cnn29dgrad2d_grouped_direct_kernelIfiffLb0ELb1ELi0ELi0EEEvNS0_24DgradGroupedDirectParamsEPKT_S5_P...
+         0.00 s      77x      17.5 us  [h3] _Z17h3_add_scaled_f32PKfS0_Pf15add_scaled_args
+         0.00 s       1x     917.0 us  [conv] _ZN5cudnn6detail14dgrad2d_alg1_1IfLi0ELi6ELi6ELi5ELi4ELi4ELb0ELb1EEEviiiPKT_iS4_iPS2_18kernel_grad_paramsyi...
+         0.00 s       3x     276.3 us  [gemm] sm80_xmma_dgrad_implicit_gemm_f32f32_f32f32_f32_nchwkcrs_nchw_tilesize32x32x8_stage3_warpsize1x2x1_g1_ffma_...
+         0.00 s      14x      44.1 us  [other] _Z13channel_orderPfPKfmiib
+  video VAE        wall   70.66  busy   57.79 (82%)  kernels  288540 mean   198.9 us | gemm 50.51, other 4.83, h3 2.04, memcpy 0.42, memset 0.00
+        40.94 s   30240x    1353.7 us  [gemm] sm80_xmma_gemm_f32f32_f32f32_f32_tn_n_tilesize128x128x8_stage3_warpsize2x2x1_ffma_aligna4_alignc4_execute_k...
+         4.93 s   52920x      93.2 us  [gemm] sm80_xmma_gemm_f32f32_f32f32_f32_nn_n_tilesize64x64x8_stage3_warpsize1x4x1_ffma_aligna4_alignc4_execute_ker...
+         4.02 s   53340x      75.4 us  [gemm] sm80_xmma_gemm_f32f32_f32f32_f32_tn_n_tilesize64x64x8_stage3_warpsize1x4x1_ffma_aligna4_alignc4_execute_ker...
+         3.81 s   60480x      62.9 us  [other] _Z12softmax_rowsPfiiib
+         1.02 s    7560x     135.1 us  [h3] _Z21h3_video_qkv_rope_f32PKfS0_S0_PfS1_S1_8qkv_args
+         0.81 s   22680x      35.5 us  [other] _Z10pack_headsIfEvPfPKT_miiii
+         0.60 s    7560x      79.7 us  [h3] _Z13h3_swiglu_f32PKfPf11swiglu_args
+         0.46 s    7560x      61.1 us  [gemm] _Z16gemmSN_NN_kernelIfLi128ELi2ELi4ELi8ELi5ELi4ELb0E30cublasGemvTensorStridedBatchedIKfES2_S0_IfEEv22cublas...
+         0.41 s     210x    1961.6 us  [memcpy] memcpy D2H
+         0.22 s    7560x      28.5 us  [other] _Z12unpack_headsIfEvPT_PKfmiii
+         0.21 s   15120x      14.2 us  [h3] _Z16h3_scale_add_f32PKfS0_S0_Pf14scale_add_args
+         0.19 s   15120x      12.9 us  [h3] _Z15h3_rms_norm_f32PKfS0_Pf9norm_args
+  FFmpeg           wall    1.14  busy    0.00 (0%)  kernels       0 mean     0.0 us | 

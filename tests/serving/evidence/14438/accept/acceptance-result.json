@@ -1,0 +1,22 @@
+{
+  "passed": true,
+  "contract_sha256": "fcece9d35dacbbf79dac53838bb0df625a1c457319dc250cb326de579fde2f72",
+  "evidence": [
+    "primitives.json",
+    "host.json",
+    "text/results.json",
+    "trajectories/256x256x22-seed0/results.json",
+    "decoded/256x256x22-seed0/results.json",
+    "trajectories/256x256x22-seed1/results.json",
+    "decoded/256x256x22-seed1/results.json",
+    "trajectories/256x256x22-seed42/results.json",
+    "decoded/256x256x22-seed42/results.json",
+    "trajectories/512x512x22-seed0/results.json",
+    "decoded/512x512x22-seed0/results.json",
+    "trajectories/512x512x22-seed1/results.json",
+    "decoded/512x512x22-seed1/results.json",
+    "trajectories/512x512x22-seed42/results.json",
+    "decoded/512x512x22-seed42/results.json",
+    "cli-smoke.json"
+  ]
+}
