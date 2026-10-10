@@ -1,0 +1,7 @@
+r1-boat|864|480|56|20|7|A small wooden fishing boat moves slowly across a calm mountain lake at sunrise. The camera follows from the shore as soft golden light reaches the water and mist drifts between the pine trees. Two people in blue jackets sit quietly in the boat. Gentle waves touch the rocks, birds call in the distance, and the wooden oars make a steady splash. Keep the camera motion smooth and show the reflections changing naturally.
+r2-fox|864|480|56|20|11|A red fox walks through fresh snow in a pine forest. Medium tracking shot, natural winter light, realistic fur, soft footsteps and wind.
+r3-boat|864|480|56|20|7|A small wooden fishing boat moves slowly across a calm mountain lake at sunrise. The camera follows from the shore as soft golden light reaches the water and mist drifts between the pine trees. Two people in blue jackets sit quietly in the boat. Gentle waves touch the rocks, birds call in the distance, and the wooden oars make a steady splash. Keep the camera motion smooth and show the reflections changing naturally.
+r4-cat|512|512|22|20|0|A cat walks through a sunny garden.
+r5-fox|864|480|56|20|11|A red fox walks through fresh snow in a pine forest. Medium tracking shot, natural winter light, realistic fur, soft footsteps and wind.
+r6-city|256|256|22|12|42|一只橘色的小猫在下雨的城市街道上奔跑，霓虹灯倒映在水坑里，远处传来汽车的声音。
+r7-fox|864|480|56|20|11|A red fox walks through fresh snow in a pine forest. Medium tracking shot, natural winter light, realistic fur, soft footsteps and wind.

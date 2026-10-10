@@ -1,0 +1,40 @@
+{
+  "passed": true,
+  "command": [
+    "/var/tmp/h3-serve-14416/build-cuda/h3",
+    "-d",
+    "/data0/models/h3-cuda/42ed227ee7df40d41602854ae760620d6eb651fe",
+    "-p",
+    "A cat walks through a sunny garden.",
+    "--width",
+    "256",
+    "--height",
+    "256",
+    "--frames",
+    "22",
+    "--steps",
+    "20",
+    "--layers",
+    "50",
+    "--reuse",
+    "1",
+    "--core-reuse",
+    "1",
+    "--seed",
+    "0",
+    "--profile",
+    "-o",
+    "results/accept/cli-smoke.mp4"
+  ],
+  "frames": 22,
+  "steps": 20,
+  "layers": 50,
+  "video_size": [
+    256,
+    256
+  ],
+  "decoded_audio_bytes": 237568,
+  "elapsed_seconds": 57.28904120158404,
+  "binary_sha256": "0e389ffbce59ab09ae6b5c4d2478a8c8d3be4546f944b5a7248a41eacca104e1",
+  "movie_sha256": "a3503bd054190c55fbcbcf89b147dd4a6d1dbef96f54593ccc33bbe9c8c2c275"
+}

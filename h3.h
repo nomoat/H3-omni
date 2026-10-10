@@ -25,6 +25,9 @@ typedef struct {
     size_t embedding_bytes;
     int prepared_dit;
     int video_decoder;
+    int resident_weights;
+    int text_encoder;
+    int audio_decoder;
 } h3_cache_info;
 
 typedef enum {
@@ -180,7 +183,17 @@ const h3_model_info *h3_model(const h3_ctx *ctx);
 /* Interactive-session reuse. Disabled by default so one-shot callers retain
  * the original phase-by-phase memory lifetime. */
 void h3_cache_set_enabled(h3_ctx *ctx, int enabled);
+/* Serving residency, effective while the cache is enabled. The tokenizer,
+ * Qwen text encoder, DiT blocks and heads, token refiner, and both decoders
+ * stay loaded across requests; a new prompt, seed, canvas, duration or step
+ * count rebuilds only request state with the same operations as a fresh load.
+ * Default: enabled in CUDA builds, disabled on Metal (unified-memory size). */
+void h3_cache_set_resident_weights(h3_ctx *ctx, int enabled);
+/* Release every cached request and every resident weight. */
 void h3_cache_clear(h3_ctx *ctx);
+/* Release cached prompt conditioning and prepared request state but keep
+ * resident weights. Use this when conditioning inputs change. */
+void h3_cache_clear_requests(h3_ctx *ctx);
 void h3_cache_get_info(const h3_ctx *ctx, h3_cache_info *info);
 
 /* Generate media, delivering decoded frames incrementally through on_frame. */

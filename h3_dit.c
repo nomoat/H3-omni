@@ -89,8 +89,27 @@ struct h3_dit {
     int use_slower_dynamic_fc1_k;
     int use_slower_grouped_quantizer;
     int use_int8_row_fc2;
+    int use_slower_bf16_qkv;
+    int use_slower_bf16_attention_output;
     int ssd_streaming;
     int keep_bf16_mlp;
+    /* Serving residency keeps the token refiner after a request and reuses
+     * the AdaLN table while its inputs are unchanged. Otherwise both are
+     * released after use, as in a one-shot run. */
+    int resident;
+    /* The AdaLN table depends only on the sigma schedule, the condition kinds
+     * and the active block set, never on the prompt. Recomputing it reads
+     * 26 GB of projection weights, so a resident DiT keeps the last table. */
+    h3_dit_schedule *schedule_cache;
+    h3_sigma_schedule schedule_cache_sigmas;
+    int schedule_cache_visual_condition;
+    int schedule_cache_audio_condition;
+    unsigned schedule_cache_active_blocks;
+    uint8_t schedule_cache_block_active[H3_DIT_BLOCKS];
+    h3_gpu_tensor *condition_w;
+    h3_gpu_tensor *condition_b;
+    h3_dit_block refiner[2];
+    h3_gpu_tensor *refiner_norm;
     int activation_aliases;
     int fused_patch_projection;
     int fused_patch_pack;
@@ -833,29 +852,44 @@ static int run_refiner_block(h3_dit *dit, const h3_dit_block *weight,
     return 1;
 }
 
+static void free_refiner(h3_dit *dit) {
+    free_tensor(&dit->condition_w);
+    free_tensor(&dit->condition_b);
+    free_block(&dit->refiner[0]);
+    free_block(&dit->refiner[1]);
+    free_tensor(&dit->refiner_norm);
+}
+
+static int load_refiner(h3_dit *dit, char *error, size_t error_size) {
+    if (dit->refiner_norm) return 1;
+    dit->condition_w = bf2(dit, "condition_proj.weight", HIDDEN, TEXT_DIM,
+                           error, error_size);
+    dit->condition_b = bf1(dit, "condition_proj.bias", HIDDEN,
+                           error, error_size);
+    int ok = dit->condition_w && dit->condition_b &&
+        load_block(dit, &dit->refiner[0], "token_refiner.blocks.0.",
+                   error, error_size) &&
+        load_block(dit, &dit->refiner[1], "token_refiner.blocks.1.",
+                   error, error_size);
+    if (ok) dit->refiner_norm = bf1(dit, "token_refiner.final_norm.weight",
+                                    HIDDEN, error, error_size);
+    if (!ok || !dit->refiner_norm) {
+        free_refiner(dit);
+        return 0;
+    }
+    return 1;
+}
+
 static int refine_text(h3_dit *dit, const h3_text_embedding *text,
                        char *error, size_t error_size) {
     h3_gpu_tensor *source = h3_gpu_tensor_from_bf16(
         dit->gpu, text->values, text->tokens * TEXT_DIM);
-    h3_gpu_tensor *condition_w = bf2(dit, "condition_proj.weight", HIDDEN,
-                                     TEXT_DIM, error, error_size);
-    h3_gpu_tensor *condition_b = bf1(dit, "condition_proj.bias", HIDDEN,
-                                     error, error_size);
-    h3_dit_block refiner[2];
-    memset(refiner, 0, sizeof(refiner));
-    h3_gpu_tensor *final_norm = NULL;
     h3_gpu_tensor *norm = NULL, *qkv = NULL, *query = NULL, *key = NULL;
     h3_gpu_tensor *value = NULL, *heads = NULL, *branch = NULL, *fc1 = NULL;
     h3_gpu_tensor *activated = NULL;
-    int ok = source && condition_w && condition_b &&
-        load_block(dit, &refiner[0], "token_refiner.blocks.0.",
-                   error, error_size) &&
-        load_block(dit, &refiner[1], "token_refiner.blocks.1.",
-                   error, error_size);
-    if (ok) final_norm = bf1(dit, "token_refiner.final_norm.weight", HIDDEN,
-                             error, error_size);
+    int ok = source && load_refiner(dit, error, error_size);
     size_t rows = dit->text_rows;
-    if (ok && final_norm) {
+    if (ok) {
         dit->refined_text = h3_gpu_tensor_new_bf16(dit->gpu, rows * HIDDEN);
         norm = h3_gpu_tensor_new_bf16(dit->gpu, rows * HIDDEN);
         qkv = h3_gpu_tensor_new_bf16(dit->gpu, rows * INNER * 3);
@@ -878,28 +912,24 @@ static int refine_text(h3_dit *dit, const h3_text_embedding *text,
     ok = gpu_op(dit, h3_gpu_begin(dit->gpu), error, error_size,
                 "begin token refinement") &&
          gpu_op(dit, h3_gpu_linear_bf16(
-             dit->gpu, dit->refined_text, source, condition_w, condition_b,
-             dit->text_rows, TEXT_DIM, HIDDEN), error, error_size,
-             "condition projection") &&
-         run_refiner_block(dit, &refiner[0], dit->refined_text, norm, qkv,
-             query, key, value, heads, branch, fc1, activated,
+             dit->gpu, dit->refined_text, source, dit->condition_w,
+             dit->condition_b, dit->text_rows, TEXT_DIM, HIDDEN), error,
+             error_size, "condition projection") &&
+         run_refiner_block(dit, &dit->refiner[0], dit->refined_text, norm,
+             qkv, query, key, value, heads, branch, fc1, activated,
              error, error_size) &&
-         run_refiner_block(dit, &refiner[1], dit->refined_text, norm, qkv,
-             query, key, value, heads, branch, fc1, activated,
+         run_refiner_block(dit, &dit->refiner[1], dit->refined_text, norm,
+             qkv, query, key, value, heads, branch, fc1, activated,
              error, error_size) &&
          gpu_op(dit, h3_gpu_rms_norm_bf16(
-             dit->gpu, dit->refined_text, dit->refined_text, final_norm,
-             dit->text_rows, HIDDEN, 1e-5f), error, error_size,
-             "refiner final norm") &&
+             dit->gpu, dit->refined_text, dit->refined_text,
+             dit->refiner_norm, dit->text_rows, HIDDEN, 1e-5f), error,
+             error_size, "refiner final norm") &&
          gpu_op(dit, h3_gpu_submit(dit->gpu), error, error_size,
                 "submit token refinement");
 cleanup:
     free_tensor(&source);
-    free_tensor(&condition_w);
-    free_tensor(&condition_b);
-    free_block(&refiner[0]);
-    free_block(&refiner[1]);
-    free_tensor(&final_norm);
+    if (!dit->resident) free_refiner(dit);
     free_tensor(&norm);
     free_tensor(&qkv);
     free_tensor(&query);
@@ -1270,10 +1300,18 @@ static void configure_gate_ranked_blocks(h3_dit *dit) {
     }
 }
 
+static int load_heads(h3_dit *dit, char *error, size_t error_size);
+
+/* Make the resident block set match the active set. A first load reads every
+ * active block; a serving rebind reads only newly active blocks and releases
+ * blocks that are no longer active. Patch and final heads load once. */
 static int load_core(h3_dit *dit, h3_dit_progress progress, void *opaque,
                      char *error, size_t error_size) {
     for (unsigned index = 0; index < H3_DIT_BLOCKS; index++) {
-        if (!dit->block_active[index]) {
+        int resident = dit->blocks[index].norm1 != NULL;
+        if (!dit->block_active[index] || resident) {
+            if (!dit->block_active[index] && resident)
+                free_block(&dit->blocks[index]);
             report(progress, opaque, "load transformer core", (int)index + 1,
                    H3_DIT_BLOCKS);
             continue;
@@ -1324,6 +1362,10 @@ static int load_core(h3_dit *dit, h3_dit_progress progress, void *opaque,
         dit->stream_bytes += job.bytes;
         dit->stream_read_seconds += job.seconds;
     }
+    return dit->video_patch_w || load_heads(dit, error, error_size);
+}
+
+static int load_heads(h3_dit *dit, char *error, size_t error_size) {
     dit->video_patch_w = f2(dit, "video_patch_proj.weight", HIDDEN,
                             VIDEO_PATCH, error, error_size);
     dit->video_patch_b = f1(dit, "video_patch_proj.bias", HIDDEN,
@@ -1588,6 +1630,169 @@ static void schedule_report(int completed, int total, void *opaque) {
     report(state->callback, state->opaque, "precompute AdaLN", completed, total);
 }
 
+static int valid_request(unsigned active_blocks, unsigned core_reuse_interval,
+                         float spatial_rope_scale, char *error,
+                         size_t error_size) {
+    if (!isfinite(spatial_rope_scale) || spatial_rope_scale <= 0.0f ||
+        active_blocks < H3_DIT_BLOCKS / 2 ||
+        active_blocks > H3_DIT_BLOCKS || core_reuse_interval < 1 ||
+        core_reuse_interval > 6) {
+        fail(error, error_size, "invalid DiT load arguments");
+        return 0;
+    }
+#ifdef H3_CUDA
+    if (active_blocks != H3_DIT_BLOCKS || core_reuse_interval != 1 ||
+        spatial_rope_scale != 1.0f) {
+        fail(error, error_size, "CUDA phase one requires all blocks, original "
+                               "precision and unmodified RoPE");
+        return 0;
+    }
+#endif
+    return 1;
+}
+
+/* Int8 projections are selected per sequence length, so they are request
+ * state even though they decide the loaded weight representation. */
+static void configure_int8_projections(h3_dit *dit) {
+    dit->int8_qkv = !dit->ssd_streaming && !dit->use_slower_bf16_qkv &&
+                    dit->sequence >= 128 &&
+                    h3_gpu_has_int8_mlp(dit->gpu);
+    dit->int8_attention_out = !dit->ssd_streaming &&
+                              !dit->use_slower_bf16_attention_output &&
+                              dit->sequence >= 128 &&
+                              h3_gpu_has_int8_mlp(dit->gpu);
+    dit->keep_bf16_attention_out = dit->int8_attention_out &&
+        (getenv("H3_INT8_KEEP_BF16_ATTENTION_OUT") ||
+         getenv("H3_BENCH_INT8_ATTENTION_OUT_AB"));
+    dit->keep_bf16_qkv = dit->int8_qkv &&
+        (getenv("H3_INT8_KEEP_BF16_QKV") ||
+         getenv("H3_BENCH_INT8_QKV_AB"));
+}
+
+static int any_block_resident(const h3_dit *dit) {
+    for (unsigned block = 0; block < H3_DIT_BLOCKS; block++)
+        if (dit->blocks[block].norm1) return 1;
+    return 0;
+}
+
+/* Only the first steps + 1 entries of each grid are defined. */
+static int same_sigmas(const h3_sigma_schedule *left,
+                       const h3_sigma_schedule *right) {
+    size_t count = (size_t)left->steps + 1;
+    return left->steps == right->steps &&
+           !memcmp(left->video, right->video, count * sizeof(*left->video)) &&
+           !memcmp(left->audio, right->audio, count * sizeof(*left->audio));
+}
+
+/* Prepare every prompt-, shape- and schedule-dependent tensor. The caller has
+ * released any previous request state. Returns -1 when the resident blocks use
+ * a weight representation that this request would not select. */
+static int bind_request(h3_dit *dit, const h3_text_embedding *text,
+                        const h3_layout *layout,
+                        const h3_sigma_schedule *sigmas,
+                        unsigned active_blocks,
+                        unsigned core_reuse_interval,
+                        int token_reduction,
+                        float spatial_rope_scale,
+                        const float *condition_video_rows,
+                        size_t condition_video_elements,
+                        const float *condition_audio_rows,
+                        size_t condition_audio_elements,
+                        h3_dit_progress progress, void *progress_opaque,
+                        char *error, size_t error_size) {
+    dit->core_reuse_interval = core_reuse_interval;
+    dit->spatial_rope_scale = spatial_rope_scale;
+    configure_active_blocks(dit, active_blocks);
+    if (!copy_layout(dit, layout, error, error_size) ||
+        !validate_layout(dit, text, error, error_size) ||
+        !configure_token_reduction(dit, token_reduction,
+                                   error, error_size)) return 0;
+    size_t wanted_video_condition =
+        (size_t)dit->video_condition_rows * VIDEO_PATCH;
+    size_t wanted_audio_condition =
+        (size_t)dit->audio_condition_rows * AUDIO_CHANNELS;
+    if (condition_video_elements != wanted_video_condition ||
+        condition_audio_elements != wanted_audio_condition ||
+        (wanted_video_condition && !condition_video_rows) ||
+        (wanted_audio_condition && !condition_audio_rows)) {
+        fail(error, error_size,
+             "condition row elements do not match the packed DiT layout");
+        return 0;
+    }
+    dit->sigmas = *sigmas;
+    int resident_blocks = any_block_resident(dit);
+    int int8_qkv = dit->int8_qkv;
+    int int8_attention_out = dit->int8_attention_out;
+    int keep_bf16_qkv = dit->keep_bf16_qkv;
+    int keep_bf16_attention_out = dit->keep_bf16_attention_out;
+    configure_int8_projections(dit);
+    if (resident_blocks &&
+        (int8_qkv != dit->int8_qkv ||
+         int8_attention_out != dit->int8_attention_out ||
+         keep_bf16_qkv != dit->keep_bf16_qkv ||
+         keep_bf16_attention_out != dit->keep_bf16_attention_out)) {
+        fail(error, error_size,
+             "resident DiT weights use another int8 projection layout");
+        return -1;
+    }
+    report(progress, progress_opaque, "refine text", 0, 1);
+    if (!refine_text(dit, text, error, error_size)) return 0;
+    report(progress, progress_opaque, "refine text", 1, 1);
+    schedule_progress schedule_state = {progress, progress_opaque};
+    int visual_condition = dit->video_condition_rows != 0;
+    int audio_condition = dit->audio_condition_rows != 0;
+    if (dit->schedule_cache &&
+        dit->schedule_cache_visual_condition == visual_condition &&
+        dit->schedule_cache_audio_condition == audio_condition &&
+        dit->schedule_cache_active_blocks == active_blocks &&
+        same_sigmas(&dit->schedule_cache_sigmas, sigmas)) {
+        /* Same inputs as the cached table: reuse it and its block set. */
+        dit->schedule = dit->schedule_cache;
+        memcpy(dit->block_active, dit->schedule_cache_block_active,
+               sizeof(dit->block_active));
+        report(progress, progress_opaque, "precompute AdaLN",
+               (int)H3_DIT_BLOCKS, (int)H3_DIT_BLOCKS);
+    } else {
+        h3_dit_schedule_free(dit->schedule_cache);
+        dit->schedule_cache = NULL;
+        dit->schedule = h3_dit_schedule_precompute(
+            dit->weights, dit->gpu, sigmas, visual_condition,
+            audio_condition, schedule_report, &schedule_state,
+            error, error_size);
+        if (dit->schedule) {
+            configure_gate_ranked_blocks(dit);
+            h3_dit_schedule_prune(dit->schedule, dit->block_active,
+                                  H3_DIT_BLOCKS);
+            if (dit->resident) {
+                dit->schedule_cache = dit->schedule;
+                dit->schedule_cache_sigmas = *sigmas;
+                dit->schedule_cache_visual_condition = visual_condition;
+                dit->schedule_cache_audio_condition = audio_condition;
+                dit->schedule_cache_active_blocks = active_blocks;
+                memcpy(dit->schedule_cache_block_active, dit->block_active,
+                       sizeof(dit->block_active));
+            }
+        }
+    }
+    if (!dit->schedule || !prepare_rope(dit, error, error_size) ||
+        !prepare_maps(dit, text, error, error_size) ||
+        !prepare_projection_maps(dit, error, error_size) ||
+        !prepare_token_reduction_maps(dit, error, error_size) ||
+        !load_core(dit, progress, progress_opaque, error, error_size) ||
+        !allocate_activations(dit, error, error_size)) return 0;
+    if ((wanted_video_condition && !h3_gpu_tensor_write_f32_range(
+             dit->video_input, 0, condition_video_rows,
+             wanted_video_condition)) ||
+        (wanted_audio_condition && !h3_gpu_tensor_write_f32_range(
+             dit->audio_input, 0, condition_audio_rows,
+             wanted_audio_condition))) {
+        fail(error, error_size, "cannot write persistent DiT condition rows");
+        return 0;
+    }
+    h3_gpu_profile_mark(dit->gpu, "load");
+    return 1;
+}
+
 static h3_dit *load_dit(const char *weight_directory,
                         const char *shader_source_path,
                         const h3_text_embedding *text,
@@ -1613,21 +1818,20 @@ static h3_dit *load_dit(const char *weight_directory,
                         size_t condition_video_elements,
                         const float *condition_audio_rows,
                         size_t condition_audio_elements,
+                        int resident,
                         h3_dit_progress progress, void *progress_opaque,
                         char *error, size_t error_size) {
     if (error && error_size) error[0] = '\0';
     if (!weight_directory || !shader_source_path || !layout || !sigmas ||
         (ssd_streaming != 0 && ssd_streaming != 1) ||
-        !isfinite(spatial_rope_scale) || spatial_rope_scale <= 0.0f ||
-        active_blocks < H3_DIT_BLOCKS / 2 ||
-        active_blocks > H3_DIT_BLOCKS || core_reuse_interval < 1 ||
-        core_reuse_interval > 6) {
-        fail(error, error_size, "invalid DiT load arguments");
+        !valid_request(active_blocks, core_reuse_interval,
+                       spatial_rope_scale, error, error_size)) {
+        if (!error || !*error)
+            fail(error, error_size, "invalid DiT load arguments");
         return NULL;
     }
 #ifdef H3_CUDA
-    if (active_blocks != H3_DIT_BLOCKS || core_reuse_interval != 1 ||
-        ssd_streaming || use_int8_row_fc2 || spatial_rope_scale != 1.0f) {
+    if (ssd_streaming || use_int8_row_fc2) {
         fail(error, error_size, "CUDA phase one requires all blocks, original "
                                "precision and unmodified RoPE");
         return NULL;
@@ -1647,27 +1851,8 @@ static h3_dit *load_dit(const char *weight_directory,
 #ifdef H3_CUDA
     dit->bf16_final = 0;
 #endif
-    dit->core_reuse_interval = core_reuse_interval;
     dit->ssd_streaming = ssd_streaming;
-    dit->spatial_rope_scale = spatial_rope_scale;
-    configure_active_blocks(dit, active_blocks);
-    if (!copy_layout(dit, layout, error, error_size) ||
-        !validate_layout(dit, text, error, error_size) ||
-        !configure_token_reduction(dit, token_reduction,
-                                   error, error_size)) goto failed;
-    size_t wanted_video_condition =
-        (size_t)dit->video_condition_rows * VIDEO_PATCH;
-    size_t wanted_audio_condition =
-        (size_t)dit->audio_condition_rows * AUDIO_CHANNELS;
-    if (condition_video_elements != wanted_video_condition ||
-        condition_audio_elements != wanted_audio_condition ||
-        (wanted_video_condition && !condition_video_rows) ||
-        (wanted_audio_condition && !condition_audio_rows)) {
-        fail(error, error_size,
-             "condition row elements do not match the packed DiT layout");
-        goto failed;
-    }
-    dit->sigmas = *sigmas;
+    dit->resident = resident;
     dit->weights = h3_weight_store_open(weight_directory, error, error_size);
     if (!dit->weights) goto failed;
     dit->gpu = h3_gpu_create(shader_source_path, error, error_size);
@@ -1676,13 +1861,8 @@ static h3_dit *load_dit(const char *weight_directory,
     dit->int8_mlp = !dit->ssd_streaming && dit->fused_mlp &&
                     !use_slower_bf16_mlp &&
                     h3_gpu_has_int8_mlp(dit->gpu);
-    dit->int8_qkv = !dit->ssd_streaming && !use_slower_bf16_qkv &&
-                    dit->sequence >= 128 &&
-                    h3_gpu_has_int8_mlp(dit->gpu);
-    dit->int8_attention_out = !dit->ssd_streaming &&
-                              !use_slower_bf16_attention_output &&
-                              dit->sequence >= 128 &&
-                              h3_gpu_has_int8_mlp(dit->gpu);
+    dit->use_slower_bf16_qkv = use_slower_bf16_qkv;
+    dit->use_slower_bf16_attention_output = use_slower_bf16_attention_output;
     dit->use_slower_row_major_attention_output =
         use_slower_row_major_attention_output;
     dit->use_slower_unfused_int8_inputs =
@@ -1693,12 +1873,6 @@ static h3_dit *load_dit(const char *weight_directory,
     dit->use_slower_uncached_int8_scales =
         use_slower_uncached_int8_scales;
     dit->use_slower_dynamic_fc1_k = use_slower_dynamic_fc1_k;
-    dit->keep_bf16_attention_out = dit->int8_attention_out &&
-        (getenv("H3_INT8_KEEP_BF16_ATTENTION_OUT") ||
-         getenv("H3_BENCH_INT8_ATTENTION_OUT_AB"));
-    dit->keep_bf16_qkv = dit->int8_qkv &&
-        (getenv("H3_INT8_KEEP_BF16_QKV") ||
-         getenv("H3_BENCH_INT8_QKV_AB"));
     dit->use_slower_grouped_quantizer = use_slower_grouped_quantizer;
     dit->use_int8_row_fc2 = dit->int8_mlp && use_int8_row_fc2;
     dit->keep_bf16_mlp = dit->int8_mlp &&
@@ -1706,36 +1880,13 @@ static h3_dit *load_dit(const char *weight_directory,
          getenv("H3_BENCH_INT8_MLP_AB") ||
          getenv("H3_INT8_MLP_STAGE"));
     h3_gpu_profile_set_label(dit->gpu, "H3 DiT");
-    report(progress, progress_opaque, "refine text", 0, 1);
-    if (!refine_text(dit, text, error, error_size)) goto failed;
-    report(progress, progress_opaque, "refine text", 1, 1);
-    schedule_progress schedule_state = {progress, progress_opaque};
-    dit->schedule = h3_dit_schedule_precompute(
-        dit->weights, dit->gpu, sigmas, dit->video_condition_rows != 0,
-        dit->audio_condition_rows != 0, schedule_report, &schedule_state,
-        error, error_size);
-    if (dit->schedule) {
-        configure_gate_ranked_blocks(dit);
-        h3_dit_schedule_prune(dit->schedule, dit->block_active,
-                              H3_DIT_BLOCKS);
-    }
-    if (!dit->schedule || !prepare_rope(dit, error, error_size) ||
-        !prepare_maps(dit, text, error, error_size) ||
-        !prepare_projection_maps(dit, error, error_size) ||
-        !prepare_token_reduction_maps(dit, error, error_size) ||
-        !load_core(dit, progress, progress_opaque, error, error_size) ||
-        !allocate_activations(dit, error, error_size)) goto failed;
-    if ((wanted_video_condition && !h3_gpu_tensor_write_f32_range(
-             dit->video_input, 0, condition_video_rows,
-             wanted_video_condition)) ||
-        (wanted_audio_condition && !h3_gpu_tensor_write_f32_range(
-             dit->audio_input, 0, condition_audio_rows,
-             wanted_audio_condition))) {
-        fail(error, error_size, "cannot write persistent DiT condition rows");
-        goto failed;
-    }
-    h3_gpu_profile_mark(dit->gpu, "load");
-    return dit;
+    if (bind_request(dit, text, layout, sigmas, active_blocks,
+                     core_reuse_interval, token_reduction,
+                     spatial_rope_scale, condition_video_rows,
+                     condition_video_elements, condition_audio_rows,
+                     condition_audio_elements, progress, progress_opaque,
+                     error, error_size) == 1)
+        return dit;
 failed:
     h3_dit_free(dit);
     return NULL;
@@ -1778,7 +1929,7 @@ h3_dit *h3_dit_load_t2va(const char *weight_directory,
                     use_slower_dynamic_fc1_k,
                     use_slower_grouped_quantizer,
                     use_int8_row_fc2,
-                    NULL, 0, NULL, 0, progress, progress_opaque,
+                    NULL, 0, NULL, 0, 0, progress, progress_opaque,
                     error, error_size);
 }
 
@@ -1826,7 +1977,92 @@ h3_dit *h3_dit_load_conditioned(
                     use_int8_row_fc2,
                     condition_video_rows, condition_video_elements,
                     condition_audio_rows, condition_audio_elements,
-                    progress, progress_opaque, error, error_size);
+                    0, progress, progress_opaque, error, error_size);
+}
+
+h3_dit *h3_dit_load_resident(
+                         const char *weight_directory,
+                         const char *shader_source_path,
+                         const h3_text_embedding *text,
+                         const h3_layout *layout,
+                         const h3_sigma_schedule *sigmas,
+                         unsigned active_blocks,
+                         unsigned core_reuse_interval,
+                         int token_reduction,
+                         int ssd_streaming,
+                         float spatial_rope_scale,
+                         int use_slower_bf16_mlp,
+                         int use_slower_bf16_qkv,
+                         int use_slower_bf16_attention_output,
+                         int use_slower_row_major_attention_output,
+                         int use_slower_unfused_int8_inputs,
+                         int use_slower_unfused_qkv_rope,
+                         int use_slower_scalar_qkv_rms,
+                         int use_slower_uncached_int8_scales,
+                         int use_slower_dynamic_fc1_k,
+                         int use_slower_grouped_quantizer,
+                         int use_int8_row_fc2,
+                         const float *condition_video_rows,
+                         size_t condition_video_elements,
+                         const float *condition_audio_rows,
+                         size_t condition_audio_elements,
+                         h3_dit_progress progress, void *progress_opaque,
+                         char *error, size_t error_size) {
+    return load_dit(weight_directory, shader_source_path, text, layout, sigmas,
+                    active_blocks, core_reuse_interval, token_reduction,
+                    ssd_streaming,
+                    spatial_rope_scale,
+                    use_slower_bf16_mlp, use_slower_bf16_qkv,
+                    use_slower_bf16_attention_output,
+                    use_slower_row_major_attention_output,
+                    use_slower_unfused_int8_inputs,
+                    use_slower_unfused_qkv_rope,
+                    use_slower_scalar_qkv_rms,
+                    use_slower_uncached_int8_scales,
+                    use_slower_dynamic_fc1_k,
+                    use_slower_grouped_quantizer,
+                    use_int8_row_fc2,
+                    condition_video_rows, condition_video_elements,
+                    condition_audio_rows, condition_audio_elements,
+                    1, progress, progress_opaque, error, error_size);
+}
+
+static void free_request_state(h3_dit *dit);
+
+int h3_dit_rebind(h3_dit *dit, const h3_text_embedding *text,
+                  const h3_layout *layout,
+                  const h3_sigma_schedule *sigmas,
+                  unsigned active_blocks,
+                  unsigned core_reuse_interval,
+                  int token_reduction,
+                  float spatial_rope_scale,
+                  const float *condition_video_rows,
+                  size_t condition_video_elements,
+                  const float *condition_audio_rows,
+                  size_t condition_audio_elements,
+                  h3_dit_progress progress, void *progress_opaque,
+                  char *error, size_t error_size) {
+    if (error && error_size) error[0] = '\0';
+    if (!dit || !layout || !sigmas ||
+        !valid_request(active_blocks, core_reuse_interval,
+                       spatial_rope_scale, error, error_size)) {
+        if (!error || !*error)
+            fail(error, error_size, "invalid DiT rebind arguments");
+        return 0;
+    }
+    /* A streamed transformer keeps request-specific stream state and only two
+     * matrix slots. Reloading it is cheap and keeps that path unchanged. */
+    if (dit->ssd_streaming) {
+        fail(error, error_size, "SSD-streamed DiT is reloaded per request");
+        return -1;
+    }
+    free_request_state(dit);
+    return bind_request(dit, text, layout, sigmas, active_blocks,
+                        core_reuse_interval, token_reduction,
+                        spatial_rope_scale, condition_video_rows,
+                        condition_video_elements, condition_audio_rows,
+                        condition_audio_elements, progress, progress_opaque,
+                        error, error_size);
 }
 
 static int enter_token_reduction(h3_dit *dit, char *error,
@@ -3082,8 +3318,9 @@ int h3_dit_denoise_euler(h3_dit *dit, float *video_latent,
         progress, progress_opaque, NULL, NULL, error, error_size);
 }
 
-void h3_dit_free(h3_dit *dit) {
-    if (!dit) return;
+/* Release everything prepared for one request and return the transformer to
+ * its weight-only state. Weight-level configuration is left untouched. */
+static void free_request_state(h3_dit *dit) {
     int steps = h3_dit_schedule_steps(dit->schedule);
     if (dit->row_maps) for (int step = 0; step < steps; step++)
         h3_gpu_tensor_free(dit->row_maps[step]);
@@ -3097,20 +3334,15 @@ void h3_dit_free(h3_dit *dit) {
     free(dit->reduced_row_maps);
     free(dit->final_audio_maps);
     free(dit->final_video_maps);
+    dit->row_maps = NULL;
+    dit->reduced_row_maps = NULL;
+    dit->final_audio_maps = NULL;
+    dit->final_video_maps = NULL;
     free_tensor(&dit->refined_text);
     free_tensor(&dit->rope_cos);
     free_tensor(&dit->rope_sin);
     free_tensor(&dit->reduced_rope_cos);
     free_tensor(&dit->reduced_rope_sin);
-    free_tensor(&dit->video_patch_w); free_tensor(&dit->video_patch_b);
-    free_tensor(&dit->audio_patch_w); free_tensor(&dit->audio_patch_b);
-    for (unsigned block = 0; block < H3_DIT_BLOCKS; block++)
-        free_block(&dit->blocks[block]);
-    free_block(&dit->stream_slots[0]);
-    free_block(&dit->stream_slots[1]);
-    free_tensor(&dit->final_norm);
-    free_tensor(&dit->final_video_w); free_tensor(&dit->final_video_b);
-    free_tensor(&dit->final_audio_w); free_tensor(&dit->final_audio_b);
 #define FREE(field) free_tensor(&dit->field)
     if (dit->activation_aliases) {
         dit->attention_heads = NULL;
@@ -3134,7 +3366,51 @@ void h3_dit_free(h3_dit *dit) {
     FREE(audio_output_bf16); FREE(video_output_bf16);
     FREE(previous_audio_velocity); FREE(previous_video_velocity);
 #undef FREE
-    h3_dit_schedule_free(dit->schedule);
+    if (dit->schedule != dit->schedule_cache)
+        h3_dit_schedule_free(dit->schedule);
+    dit->schedule = NULL;
+    h3_layout_free(&dit->layout);
+    memset(&dit->layout, 0, sizeof(dit->layout));
+    memset(&dit->sigmas, 0, sizeof(dit->sigmas));
+    dit->activation_aliases = 0;
+    dit->fused_patch_projection = 0;
+    dit->fused_patch_pack = 0;
+    dit->token_reduction = 0;
+    dit->token_reduction_active = 0;
+    dit->token_reduction_begin = 0;
+    dit->token_reduction_end = 0;
+    dit->token_reduction_early_steps = 0;
+    dit->token_reduction_early_end = 0;
+    dit->token_reduction_scale = 0.0f;
+    dit->token_original_in_qkv = 0;
+    dit->token_original_offset = 0;
+    dit->token_baseline_offset = 0;
+    dit->core_forward_count = 0;
+    dit->core_residual_ready = 0;
+    dit->latent_t = dit->latent_h = dit->latent_w = dit->audio_t = 0;
+    dit->text_rows = 0;
+    dit->video_condition_rows = dit->audio_condition_rows = 0;
+    dit->audio_rows = dit->video_rows = 0;
+    dit->video_total_rows = dit->audio_total_rows = 0;
+    dit->audio_target_start = dit->video_target_start = 0;
+    dit->sequence = dit->reduced_sequence = 0;
+    dit->reduced_video_rows = dit->token_baseline_rows = 0;
+}
+
+void h3_dit_free(h3_dit *dit) {
+    if (!dit) return;
+    free_request_state(dit);
+    free_refiner(dit);
+    h3_dit_schedule_free(dit->schedule_cache);
+    free_tensor(&dit->video_patch_w); free_tensor(&dit->video_patch_b);
+    free_tensor(&dit->audio_patch_w); free_tensor(&dit->audio_patch_b);
+    for (unsigned block = 0; block < H3_DIT_BLOCKS; block++)
+        free_block(&dit->blocks[block]);
+    free_block(&dit->stream_slots[0]);
+    free_block(&dit->stream_slots[1]);
+    free_tensor(&dit->final_norm);
+    free_tensor(&dit->final_video_w); free_tensor(&dit->final_video_b);
+    free_tensor(&dit->final_audio_w); free_tensor(&dit->final_audio_b);
     if (dit->ssd_streaming && getenv("H3_PROFILE")) {
         double gib = (double)dit->stream_bytes / (1024.0 * 1024.0 * 1024.0);
         fprintf(stderr,
@@ -3147,7 +3423,6 @@ void h3_dit_free(h3_dit *dit) {
     }
     h3_gpu_free(dit->gpu);
     h3_weight_store_free(dit->weights);
-    h3_layout_free(&dit->layout);
     free(dit);
 }
 

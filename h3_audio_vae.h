@@ -42,6 +42,22 @@ int h3_audio_vae_encode(const char *weight_directory,
                         h3_audio_vae_progress progress, void *progress_opaque,
                         h3_audio_latent *output,
                         char *error, size_t error_size);
+/* Serving form: load and weight-normalize the decoder once, then decode many
+ * latents with the same operations as h3_audio_vae_decode. Calls must not
+ * overlap because the decoder owns one GPU context. */
+typedef struct h3_audio_vae_decoder h3_audio_vae_decoder;
+h3_audio_vae_decoder *h3_audio_vae_decoder_load(
+                        const char *weight_directory,
+                        const char *shader_source_path,
+                        char *error, size_t error_size);
+void h3_audio_vae_decoder_free(h3_audio_vae_decoder *decoder);
+int h3_audio_vae_decoder_decode(h3_audio_vae_decoder *decoder,
+                                const float *normalized_latent,
+                                int latent_length,
+                                h3_audio_vae_progress progress,
+                                void *progress_opaque,
+                                h3_audio_waveform *output,
+                                char *error, size_t error_size);
 void h3_audio_waveform_free(h3_audio_waveform *waveform);
 void h3_audio_latent_free(h3_audio_latent *latent);
 

@@ -28,6 +28,12 @@ h3_video_vae_decoder *h3_video_vae_decoder_load(
                         int latent_height, int latent_width,
                         h3_video_vae_progress progress, void *progress_opaque,
                         char *error, size_t error_size);
+/* Retarget a resident decoder to another latent canvas without reloading its
+ * weights. Only the tile plan, RoPE table and tile activations are rebuilt.
+ * After a failure the decoder is incomplete and must be freed. */
+int h3_video_vae_decoder_reshape(h3_video_vae_decoder *decoder,
+                        int latent_height, int latent_width,
+                        char *error, size_t error_size);
 int h3_video_vae_decoder_preview(h3_video_vae_decoder *decoder,
                         const float *normalized_latent, int latent_time,
                         h3_video_frames *output, int *output_frame_index,

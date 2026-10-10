@@ -64,4 +64,21 @@ int h3_text_encode_multimodal_layers_bf16(
                         char *error, size_t error_size);
 void h3_text_embedding_free(h3_text_embedding *embedding);
 
+/* Serving form: load the same 50 language layers and token embedding once,
+ * then encode many prompts with operations identical to h3_text_encode_bf16.
+ * The encoder owns its GPU context; encoding calls must not overlap. */
+typedef struct h3_text_encoder h3_text_encoder;
+h3_text_encoder *h3_text_encoder_load(const char *weight_directory,
+                                      const char *shader_source_path,
+                                      h3_text_progress progress,
+                                      void *progress_opaque,
+                                      char *error, size_t error_size);
+void h3_text_encoder_free(h3_text_encoder *encoder);
+int h3_text_encoder_encode_bf16(h3_text_encoder *encoder,
+                                const uint32_t *token_ids, size_t token_count,
+                                h3_text_progress progress,
+                                void *progress_opaque,
+                                h3_text_embedding *output,
+                                char *error, size_t error_size);
+
 #endif

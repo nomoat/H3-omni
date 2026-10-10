@@ -75,6 +75,57 @@ h3_dit *h3_dit_load_conditioned(
                          size_t condition_audio_elements,
                          h3_dit_progress progress, void *progress_opaque,
                          char *error, size_t error_size);
+/* Serving form of h3_dit_load_conditioned. The token refiner stays resident
+ * with the transformer blocks so later requests can be rebound without
+ * reading any request-independent weight again. */
+h3_dit *h3_dit_load_resident(
+                         const char *weight_directory,
+                         const char *shader_source_path,
+                         const h3_text_embedding *text,
+                         const h3_layout *layout,
+                         const h3_sigma_schedule *sigmas,
+                         unsigned active_blocks,
+                         unsigned core_reuse_interval,
+                         int token_reduction,
+                         int ssd_streaming,
+                         float spatial_rope_scale,
+                         int use_slower_bf16_mlp,
+                         int use_slower_bf16_qkv,
+                         int use_slower_bf16_attention_output,
+                         int use_slower_row_major_attention_output,
+                         int use_slower_unfused_int8_inputs,
+                         int use_slower_unfused_qkv_rope,
+                         int use_slower_scalar_qkv_rms,
+                         int use_slower_uncached_int8_scales,
+                         int use_slower_dynamic_fc1_k,
+                         int use_slower_grouped_quantizer,
+                         int use_int8_row_fc2,
+                         const float *condition_video_rows,
+                         size_t condition_video_elements,
+                         const float *condition_audio_rows,
+                         size_t condition_audio_elements,
+                         h3_dit_progress progress, void *progress_opaque,
+                         char *error, size_t error_size);
+/* Prepare a loaded transformer for another prompt, canvas, duration, step
+ * count or condition set. Request state (refined text, AdaLN schedule, RoPE,
+ * row maps, activations and condition rows) is rebuilt with the same code as
+ * a fresh load; resident weights are reused. Returns 1 on success, -1 when the
+ * resident weight representation cannot serve the request (SSD streaming or a
+ * different int8 projection choice), and 0 on error. After -1 or 0 the caller
+ * must free the transformer and load a new one if needed. */
+int h3_dit_rebind(h3_dit *dit, const h3_text_embedding *text,
+                  const h3_layout *layout,
+                  const h3_sigma_schedule *sigmas,
+                  unsigned active_blocks,
+                  unsigned core_reuse_interval,
+                  int token_reduction,
+                  float spatial_rope_scale,
+                  const float *condition_video_rows,
+                  size_t condition_video_elements,
+                  const float *condition_audio_rows,
+                  size_t condition_audio_elements,
+                  h3_dit_progress progress, void *progress_opaque,
+                  char *error, size_t error_size);
 void h3_dit_free(h3_dit *dit);
 
 /* Reset mutable sampler state and replace seed-dependent condition rows before

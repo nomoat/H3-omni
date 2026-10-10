@@ -105,6 +105,40 @@ Slurm allocation, the launcher can run the same example:
   --reuse 1 --core-reuse 1 --seed 0 -o cat.mp4
 ```
 
+## Serving residency
+
+A one-shot `h3 -p ...` process loads every weight, generates once and exits.
+That is the path the acceptance below measures. For serving, a long-lived
+process should load weights once. With the cache enabled (interactive CLI, or
+`h3_cache_set_enabled` in the library), CUDA builds keep these objects loaded
+across requests by default (`--resident-weights off` or
+`h3_cache_set_resident_weights(ctx, 0)` disables it):
+
+| Object | Resident content | Rebuilt per request |
+| --- | --- | --- |
+| Tokenizer | parsed `tokenizer.json` | token IDs |
+| Qwen text encoder | 50 layers and the token embedding | prompt activations |
+| DiT | 50 blocks, patch/final heads, token refiner, timestep embedder and AdaLN projections | refined text, AdaLN table for the step count, RoPE, row maps, activations |
+| Video VAE decoder | all weights | tile plan, RoPE and tile activations when the canvas changes |
+| Audio VAE decoder | weight-normalized convolutions | activations |
+
+A new prompt, seed, canvas, frame count or step count runs the same request
+preparation code as a fresh load (`h3_dit_rebind` reuses it), so results do not
+depend on what the process served before. Peak use on one H200 is about 100 GB.
+Image/video/audio-conditioned requests still stream their Qwen vision and
+encoder weights; only their DiT and decoders are resident.
+
+`tests/serving/serve.sbatch` checks this. One process serves six requests:
+two prompts at 864x480/56 frames, the first prompt again after the second,
+512x512/22 frames, the second prompt again after the canvas change, and a
+Chinese prompt at 256x256. Each distinct request is also run as a fresh
+one-shot process. The denoised video/audio latents, decoded RGB and PCM
+(`H3_DUMP_DIR`, diagnostic only) and MP4 bytes must be identical. The same job
+reruns the full acceptance above on the new build and compares the one-shot
+MP4 with release 14274.
+
+SERVING_RESULTS_PLACEHOLDER
+
 ## Reference environment and tests
 
 `tests/pytorch/prepare.sh` installs the pinned Diffusers source and Transformers

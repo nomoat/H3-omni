@@ -53,23 +53,64 @@ static void h3_conditioning_cache_clear(h3_ctx *ctx) {
     ctx->conditioning_present = 0;
 }
 
-void h3_cache_clear(h3_ctx *ctx) {
-    if (!ctx) return;
-    h3_conditioning_cache_clear(ctx);
+static void h3_resident_dit_clear(h3_ctx *ctx) {
     h3_dit_free(ctx->dit);
     ctx->dit = NULL;
     free(ctx->dit_key);
     ctx->dit_key = NULL;
+    free(ctx->dit_weights_key);
+    ctx->dit_weights_key = NULL;
+}
+
+static void h3_resident_video_decoder_clear(h3_ctx *ctx) {
     h3_video_vae_decoder_free(ctx->video_decoder);
     ctx->video_decoder = NULL;
     free(ctx->video_decoder_key);
     ctx->video_decoder_key = NULL;
 }
 
+void h3_cache_clear_requests(h3_ctx *ctx) {
+    if (!ctx) return;
+    h3_conditioning_cache_clear(ctx);
+    if (ctx->dit && ctx->dit_weights_key) {
+        /* Keep the weights; the next request rebuilds its request state. */
+        free(ctx->dit_key);
+        ctx->dit_key = NULL;
+    } else {
+        h3_resident_dit_clear(ctx);
+    }
+}
+
+void h3_cache_clear(h3_ctx *ctx) {
+    if (!ctx) return;
+    h3_conditioning_cache_clear(ctx);
+    h3_resident_dit_clear(ctx);
+    h3_resident_video_decoder_clear(ctx);
+    h3_tokenizer_free(ctx->tokenizer);
+    ctx->tokenizer = NULL;
+    free(ctx->tokenizer_key);
+    ctx->tokenizer_key = NULL;
+    h3_text_encoder_free(ctx->text_encoder);
+    ctx->text_encoder = NULL;
+    free(ctx->text_encoder_key);
+    ctx->text_encoder_key = NULL;
+    h3_audio_vae_decoder_free(ctx->audio_decoder);
+    ctx->audio_decoder = NULL;
+    free(ctx->audio_decoder_key);
+    ctx->audio_decoder_key = NULL;
+}
+
 void h3_cache_set_enabled(h3_ctx *ctx, int enabled) {
     if (!ctx) return;
     if (!enabled) h3_cache_clear(ctx);
     ctx->cache_enabled = enabled != 0;
+}
+
+void h3_cache_set_resident_weights(h3_ctx *ctx, int enabled) {
+    if (!ctx || ctx->resident_weights == (enabled != 0)) return;
+    /* Resident and per-phase objects use different cache keys. */
+    h3_cache_clear(ctx);
+    ctx->resident_weights = enabled != 0;
 }
 
 void h3_cache_get_info(const h3_ctx *ctx, h3_cache_info *info) {
@@ -89,6 +130,9 @@ void h3_cache_get_info(const h3_ctx *ctx, h3_cache_info *info) {
     }
     info->prepared_dit = ctx->dit != NULL;
     info->video_decoder = ctx->video_decoder != NULL;
+    info->resident_weights = ctx->cache_enabled && ctx->resident_weights;
+    info->text_encoder = ctx->text_encoder != NULL;
+    info->audio_decoder = ctx->audio_decoder != NULL;
 }
 
 static int h3_key_append(h3_key *key, const char *format, ...) {
@@ -418,6 +462,9 @@ h3_ctx *h3_load_dir(const char *model_dir) {
         h3_set_error(NULL, "out of memory creating H3 context");
         return NULL;
     }
+#ifdef H3_CUDA
+    ctx->resident_weights = 1;
+#endif
     ctx->model_dir = strdup(model_dir);
     if (!ctx->model_dir) {
         h3_set_error(NULL, "out of memory copying model path");
@@ -706,6 +753,13 @@ static h3_video_vae_decoder *h3_acquire_video_decoder(
     *cached = 0;
     if (ctx->cache_enabled && ctx->video_decoder &&
         ctx->video_decoder_key && !strcmp(ctx->video_decoder_key, key)) {
+        /* A resident decoder is keyed by weights only and follows the
+         * requested canvas; the per-phase key already includes the canvas. */
+        if (!h3_video_vae_decoder_reshape(ctx->video_decoder, latent_height,
+                                          latent_width, error, error_size)) {
+            h3_resident_video_decoder_clear(ctx);
+            return NULL;
+        }
         *cached = 1;
         fprintf(stderr, "h3: video VAE cache hit\n");
         return ctx->video_decoder;
@@ -730,6 +784,128 @@ static h3_video_vae_decoder *h3_acquire_video_decoder(
     *cached = 1;
     fprintf(stderr, "h3: video VAE cache miss; decoder retained\n");
     return decoder;
+}
+
+static int h3_cache_key_matches(const char *cached, const char *key) {
+    return cached && key && !strcmp(cached, key);
+}
+
+static int h3_replace_key(char **slot, const char *key) {
+    char *copy = strdup(key);
+    if (!copy) return 0;
+    free(*slot);
+    *slot = copy;
+    return 1;
+}
+
+static h3_tokenizer *h3_acquire_tokenizer(h3_ctx *ctx, const char *path,
+                                          int *cached, char *error,
+                                          size_t error_size) {
+    *cached = 0;
+    if (!ctx->cache_enabled)
+        return h3_tokenizer_load(path, error, error_size);
+    if (ctx->tokenizer && h3_cache_key_matches(ctx->tokenizer_key, path)) {
+        *cached = 1;
+        return ctx->tokenizer;
+    }
+    h3_tokenizer *tokenizer = h3_tokenizer_load(path, error, error_size);
+    if (!tokenizer || !h3_replace_key(&ctx->tokenizer_key, path))
+        return tokenizer;
+    h3_tokenizer_free(ctx->tokenizer);
+    ctx->tokenizer = tokenizer;
+    *cached = 1;
+    return tokenizer;
+}
+
+static void h3_text_load_progress_bridge(int completed, int total,
+                                         void *opaque) {
+    h3_progress_emit(opaque, "text encoder load", completed, total);
+}
+
+static h3_text_encoder *h3_acquire_text_encoder(
+        h3_ctx *ctx, const char *path, h3_generation_progress *progress,
+        char *error, size_t error_size) {
+    if (ctx->text_encoder && h3_cache_key_matches(ctx->text_encoder_key, path))
+        return ctx->text_encoder;
+    h3_text_encoder_free(ctx->text_encoder);
+    ctx->text_encoder = NULL;
+    free(ctx->text_encoder_key);
+    ctx->text_encoder_key = NULL;
+    h3_text_encoder *encoder = h3_text_encoder_load(
+        path, "h3_shaders.metal", h3_text_load_progress_bridge, progress,
+        error, error_size);
+    if (!encoder) return NULL;
+    if (!h3_replace_key(&ctx->text_encoder_key, path)) {
+        h3_text_encoder_free(encoder);
+        snprintf(error, error_size, "out of memory retaining text encoder key");
+        return NULL;
+    }
+    ctx->text_encoder = encoder;
+    fprintf(stderr, "h3: resident text encoder loaded\n");
+    return encoder;
+}
+
+static h3_audio_vae_decoder *h3_acquire_audio_decoder(
+        h3_ctx *ctx, const char *path, char *error, size_t error_size) {
+    if (ctx->audio_decoder &&
+        h3_cache_key_matches(ctx->audio_decoder_key, path))
+        return ctx->audio_decoder;
+    h3_audio_vae_decoder_free(ctx->audio_decoder);
+    ctx->audio_decoder = NULL;
+    free(ctx->audio_decoder_key);
+    ctx->audio_decoder_key = NULL;
+    h3_audio_vae_decoder *decoder = h3_audio_vae_decoder_load(
+        path, "h3_shaders.metal", error, error_size);
+    if (!decoder) return NULL;
+    if (!h3_replace_key(&ctx->audio_decoder_key, path)) {
+        h3_audio_vae_decoder_free(decoder);
+        snprintf(error, error_size, "out of memory retaining audio VAE key");
+        return NULL;
+    }
+    ctx->audio_decoder = decoder;
+    fprintf(stderr, "h3: resident audio VAE loaded\n");
+    return decoder;
+}
+
+/* Everything that decides which DiT weights are loaded and how they are
+ * represented. Request-level choices (prompt, canvas, frames, steps, layer
+ * count, reuse, token reduction, RoPE scale) are rebound instead. */
+static char *h3_dit_weights_key(const char *dit_path, const h3_params *params) {
+    h3_key key = {0};
+    if (!h3_key_append(
+            &key,
+            "%s|ssd-streaming=%d|row-fc2=%d|slow=%d%d%d%d%d%d%d%d%d%d",
+            dit_path, params->ssd_streaming, params->use_int8_row_fc2,
+            params->use_slower_bf16_mlp,
+            params->use_slower_bf16_qkv,
+            params->use_slower_bf16_attention_output,
+            params->use_slower_row_major_attention_output,
+            params->use_slower_unfused_int8_inputs,
+            params->use_slower_unfused_qkv_rope,
+            params->use_slower_scalar_qkv_rms,
+            params->use_slower_uncached_int8_scales,
+            params->use_slower_dynamic_fc1_k,
+            params->use_slower_grouped_quantizer)) {
+        free(key.text);
+        return NULL;
+    }
+    return key.text;
+}
+
+/* Opt-in diagnostic: raw float32 copies of the final denoised latents and the
+ * decoded media, for exact comparisons between serving modes. Never enabled in
+ * timing runs. */
+static int h3_dump_f32(const char *name, const float *values, size_t count) {
+    const char *directory = getenv("H3_DUMP_DIR");
+    if (!directory || !*directory) return 1;
+    char path[4096];
+    int length = snprintf(path, sizeof(path), "%s/%s.f32", directory, name);
+    if (length < 0 || (size_t)length >= sizeof(path)) return 0;
+    FILE *file = fopen(path, "wb");
+    if (!file) return 0;
+    int ok = fwrite(values, sizeof(*values), count, file) == count;
+    if (fclose(file)) ok = 0;
+    return ok;
 }
 
 static void h3_vision_progress_bridge(int completed, int total, void *opaque) {
@@ -927,7 +1103,10 @@ h3_result *h3_generate(h3_ctx *ctx, const char *prompt,
     h3_result *result = NULL;
     char *conditioning_key = NULL;
     char *prepared_key = NULL;
+    char *dit_weights_key = NULL;
     char *decoder_key = NULL;
+    int resident = ctx->cache_enabled && ctx->resident_weights;
+    int tokenizer_is_cached = 0;
     int conditioning_hit = 0;
     int conditioned = 0;
     int dit_is_cached = 0;
@@ -959,26 +1138,35 @@ h3_result *h3_generate(h3_ctx *ctx, const char *prompt,
         h3_set_error(ctx, "out of memory constructing prepared-model cache key");
         goto cleanup;
     }
+    if (resident) {
+        dit_weights_key = h3_dit_weights_key(dit_path, params);
+        if (!dit_weights_key) {
+            h3_set_error(ctx, "out of memory constructing DiT weight key");
+            goto cleanup;
+        }
+    }
     h3_key decoder_cache_key = {0};
-    if (!h3_key_append(&decoder_cache_key, "%s|%dx%d", vae_path,
-                       latent_h, latent_w)) {
+    /* A resident decoder serves every canvas, so only its weights key it. */
+    if (!(resident ? h3_key_append(&decoder_cache_key, "%s", vae_path) :
+                     h3_key_append(&decoder_cache_key, "%s|%dx%d", vae_path,
+                                   latent_h, latent_w))) {
         h3_set_error(ctx, "out of memory constructing decoder cache key");
         goto cleanup;
     }
     decoder_key = decoder_cache_key.text;
     if (ctx->cache_enabled && ctx->video_decoder &&
-        (!ctx->video_decoder_key || strcmp(ctx->video_decoder_key, decoder_key))) {
-        h3_video_vae_decoder_free(ctx->video_decoder);
-        ctx->video_decoder = NULL;
-        free(ctx->video_decoder_key);
-        ctx->video_decoder_key = NULL;
-    }
+        (!ctx->video_decoder_key || strcmp(ctx->video_decoder_key, decoder_key)))
+        h3_resident_video_decoder_clear(ctx);
     if (ctx->cache_enabled && ctx->dit &&
         (!ctx->dit_key || strcmp(ctx->dit_key, prepared_key))) {
-        h3_dit_free(ctx->dit);
-        ctx->dit = NULL;
-        free(ctx->dit_key);
-        ctx->dit_key = NULL;
+        if (resident && h3_cache_key_matches(ctx->dit_weights_key,
+                                             dit_weights_key)) {
+            /* Keep the weights; this request is rebound below. */
+            free(ctx->dit_key);
+            ctx->dit_key = NULL;
+        } else {
+            h3_resident_dit_clear(ctx);
+        }
     }
     conditioning_hit = ctx->cache_enabled && ctx->conditioning_key &&
         !strcmp(ctx->conditioning_key, conditioning_key);
@@ -1030,7 +1218,8 @@ h3_result *h3_generate(h3_ctx *ctx, const char *prompt,
         }
     }
     h3_progress_emit(&progress, "tokenizer", 0, 1);
-    tokenizer = h3_tokenizer_load(tokenizer_path, detail, sizeof(detail));
+    tokenizer = h3_acquire_tokenizer(ctx, tokenizer_path, &tokenizer_is_cached,
+                                     detail, sizeof(detail));
     if (!tokenizer) {
         h3_set_error(ctx, "%s", detail);
         goto cleanup;
@@ -1429,11 +1618,26 @@ h3_result *h3_generate(h3_ctx *ctx, const char *prompt,
             h3_set_error(ctx, "%s", detail);
             goto cleanup;
         }
+        h3_text_encoder *encoder = NULL;
+        if (resident) {
+            encoder = h3_acquire_text_encoder(ctx, text_path, &progress,
+                                              detail, sizeof(detail));
+            if (!encoder) {
+                h3_set_error(ctx, "%s", detail);
+                goto cleanup;
+            }
+            if (progress.cancelled) goto cleanup;
+        }
         h3_progress_emit(&progress, "text encoder", 0, 50);
-        if (!h3_text_encode_bf16(
+        int text_ok = encoder ?
+            h3_text_encoder_encode_bf16(
+                encoder, ids, token_count, h3_text_progress_bridge, &progress,
+                &text, detail, sizeof(detail)) :
+            h3_text_encode_bf16(
                 text_path, "h3_shaders.metal", ids, token_count,
                 h3_text_progress_bridge, &progress, &text,
-                detail, sizeof(detail))) {
+                detail, sizeof(detail));
+        if (!text_ok) {
             h3_set_error(ctx, "%s", detail);
             goto cleanup;
         }
@@ -1491,46 +1695,97 @@ h3_result *h3_generate(h3_ctx *ctx, const char *prompt,
             goto cleanup;
         }
         fprintf(stderr, "h3: prepared DiT cache hit\n");
-    } else if (conditioned) {
-        dit = h3_dit_load_conditioned(
-            dit_path, "h3_shaders.metal", &text, &layout, &sigmas,
+    } else if (resident && ctx->dit &&
+               h3_cache_key_matches(ctx->dit_weights_key, dit_weights_key)) {
+        int rebound = h3_dit_rebind(
+            ctx->dit, &text, &layout, &sigmas,
             (unsigned)params->dit_layers, (unsigned)params->core_reuse,
-            params->token_reduction,
-            params->ssd_streaming,
-            spatial_rope_scale,
-            params->use_slower_bf16_mlp,
-            params->use_slower_bf16_qkv,
-            params->use_slower_bf16_attention_output,
-            params->use_slower_row_major_attention_output,
-            params->use_slower_unfused_int8_inputs,
-            params->use_slower_unfused_qkv_rope,
-            params->use_slower_scalar_qkv_rms,
-            params->use_slower_uncached_int8_scales,
-            params->use_slower_dynamic_fc1_k,
-            params->use_slower_grouped_quantizer,
-            params->use_int8_row_fc2,
+            params->token_reduction, spatial_rope_scale,
             condition_video_rows, condition_video_elements,
             condition_audio_rows, condition_audio_elements,
             h3_dit_progress_bridge, &progress, detail, sizeof(detail));
-    } else {
-        dit = h3_dit_load_t2va(
-            dit_path, "h3_shaders.metal", &text, &layout, &sigmas,
-            (unsigned)params->dit_layers, (unsigned)params->core_reuse,
-            params->token_reduction,
-            params->ssd_streaming,
-            spatial_rope_scale,
-            params->use_slower_bf16_mlp,
-            params->use_slower_bf16_qkv,
-            params->use_slower_bf16_attention_output,
-            params->use_slower_row_major_attention_output,
-            params->use_slower_unfused_int8_inputs,
-            params->use_slower_unfused_qkv_rope,
-            params->use_slower_scalar_qkv_rms,
-            params->use_slower_uncached_int8_scales,
-            params->use_slower_dynamic_fc1_k,
-            params->use_slower_grouped_quantizer,
-            params->use_int8_row_fc2,
-            h3_dit_progress_bridge, &progress, detail, sizeof(detail));
+        if (rebound == 1 && !h3_replace_key(&ctx->dit_key, prepared_key)) {
+            snprintf(detail, sizeof(detail),
+                     "out of memory retaining prepared DiT key");
+            rebound = 0;
+        }
+        if (rebound == 1) {
+            dit = ctx->dit;
+            dit_is_cached = 1;
+            fprintf(stderr, "h3: resident DiT rebound to new request\n");
+        } else {
+            /* A failed or refused rebind leaves incomplete request state. */
+            h3_resident_dit_clear(ctx);
+            if (rebound == 0) {
+                h3_set_error(ctx, "%s", detail);
+                goto cleanup;
+            }
+            fprintf(stderr, "h3: %s; reloading DiT\n", detail);
+        }
+    }
+    if (!dit) {
+        if (resident) {
+            dit = h3_dit_load_resident(
+                dit_path, "h3_shaders.metal", &text, &layout, &sigmas,
+                (unsigned)params->dit_layers, (unsigned)params->core_reuse,
+                params->token_reduction,
+                params->ssd_streaming,
+                spatial_rope_scale,
+                params->use_slower_bf16_mlp,
+                params->use_slower_bf16_qkv,
+                params->use_slower_bf16_attention_output,
+                params->use_slower_row_major_attention_output,
+                params->use_slower_unfused_int8_inputs,
+                params->use_slower_unfused_qkv_rope,
+                params->use_slower_scalar_qkv_rms,
+                params->use_slower_uncached_int8_scales,
+                params->use_slower_dynamic_fc1_k,
+                params->use_slower_grouped_quantizer,
+                params->use_int8_row_fc2,
+                condition_video_rows, condition_video_elements,
+                condition_audio_rows, condition_audio_elements,
+                h3_dit_progress_bridge, &progress, detail, sizeof(detail));
+        } else if (conditioned) {
+            dit = h3_dit_load_conditioned(
+                dit_path, "h3_shaders.metal", &text, &layout, &sigmas,
+                (unsigned)params->dit_layers, (unsigned)params->core_reuse,
+                params->token_reduction,
+                params->ssd_streaming,
+                spatial_rope_scale,
+                params->use_slower_bf16_mlp,
+                params->use_slower_bf16_qkv,
+                params->use_slower_bf16_attention_output,
+                params->use_slower_row_major_attention_output,
+                params->use_slower_unfused_int8_inputs,
+                params->use_slower_unfused_qkv_rope,
+                params->use_slower_scalar_qkv_rms,
+                params->use_slower_uncached_int8_scales,
+                params->use_slower_dynamic_fc1_k,
+                params->use_slower_grouped_quantizer,
+                params->use_int8_row_fc2,
+                condition_video_rows, condition_video_elements,
+                condition_audio_rows, condition_audio_elements,
+                h3_dit_progress_bridge, &progress, detail, sizeof(detail));
+        } else {
+            dit = h3_dit_load_t2va(
+                dit_path, "h3_shaders.metal", &text, &layout, &sigmas,
+                (unsigned)params->dit_layers, (unsigned)params->core_reuse,
+                params->token_reduction,
+                params->ssd_streaming,
+                spatial_rope_scale,
+                params->use_slower_bf16_mlp,
+                params->use_slower_bf16_qkv,
+                params->use_slower_bf16_attention_output,
+                params->use_slower_row_major_attention_output,
+                params->use_slower_unfused_int8_inputs,
+                params->use_slower_unfused_qkv_rope,
+                params->use_slower_scalar_qkv_rms,
+                params->use_slower_uncached_int8_scales,
+                params->use_slower_dynamic_fc1_k,
+                params->use_slower_grouped_quantizer,
+                params->use_int8_row_fc2,
+                h3_dit_progress_bridge, &progress, detail, sizeof(detail));
+        }
     }
     if (!dit) {
         h3_set_error(ctx, "%s", detail);
@@ -1538,11 +1793,15 @@ h3_result *h3_generate(h3_ctx *ctx, const char *prompt,
     }
     if (ctx->cache_enabled && !dit_is_cached) {
         char *key_copy = strdup(prepared_key);
-        if (!key_copy) {
+        char *weights_copy = resident ? strdup(dit_weights_key) : NULL;
+        if (!key_copy || (resident && !weights_copy)) {
+            free(key_copy);
+            free(weights_copy);
             fprintf(stderr, "h3: warning: could not retain prepared DiT key\n");
         } else {
             ctx->dit = dit;
             ctx->dit_key = key_copy;
+            ctx->dit_weights_key = weights_copy;
             dit_is_cached = 1;
             fprintf(stderr, "h3: prepared DiT cache miss; model retained\n");
         }
@@ -1601,18 +1860,45 @@ h3_result *h3_generate(h3_ctx *ctx, const char *prompt,
             ctx->dit = NULL;
             free(ctx->dit_key);
             ctx->dit_key = NULL;
+            free(ctx->dit_weights_key);
+            ctx->dit_weights_key = NULL;
             dit_is_cached = 0;
         }
+        goto cleanup;
+    }
+    if (!h3_dump_f32("video_latent", video, video_count) ||
+        !h3_dump_f32("audio_latent", audio, audio_count)) {
+        h3_set_error(ctx, "cannot write H3_DUMP_DIR latents");
         goto cleanup;
     }
     if (!dit_is_cached) h3_dit_free(dit);
     dit = NULL;
     if (progress.cancelled) goto cleanup;
+    h3_audio_vae_decoder *audio_decoder = NULL;
+    if (resident) {
+        audio_decoder = h3_acquire_audio_decoder(ctx, audio_vae_path,
+                                                 detail, sizeof(detail));
+        if (!audio_decoder) {
+            h3_set_error(ctx, "%s", detail);
+            goto cleanup;
+        }
+    }
     h3_progress_emit(&progress, "audio VAE", 0, 7);
-    if (!h3_audio_vae_decode(audio_vae_path, "h3_shaders.metal", audio,
-                             temporal.audio_t, h3_audio_vae_progress_bridge,
-                             &progress, &waveform, detail, sizeof(detail))) {
+    int audio_ok = audio_decoder ?
+        h3_audio_vae_decoder_decode(
+            audio_decoder, audio, temporal.audio_t,
+            h3_audio_vae_progress_bridge, &progress, &waveform,
+            detail, sizeof(detail)) :
+        h3_audio_vae_decode(audio_vae_path, "h3_shaders.metal", audio,
+                            temporal.audio_t, h3_audio_vae_progress_bridge,
+                            &progress, &waveform, detail, sizeof(detail));
+    if (!audio_ok) {
         h3_set_error(ctx, "%s", detail);
+        goto cleanup;
+    }
+    if (!h3_dump_f32("audio_pcm", waveform.pcm,
+                     (size_t)waveform.channels * (size_t)waveform.samples)) {
+        h3_set_error(ctx, "cannot write H3_DUMP_DIR audio");
         goto cleanup;
     }
     free(audio);
@@ -1642,6 +1928,11 @@ h3_result *h3_generate(h3_ctx *ctx, const char *prompt,
             detail, sizeof(detail));
     if (!video_ok) {
         h3_set_error(ctx, "%s", detail);
+        goto cleanup;
+    }
+    if (!h3_dump_f32("video_rgb", frames.rgb, (size_t)frames.frames *
+                     (size_t)frames.height * (size_t)frames.width * 3)) {
+        h3_set_error(ctx, "cannot write H3_DUMP_DIR video");
         goto cleanup;
     }
     free(video);
@@ -1709,10 +2000,11 @@ h3_result *h3_generate(h3_ctx *ctx, const char *prompt,
 cleanup:
     free(conditioning_key);
     free(prepared_key);
+    free(dit_weights_key);
     free(decoder_key);
     free(tokenizer_path); free(text_path); free(dit_path); free(vae_path);
     free(audio_vae_path);
-    h3_tokenizer_free(tokenizer);
+    if (!tokenizer_is_cached) h3_tokenizer_free(tokenizer);
     h3_tokenizer_ids_free(ids);
     for (size_t image = 0; image < visual_capacity; image++) {
         if (condition_pixels) free(condition_pixels[image]);

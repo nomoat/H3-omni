@@ -348,8 +348,12 @@ static int load_latent_normalization(const char *weight_directory,
     return ok;
 }
 
+/* Resident decoders pass already normalized projection/pre convolutions.
+ * Otherwise they are loaded here and normalized in the same command stream. */
 static int prepare_input(audio_context *audio, const float *input,
                          const float *mean, const float *deviation,
+                         const audio_conv *resident_projection,
+                         const audio_conv *resident_pre,
                          char *error, size_t error_size) {
     size_t elements = (size_t)STEREO * audio->length * LATENT_CHANNELS;
     float *rows = malloc(elements * sizeof(*rows));
@@ -375,13 +379,18 @@ static int prepare_input(audio_context *audio, const float *input,
     }
 
     audio_conv projection = {0}, pre = {0};
+    const audio_conv *use_projection = resident_projection ?
+        resident_projection : &projection;
+    const audio_conv *use_pre = resident_pre ? resident_pre : &pre;
     h3_gpu_tensor *projected = NULL, *hidden = NULL;
-    int ok = load_plain_conv(audio, &projection, "dec_in_proj",
-                             LATENT_CHANNELS, LATENT_DIM, 1, 0, 1, 1,
-                             error, error_size) &&
-             load_normalized_conv(audio, &pre, "decoder.conv_pre",
-                                  LATENT_DIM, DECODER_DIM, 7, 3, 1, 1, 0, 1,
-                                  error, error_size);
+    int ok = (resident_projection ||
+              load_plain_conv(audio, &projection, "dec_in_proj",
+                              LATENT_CHANNELS, LATENT_DIM, 1, 0, 1, 1,
+                              error, error_size)) &&
+             (resident_pre ||
+              load_normalized_conv(audio, &pre, "decoder.conv_pre",
+                                   LATENT_DIM, DECODER_DIM, 7, 3, 1, 1, 0, 1,
+                                   error, error_size));
     if (!ok) goto done;
     projected = h3_gpu_tensor_new_f32(
         audio->gpu, (size_t)STEREO * audio->length * LATENT_DIM);
@@ -395,13 +404,15 @@ static int prepare_input(audio_context *audio, const float *input,
     }
     ok = gpu_op(audio, h3_gpu_begin(audio->gpu), error, error_size,
                 "begin AudioVAE input") &&
-         normalize_conv(audio, &pre, error, error_size) &&
+         (resident_pre || normalize_conv(audio, &pre, error, error_size)) &&
          gpu_op(audio, h3_gpu_conv1d_f32(
-             audio->gpu, projected, latent, projection.weight, projection.bias,
-             STEREO, audio->length, LATENT_CHANNELS, LATENT_DIM, 1, 0, 1),
+             audio->gpu, projected, latent, use_projection->weight,
+             use_projection->bias, STEREO, audio->length, LATENT_CHANNELS,
+             LATENT_DIM, 1, 0, 1),
              error, error_size, "AudioVAE input projection") &&
          gpu_op(audio, h3_gpu_conv1d_f32(
-             audio->gpu, hidden, projected, pre.weight, pre.bias, STEREO,
+             audio->gpu, hidden, projected, use_pre->weight, use_pre->bias,
+             STEREO,
              audio->length, LATENT_DIM, DECODER_DIM, 7, 3, 1), error,
              error_size, "AudioVAE pre convolution") &&
          gpu_op(audio, h3_gpu_submit(audio->gpu), error, error_size,
@@ -602,17 +613,25 @@ done:
     return ok;
 }
 
-static int decode_output(audio_context *audio, h3_audio_waveform *output,
+static int decode_output(audio_context *audio,
+                         const audio_activation *resident_activation,
+                         const audio_conv *resident_post,
+                         h3_audio_waveform *output,
                          char *error, size_t error_size) {
     audio_activation activation = {0};
     audio_conv post = {0};
+    const audio_activation *use_activation = resident_activation ?
+        resident_activation : &activation;
+    const audio_conv *use_post = resident_post ? resident_post : &post;
     h3_gpu_tensor *activated = NULL, *waveform = NULL;
     size_t hidden_elements = (size_t)STEREO * audio->length * 8;
     size_t waveform_elements = (size_t)STEREO * audio->length;
-    int ok = load_activation(audio, &activation, "decoder.activation_post", 8,
-                             error, error_size) &&
-             load_normalized_conv(audio, &post, "decoder.conv_post", 8, 1, 7,
-                                  3, 1, 1, 0, 0, error, error_size);
+    int ok = (resident_activation ||
+              load_activation(audio, &activation, "decoder.activation_post", 8,
+                              error, error_size)) &&
+             (resident_post ||
+              load_normalized_conv(audio, &post, "decoder.conv_post", 8, 1, 7,
+                                   3, 1, 1, 0, 0, error, error_size));
     if (!ok) goto done;
     activated = h3_gpu_tensor_new_f32(audio->gpu, hidden_elements);
     waveform = h3_gpu_tensor_new_f32(audio->gpu, waveform_elements);
@@ -624,10 +643,10 @@ static int decode_output(audio_context *audio, h3_audio_waveform *output,
     }
     ok = gpu_op(audio, h3_gpu_begin(audio->gpu), error, error_size,
                 "begin AudioVAE output") &&
-         normalize_conv(audio, &post, error, error_size) &&
-         run_activation(audio, activated, audio->hidden, &activation,
+         (resident_post || normalize_conv(audio, &post, error, error_size)) &&
+         run_activation(audio, activated, audio->hidden, use_activation,
                         audio->length, 8, error, error_size) &&
-         run_conv(audio, waveform, activated, &post, audio->length,
+         run_conv(audio, waveform, activated, use_post, audio->length,
                   error, error_size) &&
          gpu_op(audio, h3_gpu_clip_f32(audio->gpu, waveform, waveform,
                                        (uint32_t)waveform_elements,
@@ -682,7 +701,7 @@ int h3_audio_vae_decode(const char *weight_directory,
     audio.weights = h3_weight_store_open(weight_directory, error, error_size);
     int ok = audio.weights && load_filters(&audio, error, error_size) &&
              prepare_input(&audio, normalized_latent, mean, deviation,
-                           error, error_size);
+                           NULL, NULL, error, error_size);
     for (int index = 0; ok && index < STAGES; index++) {
         audio_stage stage = {0};
         ok = load_stage(&audio, &stage, index, error, error_size) &&
@@ -694,12 +713,154 @@ int h3_audio_vae_decode(const char *weight_directory,
     if (ok) ok = audio.length == (uint32_t)latent_length * HOP_LENGTH;
     if (!ok && error && error_size && !error[0])
         fail(error, error_size, "AudioVAE produced the wrong sample count");
-    if (ok) ok = decode_output(&audio, output, error, error_size);
+    if (ok) ok = decode_output(&audio, NULL, NULL, output, error, error_size);
     if (ok && !h3_gpu_get_stats(audio.gpu, &output->gpu_stats)) {
         fail(error, error_size, "cannot read AudioVAE GPU statistics");
         ok = 0;
     }
     cleanup(&audio);
+    if (!ok) h3_audio_waveform_free(output);
+    return ok;
+}
+
+struct h3_audio_vae_decoder {
+    h3_gpu *gpu;
+    h3_gpu_tensor *upsample_filter;
+    h3_gpu_tensor *downsample_filter;
+    float mean[LATENT_CHANNELS];
+    float deviation[LATENT_CHANNELS];
+    audio_conv projection;
+    audio_conv pre;
+    audio_stage stages[STAGES];
+    audio_activation post_activation;
+    audio_conv post;
+};
+
+static int normalize_resident_conv(audio_context *audio, audio_conv *conv,
+                                   char *error, size_t error_size) {
+    int ok = gpu_op(audio, h3_gpu_begin(audio->gpu), error, error_size,
+                    "begin AudioVAE weight normalization") &&
+             normalize_conv(audio, conv, error, error_size) &&
+             gpu_op(audio, h3_gpu_submit(audio->gpu), error, error_size,
+                    "submit AudioVAE weight normalization");
+    if (ok) retire_normalization_inputs(conv);
+    return ok;
+}
+
+h3_audio_vae_decoder *h3_audio_vae_decoder_load(
+                        const char *weight_directory,
+                        const char *shader_source_path,
+                        char *error, size_t error_size) {
+    if (error && error_size) error[0] = '\0';
+    if (!weight_directory || !*weight_directory || !shader_source_path ||
+        !*shader_source_path) {
+        fail(error, error_size, "invalid resident AudioVAE arguments");
+        return NULL;
+    }
+    h3_audio_vae_decoder *decoder = calloc(1, sizeof(*decoder));
+    if (!decoder) {
+        fail(error, error_size, "out of memory creating resident AudioVAE");
+        return NULL;
+    }
+    audio_context audio = {0};
+    int ok = load_latent_normalization(weight_directory, decoder->mean,
+                                       decoder->deviation, error, error_size);
+    if (ok) {
+        audio.gpu = h3_gpu_create(shader_source_path, error, error_size);
+        ok = audio.gpu != NULL;
+    }
+    if (ok) {
+        h3_gpu_profile_set_label(audio.gpu, "resident audio VAE decoder");
+        audio.weights = h3_weight_store_open(weight_directory, error,
+                                             error_size);
+        ok = audio.weights && load_filters(&audio, error, error_size) &&
+             load_plain_conv(&audio, &decoder->projection, "dec_in_proj",
+                             LATENT_CHANNELS, LATENT_DIM, 1, 0, 1, 1,
+                             error, error_size) &&
+             load_normalized_conv(&audio, &decoder->pre, "decoder.conv_pre",
+                                  LATENT_DIM, DECODER_DIM, 7, 3, 1, 1, 0, 1,
+                                  error, error_size) &&
+             normalize_resident_conv(&audio, &decoder->pre, error, error_size);
+    }
+    for (int index = 0; ok && index < STAGES; index++)
+        ok = load_stage(&audio, &decoder->stages[index], index,
+                        error, error_size) &&
+             normalize_stage(&audio, &decoder->stages[index],
+                             error, error_size);
+    if (ok)
+        ok = load_activation(&audio, &decoder->post_activation,
+                             "decoder.activation_post", 8,
+                             error, error_size) &&
+             load_normalized_conv(&audio, &decoder->post, "decoder.conv_post",
+                                  8, 1, 7, 3, 1, 1, 0, 0,
+                                  error, error_size) &&
+             normalize_resident_conv(&audio, &decoder->post,
+                                     error, error_size);
+    /* The decoder keeps the GPU context and filters; the store is not needed
+     * after every weight has been read. */
+    decoder->gpu = audio.gpu;
+    decoder->upsample_filter = audio.upsample_filter;
+    decoder->downsample_filter = audio.downsample_filter;
+    h3_weight_store_free(audio.weights);
+    if (!ok) {
+        h3_audio_vae_decoder_free(decoder);
+        return NULL;
+    }
+    return decoder;
+}
+
+void h3_audio_vae_decoder_free(h3_audio_vae_decoder *decoder) {
+    if (!decoder) return;
+    free_conv(&decoder->projection);
+    free_conv(&decoder->pre);
+    for (int index = 0; index < STAGES; index++)
+        free_stage(&decoder->stages[index]);
+    free_activation(&decoder->post_activation);
+    free_conv(&decoder->post);
+    free_tensor(&decoder->upsample_filter);
+    free_tensor(&decoder->downsample_filter);
+    h3_gpu_free(decoder->gpu);
+    free(decoder);
+}
+
+int h3_audio_vae_decoder_decode(h3_audio_vae_decoder *decoder,
+                                const float *normalized_latent,
+                                int latent_length,
+                                h3_audio_vae_progress progress,
+                                void *progress_opaque,
+                                h3_audio_waveform *output,
+                                char *error, size_t error_size) {
+    if (error && error_size) error[0] = '\0';
+    if (output) memset(output, 0, sizeof(*output));
+    if (!decoder || !normalized_latent || !output || latent_length < 1 ||
+        latent_length > INT32_MAX / HOP_LENGTH) {
+        fail(error, error_size, "invalid resident AudioVAE decode arguments");
+        return 0;
+    }
+    audio_context audio = {0};
+    audio.gpu = decoder->gpu;
+    audio.upsample_filter = decoder->upsample_filter;
+    audio.downsample_filter = decoder->downsample_filter;
+    audio.length = (uint32_t)latent_length;
+    int ok = prepare_input(&audio, normalized_latent, decoder->mean,
+                           decoder->deviation, &decoder->projection,
+                           &decoder->pre, error, error_size);
+    for (int index = 0; ok && index < STAGES; index++) {
+        ok = run_stage(&audio, &decoder->stages[index], index,
+                       error, error_size);
+        if (ok && progress) progress(index + 1, STAGES, progress_opaque);
+    }
+    if (ok) ok = audio.length == (uint32_t)latent_length * HOP_LENGTH;
+    if (!ok && error && error_size && !error[0])
+        fail(error, error_size, "AudioVAE produced the wrong sample count");
+    if (ok) ok = decode_output(&audio, &decoder->post_activation,
+                               &decoder->post, output, error, error_size);
+    if (ok && !h3_gpu_get_stats(audio.gpu, &output->gpu_stats)) {
+        fail(error, error_size, "cannot read AudioVAE GPU statistics");
+        ok = 0;
+    }
+    /* Only the request activation belongs to this call. */
+    free_tensor(&audio.hidden);
     if (!ok) h3_audio_waveform_free(output);
     return ok;
 }

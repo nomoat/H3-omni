@@ -8,6 +8,9 @@
 
 struct h3_dit;
 struct h3_video_vae_decoder;
+struct h3_tokenizer;
+struct h3_text_encoder;
+struct h3_audio_vae_decoder;
 
 struct h3_ctx {
     char *model_dir;
@@ -31,6 +34,16 @@ struct h3_ctx {
     struct h3_dit *dit;
     char *video_decoder_key;
     struct h3_video_vae_decoder *video_decoder;
+    /* Serving residency (with cache_enabled): request-independent weights
+     * stay loaded and only request state is rebuilt for a new request. */
+    int resident_weights;
+    char *dit_weights_key;
+    char *tokenizer_key;
+    struct h3_tokenizer *tokenizer;
+    char *text_encoder_key;
+    struct h3_text_encoder *text_encoder;
+    char *audio_decoder_key;
+    struct h3_audio_vae_decoder *audio_decoder;
 };
 
 void h3_set_error(h3_ctx *ctx, const char *format, ...)

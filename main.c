@@ -33,6 +33,8 @@ static void usage(const char *program) {
         "      --core-reuse N     Core refresh: 1 exact, 4 fast, 6 aggressive\n"
         "      --token-reduction  Pair video tokens in middle DiT blocks\n"
         "      --ssd-streaming    Stream original BF16 DiT layers from SSD\n"
+        "      --resident-weights on|off  Keep all weights loaded across\n"
+        "                         interactive requests (default: on for CUDA)\n"
         "      --use-int8-row-fc2 Faster one-scale int8 FC2 (M5)\n"
         "      --use-reference-rope  Disable native 256 RoPE adaptation\n"
         "      --use-slower-bf16-mlp  Force close-reference BF16/MPS MLP\n"
@@ -259,7 +261,7 @@ int main(int argc, char **argv) {
            OPT_FIRST, OPT_LAST, OPT_REF_IMAGE, OPT_REF_IMAGE_SIZE,
            OPT_REF_VIDEO, OPT_REF_SILENT_VIDEO, OPT_REF_VIDEO_AUDIO,
            OPT_REF_AUDIO, OPT_FRAMES_DIR, OPT_SHOW, OPT_ZOOM,
-           OPT_PROFILE, OPT_INFO };
+           OPT_PROFILE, OPT_INFO, OPT_RESIDENT_WEIGHTS };
     static const struct option options[] = {
         {"model-dir", required_argument, NULL, 'd'},
         {"prompt", required_argument, NULL, 'p'},
@@ -312,6 +314,7 @@ int main(int argc, char **argv) {
         {"zoom", required_argument, NULL, OPT_ZOOM},
         {"profile", no_argument, NULL, OPT_PROFILE},
         {"info", no_argument, NULL, OPT_INFO},
+        {"resident-weights", required_argument, NULL, OPT_RESIDENT_WEIGHTS},
         {"help", no_argument, NULL, 'h'},
         {NULL, 0, NULL, 0}
     };
@@ -328,6 +331,7 @@ int main(int argc, char **argv) {
     int frames_given = 0;
     int seconds_given = 0;
     int seed_given = 0;
+    int resident_weights = -1;
     int option;
     while ((option = getopt_long(argc, argv, "d:p:o:h", options, NULL)) != -1) {
         switch (option) {
@@ -469,6 +473,14 @@ int main(int argc, char **argv) {
                 break;
             case OPT_PROFILE: profile = 1; break;
             case OPT_INFO: info = 1; break;
+            case OPT_RESIDENT_WEIGHTS:
+                if (!strcmp(optarg, "on")) resident_weights = 1;
+                else if (!strcmp(optarg, "off")) resident_weights = 0;
+                else {
+                    fprintf(stderr, "h3: --resident-weights takes on or off\n");
+                    return 1;
+                }
+                break;
             default: usage(argv[0]); return 2;
         }
     }
@@ -500,6 +512,8 @@ int main(int argc, char **argv) {
         fprintf(stderr, "h3: %s\n", h3_last_error(NULL));
         return 1;
     }
+    if (resident_weights >= 0)
+        h3_cache_set_resident_weights(ctx, resident_weights);
     if (info) print_info(ctx);
     if (prompt) {
         params.output_path = output;

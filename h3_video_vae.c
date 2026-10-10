@@ -980,6 +980,73 @@ h3_video_vae_decoder *h3_video_vae_decoder_load(
     return decoder;
 }
 
+static void free_tile_activations(vae_context *vae) {
+    free_tensor(&vae->latent); free_tensor(&vae->post);
+    free_tensor(&vae->patch_hidden); free_tensor(&vae->hidden);
+    free_tensor(&vae->norm); free_tensor(&vae->qkv); free_tensor(&vae->query);
+    free_tensor(&vae->key); free_tensor(&vae->value); free_tensor(&vae->heads);
+    free_tensor(&vae->branch); free_tensor(&vae->ff1);
+    free_tensor(&vae->activated); free_tensor(&vae->rope_cos);
+    free_tensor(&vae->rope_sin); free_tensor(&vae->projected);
+}
+
+int h3_video_vae_decoder_reshape(h3_video_vae_decoder *decoder,
+                                 int latent_height, int latent_width,
+                                 char *error, size_t error_size) {
+    if (error && error_size) error[0] = '\0';
+    if (!decoder || latent_height < 1 || latent_width < 1 ||
+        latent_height > INT32_MAX / SPATIAL_RATIO ||
+        latent_width > INT32_MAX / SPATIAL_RATIO ||
+        (uint64_t)(unsigned)latent_height * (uint64_t)(unsigned)latent_width >
+            UINT32_MAX) {
+        fail(error, error_size, "invalid resident video VAE reshape arguments");
+        return 0;
+    }
+    if (decoder->latent_h == latent_height &&
+        decoder->latent_w == latent_width) return 1;
+    tile_axis y_axis, x_axis;
+    memset(&y_axis, 0, sizeof(y_axis));
+    memset(&x_axis, 0, sizeof(x_axis));
+    int tile_pixels = configured_tile_pixels(
+        latent_height * SPATIAL_RATIO, latent_width * SPATIAL_RATIO);
+    if (!tile_axis_build(latent_height * SPATIAL_RATIO, tile_pixels,
+                         &y_axis, error, error_size) ||
+        !tile_axis_build(latent_width * SPATIAL_RATIO, tile_pixels,
+                         &x_axis, error, error_size)) {
+        tile_axis_free(&y_axis);
+        tile_axis_free(&x_axis);
+        return 0;
+    }
+    vae_context *vae = &decoder->vae;
+    int tile_h = y_axis.length / SPATIAL_RATIO;
+    int tile_w = x_axis.length / SPATIAL_RATIO;
+    /* Tile activations and RoPE depend only on the tile geometry. The weights
+     * are reused unchanged for every canvas. */
+    if (tile_h != vae->latent_h || tile_w != vae->latent_w) {
+        free_tile_activations(vae);
+        vae->latent_h = tile_h;
+        vae->latent_w = tile_w;
+        vae->patches = (uint32_t)(CHUNK_LATENT_TIME * tile_h * tile_w);
+        vae->sequence = vae->patches + SUFFIX;
+        if (!prepare_rope(vae, error, error_size) ||
+            !allocate_activations(vae, error, error_size)) {
+            tile_axis_free(&y_axis);
+            tile_axis_free(&x_axis);
+            return 0;
+        }
+    }
+    tile_axis_free(&decoder->y_axis);
+    tile_axis_free(&decoder->x_axis);
+    decoder->y_axis = y_axis;
+    decoder->x_axis = x_axis;
+    decoder->latent_h = latent_height;
+    decoder->latent_w = latent_width;
+    if (getenv("H3_PROFILE"))
+        fprintf(stderr, "h3: resident video VAE tiles %dx%d at %d pixels\n",
+                decoder->x_axis.count, decoder->y_axis.count, tile_pixels);
+    return 1;
+}
+
 int h3_video_vae_decoder_preview(h3_video_vae_decoder *decoder,
                         const float *normalized_latent, int latent_time,
                         h3_video_frames *output, int *output_frame_index,
