@@ -1,0 +1,76 @@
+== p2: 19.9 s
+  denoise          wall   11.82  busy   11.75 (99%)  kernels   11180 mean  1049.8 us | gemm 7.65, attention 2.35, h3 1.73, memcpy 0.00, memset 0.00, other 0.00
+         5.34 s    2000x    2671.8 us  [gemm] nvjet_tst_256x152_64x4_2x1_v_bz_coopA_TNT
+         2.35 s    1000x    2350.3 us  [attention] _ZN7cutlass13device_kernelIN5flash20enable_sm90_or_laterINS1_16FlashAttnFwdSm90INS1_25CollectiveMainloopFwd...
+         2.29 s    2000x    1146.2 us  [gemm] nvjet_tst_128x288_64x4_2x1_v_bz_coopA_TNT
+         0.63 s    1000x     630.6 us  [h3] _Z16h3_qkv_rope_bf16PKtS0_S0_S0_S0_PtS1_S1_8qkv_args
+         0.43 s    1000x     425.6 us  [h3] _Z14h3_swiglu_bf16PKtPt11swiglu_args
+         0.37 s    2000x     185.8 us  [h3] _Z12h3_gate_bf16PKtS0_S0_PKjPt9gate_args
+         0.30 s    2020x     148.7 us  [h3] _Z13h3_adaln_bf16PKtS0_S0_PKjPt10adaln_args
+         0.01 s      20x     385.7 us  [gemm] sm80_xmma_gemm_f32f32_f32f32_f32_tn_n_tilesize64x64x8_stage3_warpsize1x4x1_ffma_aligna4_alignc4_execute_ker...
+         0.01 s      20x     268.8 us  [gemm] sm80_xmma_gemm_f32f32_f32f32_f32_tn_n_tilesize64x128x8_stage3_warpsize1x4x1_ffma_aligna4_alignc4_execute_ke...
+         0.00 s      20x     196.0 us  [gemm] sm80_xmma_gemm_f32f32_f32f32_f32_tn_n_tilesize32x32x8_stage3_warpsize1x2x1_ffma_aligna4_alignc4_execute_ker...
+         0.00 s    4000x       0.9 us  [memset] memset
+         0.00 s      20x     133.8 us  [h3] _Z19h3_cast_bf16_to_f32PKtPfj
+  audio VAE        wall    0.07  busy    0.07 (98%)  kernels     492 mean   146.3 us | h3 0.04, gemm 0.03, conv 0.00, other 0.00, memcpy 0.00
+         0.04 s     127x     291.5 us  [h3] _Z23h3_alias_free_snake_f32PKfS0_S0_S0_S0_Pf21audio_activation_args
+         0.02 s      85x     227.6 us  [gemm] _Z23implicit_convolve_sgemmIffLi1024ELi5ELi5ELi3ELi3ELi3ELi1ELb0ELb1ELb1EEviiiPKT_iPT0_S2_18kernel_conv_par...
+         0.01 s      40x     196.8 us  [gemm] _Z23implicit_convolve_sgemmIffLi1024ELi5ELi5ELi3ELi3ELi3ELi1ELb0ELb1ELb0EEviiiPKT_iPT0_S2_18kernel_conv_par...
+         0.00 s       1x    2853.4 us  [gemm] _Z23implicit_convolve_sgemmIffLi128ELi6ELi7ELi3ELi3ELi5ELi1ELb0ELb1ELb1EEviiiPKT_iPT0_S2_18kernel_conv_para...
+         0.00 s       2x    1040.1 us  [gemm] _Z23implicit_convolve_sgemmIffLi128ELi6ELi7ELi3ELi3ELi5ELi1ELb0ELb1ELb0EEviiiPKT_iPT0_S2_18kernel_conv_para...
+         0.00 s     135x       4.9 us  [other] _Z8bias_f32PfPKfmi
+         0.00 s       1x     652.5 us  [conv] _ZN5cudnn6detail14dgrad2d_alg1_1IfLi0ELi6ELi7ELi5ELi4ELi5ELb0ELb1EEEviiiPKT_iS4_iPS2_18kernel_grad_paramsyi...
+         0.00 s       2x     216.8 us  [conv] _ZN5cudnn3cnn29dgrad2d_grouped_direct_kernelIfiffLb0ELb1ELi0ELi0EEEvNS0_24DgradGroupedDirectParamsEPKT_S5_P...
+         0.00 s      77x       4.4 us  [h3] _Z17h3_add_scaled_f32PKfS0_Pf15add_scaled_args
+         0.00 s       1x     277.5 us  [conv] _ZN5cudnn6detail14dgrad2d_alg1_1IfLi0ELi6ELi6ELi5ELi4ELi4ELb0ELb1EEEviiiPKT_iS4_iPS2_18kernel_grad_paramsyi...
+         0.00 s       3x      81.3 us  [gemm] sm80_xmma_dgrad_implicit_gemm_f32f32_f32f32_f32_nchwkcrs_nchw_tilesize32x32x8_stage3_warpsize1x2x1_g1_ffma_...
+         0.00 s      14x      11.5 us  [other] _Z13channel_orderPfPKfmiib
+  video VAE        wall    7.57  busy    7.12 (94%)  kernels   76410 mean    93.0 us | gemm 5.48, other 1.63, memcpy 0.02, memset 0.01, h3 0.00
+         2.40 s    9720x     246.7 us  [gemm] sm90_xmma_gemm_f32f32_tf32f32_f32_tn_n_tilesize128x128x32_warpgroupsize1x1x1_execute_segment_k_off_kernel__...
+         1.06 s   11340x      93.2 us  [gemm] sm80_xmma_gemm_f32f32_f32f32_f32_nn_n_tilesize64x64x8_stage3_warpsize1x4x1_ffma_aligna4_alignc4_execute_ker...
+         0.86 s   11430x      75.2 us  [gemm] sm80_xmma_gemm_f32f32_f32f32_f32_tn_n_tilesize64x64x8_stage3_warpsize1x4x1_ffma_aligna4_alignc4_execute_ker...
+         0.82 s   12960x      63.1 us  [other] _Z12softmax_rowsPfiiib
+         0.79 s    4860x     162.0 us  [gemm] sm90_xmma_gemm_f32f32_tf32f32_f32_tn_n_tilesize128x256x32_warpgroupsize2x1x1_execute_segment_k_off_kernel__...
+         0.36 s    1620x     221.5 us  [other] _Z19video_qkv_rope_biasPKfS0_S0_S0_PfS1_S1_8qkv_args
+         0.24 s    4860x      49.9 us  [gemm] sm90_xmma_gemm_f32f32_tf32f32_f32_tn_n_tilesize256x128x32_warpgroupsize2x1x1_execute_segment_k_off_kernel__...
+         0.17 s    4860x      35.6 us  [other] _Z10pack_headsIfEvPfPKT_miiii
+         0.11 s    1620x      70.0 us  [other] _Z22swiglu_bias_split_tf32PKfS0_PfS1_11swiglu_args
+         0.10 s    1620x      61.5 us  [gemm] _Z16gemmSN_NN_kernelIfLi128ELi2ELi4ELi8ELi5ELi4ELb0E30cublasGemvTensorStridedBatchedIKfES2_S0_IfEEv22cublas...
+         0.05 s    3240x      16.1 us  [other] _Z19rms_norm_split_tf32PKfS0_PfS1_9norm_args
+         0.05 s    3240x      14.3 us  [other] _Z14scale_add_biasPKfS0_S0_S0_Pf14scale_add_args
+  FFmpeg           wall    0.39  busy    0.00 (0%)  kernels       0 mean     0.0 us | 
+p2 denoise: window 11.82 s, GPU idle 0.07 s in 15321 gaps, idle not inside any runtime call 0.02 s
+API time overlapping GPU idle (s) | all time in API (s) | calls
+     0.031 |   11.686 |     100  R:cudaStreamSynchronize_v3020
+     0.013 |    0.016 |    3140  R:cudaMallocAsync_v11020
+     0.004 |    0.008 |      80  R:cudaMemcpy_v3020
+     0.000 |    0.001 |      60  R:cudaMemcpyAsync_v3020
+     0.000 |    0.004 |    1080  R:cudaLaunchKernelExC_v11060
+     0.000 |    0.017 |    4000  D:cuLaunchKernelEx
+     0.000 |    0.019 |    6100  R:cudaLaunchKernel_v7000
+     0.000 |    0.000 |      20  R:cudaEventElapsedTime_v3020
+     0.000 |    0.001 |    4040  R:cudaEventRecord_v3020
+     0.000 |    0.002 |    3140  R:cudaFreeAsync_v11020
+     0.000 |    0.006 |    4000  R:cudaMemsetAsync_v3020
+     0.000 |    0.001 |    9086  R:cudaGetDevice_v3020
+     0.000 |    0.001 |   12200  R:cudaGetLastError_v3020
+     0.000 |    0.001 |   20000  D:cuStreamGetCaptureInfo_v2
+     0.000 |    0.001 |    6000  R:cudaGetDriverEntryPoint_v11030
+     0.000 |    0.001 |    6000  D:cuTensorMapEncodeTiled
+     0.000 |    0.000 |    8000  D:cuKernelGetAttribute
+     0.000 |    0.001 |    2000  R:cudaFuncSetAttribute_v9000
+p2 video VAE load: window 7.57 s, GPU idle 0.46 s in 85697 gaps, idle not inside any runtime call 0.30 s
+API time overlapping GPU idle (s) | all time in API (s) | calls
+     0.082 |    3.870 |      47  R:cudaEventSynchronize_v3020
+     0.070 |    2.848 |   43830  R:cudaLaunchKernelExC_v11060
+     0.061 |    3.205 |   32580  R:cudaLaunchKernel_v7000
+     0.024 |    0.780 |    9765  R:cudaMemsetAsync_v3020
+     0.002 |    0.005 |    3240  R:cudaMallocAsync_v11020
+     0.002 |    0.087 |       1  R:cudaStreamSynchronize_v3020
+     0.000 |    0.053 |   38880  R:cudaFuncGetAttributes_v3020
+     0.000 |    0.032 |     225  R:cudaMemcpyAsync_v3020
+     0.000 |    0.003 |    9812  R:cudaEventRecord_v3020
+     0.000 |    0.007 |   43830  R:cudaGetDevice_v3020
+     0.000 |    0.003 |   48600  D:cuStreamGetCaptureInfo_v2
+     0.000 |    0.005 |   74925  R:cudaGetLastError_v3020
+     0.000 |    0.002 |    3240  R:cudaFreeAsync_v11020

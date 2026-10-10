@@ -1,0 +1,11 @@
+gap        0-        5 us: n= 399739 total=  0.695 s
+gap        5-       20 us: n=    109 total=  0.001 s
+gap       20-      100 us: n=      5 total=  0.000 s
+gap      100-     1000 us: n=      1 total=  0.000 s
+gap     1000-    10000 us: n=      0 total=  0.000 s
+gap    10000-   100000 us: n=      0 total=  0.000 s
+gap   100000-100000000 us: n=      1 total=  0.965 s
+window 34.888284001 idle 1.660895497
+   0.000 s  gap     0.25 ms  after None  before ('M', '172032 1')
+  22.121 s  gap     0.06 ms  after ('K', '_Z10pack_headsIfEvPfPKT_miiii')  before ('K', '_Z10pack_headsIfEvPfPKT_miiii')
+  33.923 s  gap   964.89 ms  after ('M', '22081536 2')  before None

@@ -1,0 +1,14 @@
+gap        0-        5 us: n= 399741 total=  0.743 s
+gap        5-       20 us: n=    110 total=  0.001 s
+gap       20-      100 us: n=      3 total=  0.000 s
+gap      100-     1000 us: n=      1 total=  0.000 s
+gap     1000-    10000 us: n=      0 total=  0.000 s
+gap    10000-   100000 us: n=      0 total=  0.000 s
+gap   100000-100000000 us: n=      1 total=  0.145 s
+window 32.993857 idle 0.889642573
+   0.000 s  gap     0.34 ms  after None  before ('M', '172032 1')
+   0.000 s  gap     0.05 ms  after ('K', '_ZN8cublasLt8epilogue4impl12globalKernelILi8ELi32E')  before ('K', 'sm80_xmma_gemm_f32f32_f32f32_f32_tn_n_tilesize64x6')
+  32.849 s  gap   145.16 ms  after ('M', '22081536 2')  before None
+{"event":"context","seconds":1.406469}
+{"event":"request","name":"warmup","start":5584806.090561,"seconds":91.742782,"text_encoder":1,"audio_decoder":1,"video_decoder":1,"dit":1,"phases":[{"phase":"tokenizer","first":0.000007,"last":0.280902},{"phase":"text encoder load","first":2.001463,"last":24.022589},{"phase":"text encoder","first":24.023101,"last":24.188414},{"phase":"refine text","first":24.611845,"last":25.426445},{"phase":"precompute AdaLN","first":25.763562,"last":33.307134},{"phase":"load transformer core","first":33.732493,"last":49.414823},{"phase":"denoise","first":49.609649,"last":61.390461},{"phase":"audio VAE","first":73.121633,"last":73.528635},{"phase":"video VAE load","first":73.548295,"last":84.253910},{"phase":"FFmpeg","first":91.500762,"last":91.741636}]}
+{"event":"request","name":"p10","start":5584897.833440,"seconds":113.181341,"text_encoder":1,"audio_decoder":1,"video_decoder":1,"dit":1,"phases":[{"phase":"tokenizer","first":0.000009,"last":0.000011},{"phase":"text encoder","first":0.000707,"last":0.045003},{"phase":"refine text","first":0.045478,"last":0.054204},{"phase":"precompute AdaLN","first":0.054206,"last":0.054206},{"phase":"load transformer core","first":0.081845,"last":0.081850},{"phase":"denoise","first":0.205189,"last":79.722535},{"phase":"audio VAE","first":79.722546,"last":79.989379},{"phase":"video VAE load","first":79.992760,"last":79.992785},{"phase":"FFmpeg","first":112.986617,"last":113.177023}]}

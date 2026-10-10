@@ -1,0 +1,16 @@
+gap        0-        5 us: n= 454892 total=  0.811 s
+gap        5-       20 us: n=    942 total=  0.010 s
+gap       20-      100 us: n=    223 total=  0.008 s
+gap      100-     1000 us: n=     54 total=  0.017 s
+gap     1000-    10000 us: n=    204 total=  1.263 s
+gap    10000-   100000 us: n=     13 total=  0.983 s
+gap   100000-100000000 us: n=      3 total=  1.376 s
+window 39.213703 idle 4.467043939
+   2.646 s  gap    87.22 ms  after ('M', '22081536 2')  before ('M', '172032 1')
+   8.091 s  gap   101.48 ms  after ('M', '22081536 2')  before ('M', '172032 1')
+  10.840 s  gap    90.84 ms  after ('M', '22081536 2')  before ('M', '172032 1')
+  13.568 s  gap   104.19 ms  after ('M', '22081536 2')  before ('M', '172032 1')
+  16.308 s  gap    89.75 ms  after ('M', '22081536 2')  before ('M', '172032 1')
+  21.748 s  gap    87.42 ms  after ('M', '22081536 2')  before ('M', '172032 1')
+  24.464 s  gap    89.33 ms  after ('M', '22081536 2')  before ('M', '172032 1')
+  38.043 s  gap  1170.82 ms  after ('M', '22081536 2')  before None

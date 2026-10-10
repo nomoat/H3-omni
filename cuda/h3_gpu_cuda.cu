@@ -25,6 +25,8 @@ using uint = unsigned int;
 using ushort = unsigned short;
 struct h3_gpu {
     cudaStream_t stream{};
+    cudaStream_t copy_stream{};  // asynchronous readback (vae_fused.cuh)
+    cudaEvent_t copy_ready{};
     cudaEvent_t start_event{}, stop_event{};
     bool timing_open{};
     cublasHandle_t blas{};
@@ -176,6 +178,12 @@ extern "C" void h3_gpu_free(h3_gpu *g) {
         return;
     if (g->stream)
         cudaStreamSynchronize(g->stream);
+    if (g->copy_stream) {
+        cudaStreamSynchronize(g->copy_stream);
+        cudaStreamDestroy(g->copy_stream);
+    }
+    if (g->copy_ready)
+        cudaEventDestroy(g->copy_ready);
     if (g->dnn)
         cudnnDestroy(g->dnn);
     if (g->lt_workspace)
@@ -685,6 +693,20 @@ extern "C" int h3_gpu_tensor_split_tf32(h3_gpu *g, h3_gpu_tensor *w) {
         (const float *)w->data, (float *)w->data, (float *)w->tf32_low, w->elements);
     return launch_ok(g);
 }
+// Three Hopper TF32 products xh*wl + xl*wh + xh*wh accumulate into y.
+static int gemm_3xtf32(h3_gpu *g, h3_gpu_tensor *y, const float *high, const float *low,
+                       const h3_gpu_tensor *w, uint rows, uint k, uint n) {
+    const void *weights[3] = {w->tf32_low, w->data, w->data};
+    const float *inputs[3] = {high, low, high};
+    float one = 1, zero = 0;
+    int ok = 1;
+    for (int term = 0; ok && term < 3; term++)
+        ok = blas_ok(g, cublasGemmEx(g->blas, CUBLAS_OP_T, CUBLAS_OP_N, n, rows, k, &one,
+                                     weights[term], CUDA_R_32F, k, inputs[term], CUDA_R_32F, k,
+                                     term ? &one : &zero, y->data, CUDA_R_32F, n,
+                                     CUBLAS_COMPUTE_32F_FAST_TF32, CUBLAS_GEMM_DEFAULT));
+    return ok;
+}
 // y = x w^T + b with 3xTF32: the activation is split per call, the weight at
 // load. Three Hopper TF32 products accumulate into y, then the bias is added.
 static int linear_3xtf32(h3_gpu *g, h3_gpu_tensor *y, const h3_gpu_tensor *x,
@@ -696,15 +718,7 @@ static int linear_3xtf32(h3_gpu *g, h3_gpu_tensor *y, const h3_gpu_tensor *x,
     float *high = (float *)parts->data, *low = high + count;
     split_tf32<<<(count + 255) / 256, 256, 0, g->stream>>>((const float *)x->data, high, low,
                                                            count);
-    int ok = launch_ok(g);
-    const void *weights[3] = {w->tf32_low, w->data, w->data};
-    const float *inputs[3] = {high, low, high};
-    float one = 1, zero = 0;
-    for (int term = 0; ok && term < 3; term++)
-        ok = blas_ok(g, cublasGemmEx(g->blas, CUBLAS_OP_T, CUBLAS_OP_N, n, rows, k, &one,
-                                     weights[term], CUDA_R_32F, k, inputs[term], CUDA_R_32F, k,
-                                     term ? &one : &zero, y->data, CUDA_R_32F, n,
-                                     CUBLAS_COMPUTE_32F_FAST_TF32, CUBLAS_GEMM_DEFAULT));
+    int ok = launch_ok(g) && gemm_3xtf32(g, y, high, low, w, rows, k, n);
     if (ok && b) {
         ok = h3_gpu_require_elements(g, b, n, "linear bias") && b->dtype == H3_GPU_F32;
         if (ok) {
@@ -1387,4 +1401,5 @@ extern "C" int h3_gpu_adaln_linear_bf16(h3_gpu *g, h3_gpu_tensor *y, h3_gpu_tens
     h3_gpu_tensor_free(t);
     return ok;
 }
+#include "vae_fused.cuh"
 #include "unsupported.inc"

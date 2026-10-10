@@ -1,0 +1,22 @@
+gap        0-        5 us: n=  85661 total=  0.160 s
+gap        5-       20 us: n=     31 total=  0.000 s
+gap       20-      100 us: n=      2 total=  0.000 s
+gap      100-     1000 us: n=      0 total=  0.000 s
+gap     1000-    10000 us: n=      1 total=  0.002 s
+gap    10000-   100000 us: n=      1 total=  0.070 s
+gap   100000-100000000 us: n=      1 total=  0.215 s
+window 7.310014 idle 0.447664524
+   0.000 s  gap    69.85 ms  after None  before ('M', '172032 1')
+   0.071 s  gap     2.31 ms  after ('K', '_Z24video_qkv_rope_bias_rowsPKfS0_S0_S0_PfS1_S1_8q')  before ('K', '_Z10pack_headsIfEvPfPKT_miiii')
+   7.095 s  gap   215.08 ms  after ('M', '22081536 2')  before None
+gap        0-        5 us: n= 199876 total=  0.374 s
+gap        5-       20 us: n=     55 total=  0.000 s
+gap       20-      100 us: n=      4 total=  0.000 s
+gap      100-     1000 us: n=      0 total=  0.000 s
+gap     1000-    10000 us: n=      0 total=  0.000 s
+gap    10000-   100000 us: n=      1 total=  0.071 s
+gap   100000-100000000 us: n=      1 total=  0.211 s
+window 16.69832 idle 0.656887227
+   0.000 s  gap    70.79 ms  after None  before ('M', '172032 1')
+   0.071 s  gap     0.04 ms  after ('K', '_ZN8cublasLt8epilogue4impl12globalKernelILi8ELi32E')  before ('K', 'sm80_xmma_gemm_f32f32_f32f32_f32_tn_n_tilesize64x6')
+  16.487 s  gap   211.38 ms  after ('M', '22081536 2')  before None

@@ -42,6 +42,17 @@ int h3_video_vae_decoder_decode(h3_video_vae_decoder *decoder,
                         const float *normalized_latent, int latent_time,
                         h3_video_frames *output,
                         char *error, size_t error_size);
+/* Decode as above and also convert the final pixels to RGB24 (*rgb8, the
+ * caller frees it), with the same rounding as the CLI output. ready() reports
+ * each range of frames as soon as it is final, in frame order; it may run on
+ * another thread while the decode continues. */
+typedef void (*h3_video_frames_ready)(void *opaque, const uint8_t *rgb8,
+                                      int first_frame, int frame_count);
+int h3_video_vae_decoder_decode_rgb8(h3_video_vae_decoder *decoder,
+                        const float *normalized_latent, int latent_time,
+                        h3_video_frames *output, uint8_t **rgb8,
+                        h3_video_frames_ready ready, void *ready_opaque,
+                        char *error, size_t error_size);
 void h3_video_vae_decoder_free(h3_video_vae_decoder *decoder);
 
 /* Decode aligned H3 temporal chunks, using the released overlap/blend rules in
