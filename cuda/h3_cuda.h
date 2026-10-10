@@ -36,6 +36,15 @@ int h3_gpu_final_heads_f32(h3_gpu *gpu, h3_gpu_tensor *video_output,
  * low remainder stored beside it. FP32 linears with a split weight then run
  * as three TF32 tensor-core products, xh*wh + xh*wl + xl*wh (3xTF32). */
 int h3_gpu_tensor_split_tf32(h3_gpu *gpu, h3_gpu_tensor *weight);
+/* Non-causal FP32 attention, head dim 64, [token][head][64] layout: K and V
+ * are split into TF32 high/low parts, then one fused kernel computes both
+ * products as 3xTF32 tensor-core products with an online FP32 softmax.
+ * Error against FP64 is the same as h3_gpu_sdpa_f32 (about 1e-6), but it
+ * rounds differently (video VAE default mode only; cuda/vae_attention.cuh). */
+int h3_gpu_sdpa_3xtf32_f32(h3_gpu *gpu, h3_gpu_tensor *output,
+                           const h3_gpu_tensor *query, const h3_gpu_tensor *key,
+                           const h3_gpu_tensor *value, uint32_t tokens,
+                           uint32_t heads, uint32_t head_dim, float scale);
 #ifdef __cplusplus
 }
 #endif

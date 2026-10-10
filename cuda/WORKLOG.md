@@ -71,10 +71,30 @@ width 5376 instead of the attention width 56 x 128 = 7168.
 | 7a | #7 in the video VAE | Decoded error against PyTorch about 1e-4 (FP32 path 1e-6); 99.7% of 8-bit pixels identical, the rest differ by 1; +10 GB | Worked | 14435-vae-3xtf32 |
 | 7b | #7 end to end | 5 s 62.2 -> 51.0 s, 10 s 140.9 -> 118.7 s; peak 114 GB | Worked | 14436-duration |
 | 8 | Measure SM clock and power every 100 ms, FA3 and FA2 on one GPU | FA3: median 690 W, SM 1530 MHz, power-cap throttling; FA2: 633 W, 1920 MHz. FA3 still wins (10 s denoise 128 -> 78 s) | Finding: the default mode is power-bound | 14445 log |
+| 10 | Video-VAE attention as one fused kernel (`cuda/vae_attention.cuh`): 3xTF32 `mma.sync` m16n8k8 for Q K^T and P V, online FP32 softmax (`expf`), token-major input (no pack/unpack); first version keeps O in the tensor-core accumulator | 1797 tokens x 32 heads: 1.91 -> 0.63 ms per layer (3.0x); error against FP64 3e-6 to 1.3e-5, FP32 path 0.8e-6 to 1.2e-6; worst when attention is nearly uniform | Rejected: 10x less accurate than FP32 | 14446-vae-attn-first |
+| 10a | #10 plus promotion: each 64-key block's P V goes into a fresh accumulator, added to O with FP32 adds | Error 5.6e-7 to 1.3e-6, the same as the FP32 path; 0.78 ms (255 registers). A fourth product (xl*yl) without promotion: same error, 0.92 ms | Worked (accuracy) | 14449-vae-attn-promote |
+| 10b | 128-bit fragment layout in shared memory (one load = high and low parts of both B registers), scalar global loads, split in the kernel; 4 and 8 warps | 0.87 ms (4 warps), 0.71 ms (8 warps): slower than #10a; staging the K/V block dominates | Rejected | 14453-vae-attn-layout |
+| 10c | K and V split once per call into fragment-ordered high/low buffers (`split_kv`, 61 MB transient), `cp.async` double buffer, 8 warps x 16 rows | 0.70 ms including the split (2.7x); same error as #10a | Worked | 14459-vae-attn-bench-v5 |
+| 10d | #10c in the video VAE (default mode only, `H3_VAE_3XTF32`), decoder suite + RGB on identical latents | Decoder suite passes; video relative L2 against PyTorch 1.4985e-4 / 1.4011e-4 / 6.81e-5 / 5.20e-5 / 7.09e-5 (#7a: 1.4987e-4 / 1.4013e-4 / 6.81e-5 / 5.20e-5 / 7.09e-5); RGB against the FP32 decoder, 4 requests: relative L2 2.05e-5 to 8.08e-5, 99.687% to 99.826% of 8-bit pixels identical, the rest off by 1 (#7a: same to 3 digits) | Worked: no measurable loss against #7a | 14460-vae-attention-accuracy |
+| 10e | #10c end to end (10 s, CUPTI) | Video VAE 39.2 -> 29.7 s; attention 14.2 s (2 SGEMMs 8.95, softmax 3.80, pack/unpack 1.03, gemv 0.46) -> 5.2 s; VAE kernel launches 409,500 -> 212,940; request 119.4 -> 110.7 s | Worked | 14461-profile-10s-v5 |
+| 10f | Interleave the 8 independent MMA chains (Q K^T: kk outer; P V: key group outer, P split one group at a time); each accumulator keeps its summation order | 0.548 ms (3.5x the FP32 path, 48 effective TFLOPS); output bit-identical to #10c in all 8 bench cases | Worked | 14464-vae-attn-bench |
+| 10g | #10f end to end | Video VAE 28.8 s (baseline 39.2 s); attention 4.09 s (kernel 3.91 + split 0.18); request 107.4 s (baseline 119.4 s; this node's denoise was 1.6 s faster, so about 10.4 s is from this change); reference mode bit-exact, 7 of 7 requests; decoder suite and RGB numbers identical to #10d | Worked | 14467-profile-10s, 14466-bitcheck, 14470-vae-attention-accuracy-final |
 
 Why 3xTF32 is not as accurate as FP32 here: the Hopper tensor-core FP32
 accumulator is not a full IEEE accumulator; the error grows with K (K=8192
 gives 1.9e-5). It is still 1000x below BF16 resolution.
+
+The same accumulator explains #10 against #10a. Attention sums 1797 products
+P V whose sum is much smaller than the sum of their sizes when attention is
+nearly uniform, so accumulator rounding is amplified. Summing each 64-key
+block in a fresh accumulator and adding the blocks in FP32 removes the
+difference at no cost after #10f (0.534 ms without, 0.548 ms with).
+
+Video-VAE attention kernel limits (#10f): 255 registers per thread, so one
+CTA of 8 warps per SM; plain TF32 in the same kernel takes 0.40 ms, so most of
+the time is softmax, splitting and latency, not tensor-core work. Next steps if
+needed: WGMMA (sm_90a, B from shared memory, V transposed), or `exp2` with a
+folded log2(e) (changes rounding of every probability; measure first).
 
 ## Calibrated acceptance
 
@@ -104,8 +124,8 @@ passes them. Visual check: `/home/homo/model/h3-samples/compare/`, user review
   return before long-running serving.
 - DiT elementwise fusion: about 6.5 s of 132 s at 10 s; can be bit-exact if
   the operation order is kept.
-- Video VAE attention: fused FP32 attention instead of GEMM + softmax + pack
-  (about 6 s at 10 s).
+- Video VAE attention: done in the default mode (#10, 14.2 -> 4.1 s at
+  10 s). The reference mode still uses GEMM + softmax + pack.
 - Remaining GPU idle time in the video VAE; overlap VAE decode with MP4
   encoding.
 - Lossy options (not started): step reuse, fewer layers, token reduction,

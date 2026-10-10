@@ -20,6 +20,7 @@ extern "C" {
 #include "h3_gpu.h"
 #include "h3_metal.h"
 }
+#include "vae_attention.cuh"
 using uint = unsigned int;
 using ushort = unsigned short;
 struct h3_gpu {
@@ -1049,6 +1050,36 @@ extern "C" int h3_gpu_sdpa_f32(h3_gpu *g, h3_gpu_tensor *y, const h3_gpu_tensor 
                                const h3_gpu_tensor *k, const h3_gpu_tensor *v, uint n, uint h,
                                uint d, float s) {
     return sdpa(g, y, q, k, v, 1, n, h, h, d, s, false);
+}
+extern "C" int h3_gpu_sdpa_3xtf32_f32(h3_gpu *g, h3_gpu_tensor *y, const h3_gpu_tensor *q,
+                                      const h3_gpu_tensor *k, const h3_gpu_tensor *v, uint n,
+                                      uint h, uint d, float s) {
+    size_t size = size_t(n) * h * d;
+    if (!n || !h || d != vae_attention::D || size_t(n) * h > INT_MAX) {
+        h3_gpu_set_error(g, "3xTF32 attention needs head dim 64");
+        return 0;
+    }
+    if (!h3_gpu_require_elements(g, q, size, "attention query") ||
+        !h3_gpu_require_elements(g, k, size, "attention key") ||
+        !h3_gpu_require_elements(g, v, size, "attention value") ||
+        !h3_gpu_require_elements(g, y, size, "attention output"))
+        return 0;
+    if (q->dtype != H3_GPU_F32 || k->dtype != H3_GPU_F32 || v->dtype != H3_GPU_F32 ||
+        y->dtype != H3_GPU_F32) {
+        h3_gpu_set_error(g, "3xTF32 attention needs FP32 tensors");
+        return 0;
+    }
+    size_t words = vae_attention::split_words(int(n), int(h));
+    auto *split = allocate(g, 2 * words, H3_GPU_F32);
+    if (!split) return 0;
+    unsigned *split_k = (unsigned *)split->data, *split_v = split_k + words;
+    int ok = cuda_ok(g, vae_attention::launch((float *)y->data, (const float *)q->data,
+                                              (const float *)k->data, (const float *)v->data,
+                                              split_k, split_v, int(n), int(h), s, g->stream));
+    h3_gpu_tensor_free(split);
+    g->stats.direct_dispatches += 2;
+    ++g->stats.mps_sdpa_dispatches;
+    return ok;
 }
 extern "C" int h3_gpu_sdpa_bf16(h3_gpu *g, h3_gpu_tensor *y, const h3_gpu_tensor *q,
                                 const h3_gpu_tensor *k, const h3_gpu_tensor *v, uint n, uint h,

@@ -53,6 +53,7 @@ typedef struct {
     h3_gpu_tensor *w2;
     h3_gpu_tensor *w2_b;
     h3_gpu_tensor *scale2;
+    int tf32_attention; /* fused 3xTF32 attention (CUDA default mode) */
 } vae_block;
 
 typedef struct {
@@ -204,7 +205,10 @@ static int load_block(vae_context *vae, int index, char *error,
      * against the FP32 reference, and twice the memory for these weights.
      * H3_VAE_3XTF32=0 restores the FP32 path that matches PyTorch. */
     const char *x3 = getenv("H3_VAE_3XTF32");
-    if (!x3 || strcmp(x3, "0")) {
+    /* The same switch selects the fused 3xTF32 attention kernel instead of
+     * FP32 SIMT GEMMs + softmax over packed heads. */
+    block->tf32_attention = !x3 || strcmp(x3, "0");
+    if (block->tf32_attention) {
         h3_gpu_tensor *split[] = {block->qkv_w, block->out_w, block->w1, block->w2};
         for (size_t item = 0; item < sizeof(split) / sizeof(split[0]); item++)
             if (!h3_gpu_tensor_split_tf32(vae->gpu, split[item])) {
@@ -453,6 +457,13 @@ static int run_block(vae_context *vae, int index, char *error,
     OP(h3_gpu_video_qkv_rope_f32(vae->gpu, vae->query, vae->key, vae->value,
         vae->qkv, vae->rope_cos, vae->rope_sin, rows, HEADS, HEAD_DIM,
         ROPE_HALF, 1e-5f), "video VAE QK norm/RoPE");
+#ifdef H3_CUDA
+    if (weight->tf32_attention)
+        OP(h3_gpu_sdpa_3xtf32_f32(vae->gpu, vae->heads, vae->query, vae->key,
+            vae->value, rows, HEADS, HEAD_DIM, 1.0f / sqrtf((float)HEAD_DIM)),
+           "video VAE attention");
+    else
+#endif
     OP(h3_gpu_sdpa_f32(vae->gpu, vae->heads, vae->query, vae->key, vae->value,
         rows, HEADS, HEAD_DIM, 1.0f / sqrtf((float)HEAD_DIM)),
        "video VAE attention");
