@@ -70,6 +70,7 @@ width 5376 instead of the attention width 56 x 128 = 7168.
 | 7 | 3xTF32 from three Hopper TF32 cuBLAS products, weights split at load | 2.3-2.5x faster GEMMs (110 TFLOPS); GEMM error 4.8e-6 | Worked | 14432-vae-gemm |
 | 7a | #7 in the video VAE | Decoded error against PyTorch about 1e-4 (FP32 path 1e-6); 99.7% of 8-bit pixels identical, the rest differ by 1; +10 GB | Worked | 14435-vae-3xtf32 |
 | 7b | #7 end to end | 5 s 62.2 -> 51.0 s, 10 s 140.9 -> 118.7 s; peak 114 GB | Worked | 14436-duration |
+| 8 | Measure SM clock and power every 100 ms, FA3 and FA2 on one GPU | FA3: median 690 W, SM 1530 MHz, power-cap throttling; FA2: 633 W, 1920 MHz. FA3 still wins (10 s denoise 128 -> 78 s) | Finding: the default mode is power-bound | 14445 log |
 
 Why 3xTF32 is not as accurate as FP32 here: the Hopper tensor-core FP32
 accumulator is not a full IEEE accumulator; the error grows with K (K=8192
@@ -92,6 +93,11 @@ passes them. Visual check: `/home/homo/model/h3-samples/compare/`, user review
 2026-10-10: "挺好的" (good).
 
 ## Open items and ideas
+
+- The default mode runs at the 700 W power cap (experiment 8), so all
+  kernels run about 20% below the maximum clock. Changes that cut memory
+  traffic or energy (fusion, vectorized elementwise kernels) may gain more
+  than their kernel time suggests.
 
 - FA3 exits the process on a launch error (`CHECK_CUDA` in upstream
   `cuda_check.h`). Inputs are checked before the call; replace with an error

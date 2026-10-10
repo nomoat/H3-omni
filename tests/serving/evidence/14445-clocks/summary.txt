@@ -1,0 +1,8 @@
+name, clocks.max.sm [MHz], power.limit [W], enforced.power.limit [W]
+NVIDIA H200, 1980 MHz, 700.00 W, 700.00 W
+fa3 p10a seconds 121.4 denoise 78.3
+fa3 p10b seconds 121.6 denoise 78.6
+fa3 samples>300W 2590 SM MHz median 1530.0 p10 1485.0 min 1305.0 power median 690.49 temp max 70.0 throttle reasons ['0x0000000000000000', '0x0000000000000004']
+fa2 p10a seconds 171.6 denoise 128.3
+fa2 p10b seconds 171.4 denoise 128.4
+fa2 samples>300W 3610 SM MHz median 1920.0 p10 1650.0 min 1515.0 power median 632.88 temp max 70.0 throttle reasons ['0x0000000000000000', '0x0000000000000004']
