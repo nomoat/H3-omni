@@ -12,7 +12,8 @@ also produced a valid 22-frame MP4 with audio. Its runtime dependencies contain
 neither libtorch nor libpython.
 
 **Two modes.** The default mode is for serving: FlashAttention-3 for the DiT
-attention and 3xTF32 tensor-core GEMMs in the video VAE. The reference mode,
+attention, and 3xTF32 tensor-core GEMMs and a fused 3xTF32 attention kernel
+(`vae_attention.cuh`) in the video VAE. The reference mode,
 `H3_FLASH3=0 H3_VAE_3XTF32=0`, is the phase-one backend that matches PyTorch
 bit for bit; it must keep passing the contract below. The default mode passes
 the calibrated acceptance described in [WORKLOG.md](WORKLOG.md), which also
