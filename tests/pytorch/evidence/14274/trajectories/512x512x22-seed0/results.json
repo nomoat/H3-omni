@@ -1,0 +1,642 @@
+{
+  "scope": "DiT and sampler; text and decoded-output acceptance remain separate",
+  "arguments": {
+    "weights": "/var/tmp/h3-cuda-14228/local-model/FL2VA",
+    "diffusers": "/var/tmp/h3-cuda-14274/diffusers",
+    "library": "build-cuda/libh3_model.so",
+    "output": "results/trajectories/512x512x22-seed0",
+    "text": "results/text/text-0.safetensors",
+    "width": 512,
+    "height": 512,
+    "frames": 22,
+    "steps": 20,
+    "evaluations": null,
+    "seed": 0,
+    "trace": false,
+    "attention_math_diagnostic": false
+  },
+  "complete_trajectory": true,
+  "real_text": true,
+  "layers": 50,
+  "diagnostic_attention": false,
+  "trace_enabled": false,
+  "reference_timestep_plan": "MiniMaxH3SetTimestepsStep.build_row_timesteps",
+  "reference_timestep_rows": [
+    1,
+    2,
+    2,
+    2,
+    2,
+    2,
+    2,
+    2,
+    2,
+    2,
+    2,
+    2,
+    2,
+    2,
+    2,
+    2,
+    2,
+    2,
+    2,
+    2
+  ],
+  "exact_checks": {
+    "positions": true,
+    "token_tags": true,
+    "packing_indices": true,
+    "latent_packing": true
+  },
+  "input_sha256": "023516be59d7c4a1721f1e1bde89948386bc583ef92f09dce017eb769e0a9881",
+  "passed": true,
+  "results": [
+    {
+      "label": "step_0_video_velocity",
+      "relative_l2": 0.0,
+      "normalized_max": 0.0,
+      "passed": true
+    },
+    {
+      "label": "step_0_audio_velocity",
+      "relative_l2": 0.0,
+      "normalized_max": 0.0,
+      "passed": true
+    },
+    {
+      "label": "step_0_video_latent",
+      "relative_l2": 0.0,
+      "normalized_max": 0.0,
+      "passed": true
+    },
+    {
+      "label": "step_0_audio_latent",
+      "relative_l2": 0.0,
+      "normalized_max": 0.0,
+      "passed": true
+    },
+    {
+      "label": "step_1_video_velocity",
+      "relative_l2": 0.0,
+      "normalized_max": 0.0,
+      "passed": true
+    },
+    {
+      "label": "step_1_audio_velocity",
+      "relative_l2": 0.0,
+      "normalized_max": 0.0,
+      "passed": true
+    },
+    {
+      "label": "step_1_video_latent",
+      "relative_l2": 0.0,
+      "normalized_max": 0.0,
+      "passed": true
+    },
+    {
+      "label": "step_1_audio_latent",
+      "relative_l2": 0.0,
+      "normalized_max": 0.0,
+      "passed": true
+    },
+    {
+      "label": "step_2_video_velocity",
+      "relative_l2": 0.0,
+      "normalized_max": 0.0,
+      "passed": true
+    },
+    {
+      "label": "step_2_audio_velocity",
+      "relative_l2": 0.0,
+      "normalized_max": 0.0,
+      "passed": true
+    },
+    {
+      "label": "step_2_video_latent",
+      "relative_l2": 0.0,
+      "normalized_max": 0.0,
+      "passed": true
+    },
+    {
+      "label": "step_2_audio_latent",
+      "relative_l2": 0.0,
+      "normalized_max": 0.0,
+      "passed": true
+    },
+    {
+      "label": "step_3_video_velocity",
+      "relative_l2": 0.0,
+      "normalized_max": 0.0,
+      "passed": true
+    },
+    {
+      "label": "step_3_audio_velocity",
+      "relative_l2": 0.0,
+      "normalized_max": 0.0,
+      "passed": true
+    },
+    {
+      "label": "step_3_video_latent",
+      "relative_l2": 0.0,
+      "normalized_max": 0.0,
+      "passed": true
+    },
+    {
+      "label": "step_3_audio_latent",
+      "relative_l2": 0.0,
+      "normalized_max": 0.0,
+      "passed": true
+    },
+    {
+      "label": "step_4_video_velocity",
+      "relative_l2": 0.0,
+      "normalized_max": 0.0,
+      "passed": true
+    },
+    {
+      "label": "step_4_audio_velocity",
+      "relative_l2": 0.0,
+      "normalized_max": 0.0,
+      "passed": true
+    },
+    {
+      "label": "step_4_video_latent",
+      "relative_l2": 0.0,
+      "normalized_max": 0.0,
+      "passed": true
+    },
+    {
+      "label": "step_4_audio_latent",
+      "relative_l2": 0.0,
+      "normalized_max": 0.0,
+      "passed": true
+    },
+    {
+      "label": "step_5_video_velocity",
+      "relative_l2": 0.0,
+      "normalized_max": 0.0,
+      "passed": true
+    },
+    {
+      "label": "step_5_audio_velocity",
+      "relative_l2": 0.0,
+      "normalized_max": 0.0,
+      "passed": true
+    },
+    {
+      "label": "step_5_video_latent",
+      "relative_l2": 0.0,
+      "normalized_max": 0.0,
+      "passed": true
+    },
+    {
+      "label": "step_5_audio_latent",
+      "relative_l2": 0.0,
+      "normalized_max": 0.0,
+      "passed": true
+    },
+    {
+      "label": "step_6_video_velocity",
+      "relative_l2": 0.0,
+      "normalized_max": 0.0,
+      "passed": true
+    },
+    {
+      "label": "step_6_audio_velocity",
+      "relative_l2": 0.0,
+      "normalized_max": 0.0,
+      "passed": true
+    },
+    {
+      "label": "step_6_video_latent",
+      "relative_l2": 0.0,
+      "normalized_max": 0.0,
+      "passed": true
+    },
+    {
+      "label": "step_6_audio_latent",
+      "relative_l2": 0.0,
+      "normalized_max": 0.0,
+      "passed": true
+    },
+    {
+      "label": "step_7_video_velocity",
+      "relative_l2": 0.0,
+      "normalized_max": 0.0,
+      "passed": true
+    },
+    {
+      "label": "step_7_audio_velocity",
+      "relative_l2": 0.0,
+      "normalized_max": 0.0,
+      "passed": true
+    },
+    {
+      "label": "step_7_video_latent",
+      "relative_l2": 0.0,
+      "normalized_max": 0.0,
+      "passed": true
+    },
+    {
+      "label": "step_7_audio_latent",
+      "relative_l2": 0.0,
+      "normalized_max": 0.0,
+      "passed": true
+    },
+    {
+      "label": "step_8_video_velocity",
+      "relative_l2": 0.0,
+      "normalized_max": 0.0,
+      "passed": true
+    },
+    {
+      "label": "step_8_audio_velocity",
+      "relative_l2": 0.0,
+      "normalized_max": 0.0,
+      "passed": true
+    },
+    {
+      "label": "step_8_video_latent",
+      "relative_l2": 0.0,
+      "normalized_max": 0.0,
+      "passed": true
+    },
+    {
+      "label": "step_8_audio_latent",
+      "relative_l2": 0.0,
+      "normalized_max": 0.0,
+      "passed": true
+    },
+    {
+      "label": "step_9_video_velocity",
+      "relative_l2": 0.0,
+      "normalized_max": 0.0,
+      "passed": true
+    },
+    {
+      "label": "step_9_audio_velocity",
+      "relative_l2": 0.0,
+      "normalized_max": 0.0,
+      "passed": true
+    },
+    {
+      "label": "step_9_video_latent",
+      "relative_l2": 0.0,
+      "normalized_max": 0.0,
+      "passed": true
+    },
+    {
+      "label": "step_9_audio_latent",
+      "relative_l2": 0.0,
+      "normalized_max": 0.0,
+      "passed": true
+    },
+    {
+      "label": "step_10_video_velocity",
+      "relative_l2": 0.0,
+      "normalized_max": 0.0,
+      "passed": true
+    },
+    {
+      "label": "step_10_audio_velocity",
+      "relative_l2": 0.0,
+      "normalized_max": 0.0,
+      "passed": true
+    },
+    {
+      "label": "step_10_video_latent",
+      "relative_l2": 0.0,
+      "normalized_max": 0.0,
+      "passed": true
+    },
+    {
+      "label": "step_10_audio_latent",
+      "relative_l2": 0.0,
+      "normalized_max": 0.0,
+      "passed": true
+    },
+    {
+      "label": "step_11_video_velocity",
+      "relative_l2": 0.0,
+      "normalized_max": 0.0,
+      "passed": true
+    },
+    {
+      "label": "step_11_audio_velocity",
+      "relative_l2": 0.0,
+      "normalized_max": 0.0,
+      "passed": true
+    },
+    {
+      "label": "step_11_video_latent",
+      "relative_l2": 0.0,
+      "normalized_max": 0.0,
+      "passed": true
+    },
+    {
+      "label": "step_11_audio_latent",
+      "relative_l2": 0.0,
+      "normalized_max": 0.0,
+      "passed": true
+    },
+    {
+      "label": "step_12_video_velocity",
+      "relative_l2": 0.0,
+      "normalized_max": 0.0,
+      "passed": true
+    },
+    {
+      "label": "step_12_audio_velocity",
+      "relative_l2": 0.0,
+      "normalized_max": 0.0,
+      "passed": true
+    },
+    {
+      "label": "step_12_video_latent",
+      "relative_l2": 0.0,
+      "normalized_max": 0.0,
+      "passed": true
+    },
+    {
+      "label": "step_12_audio_latent",
+      "relative_l2": 0.0,
+      "normalized_max": 0.0,
+      "passed": true
+    },
+    {
+      "label": "step_13_video_velocity",
+      "relative_l2": 0.0,
+      "normalized_max": 0.0,
+      "passed": true
+    },
+    {
+      "label": "step_13_audio_velocity",
+      "relative_l2": 0.0,
+      "normalized_max": 0.0,
+      "passed": true
+    },
+    {
+      "label": "step_13_video_latent",
+      "relative_l2": 0.0,
+      "normalized_max": 0.0,
+      "passed": true
+    },
+    {
+      "label": "step_13_audio_latent",
+      "relative_l2": 0.0,
+      "normalized_max": 0.0,
+      "passed": true
+    },
+    {
+      "label": "step_14_video_velocity",
+      "relative_l2": 0.0,
+      "normalized_max": 0.0,
+      "passed": true
+    },
+    {
+      "label": "step_14_audio_velocity",
+      "relative_l2": 0.0,
+      "normalized_max": 0.0,
+      "passed": true
+    },
+    {
+      "label": "step_14_video_latent",
+      "relative_l2": 0.0,
+      "normalized_max": 0.0,
+      "passed": true
+    },
+    {
+      "label": "step_14_audio_latent",
+      "relative_l2": 0.0,
+      "normalized_max": 0.0,
+      "passed": true
+    },
+    {
+      "label": "step_15_video_velocity",
+      "relative_l2": 0.0,
+      "normalized_max": 0.0,
+      "passed": true
+    },
+    {
+      "label": "step_15_audio_velocity",
+      "relative_l2": 0.0,
+      "normalized_max": 0.0,
+      "passed": true
+    },
+    {
+      "label": "step_15_video_latent",
+      "relative_l2": 0.0,
+      "normalized_max": 0.0,
+      "passed": true
+    },
+    {
+      "label": "step_15_audio_latent",
+      "relative_l2": 0.0,
+      "normalized_max": 0.0,
+      "passed": true
+    },
+    {
+      "label": "step_16_video_velocity",
+      "relative_l2": 0.0,
+      "normalized_max": 0.0,
+      "passed": true
+    },
+    {
+      "label": "step_16_audio_velocity",
+      "relative_l2": 0.0,
+      "normalized_max": 0.0,
+      "passed": true
+    },
+    {
+      "label": "step_16_video_latent",
+      "relative_l2": 0.0,
+      "normalized_max": 0.0,
+      "passed": true
+    },
+    {
+      "label": "step_16_audio_latent",
+      "relative_l2": 0.0,
+      "normalized_max": 0.0,
+      "passed": true
+    },
+    {
+      "label": "step_17_video_velocity",
+      "relative_l2": 0.0,
+      "normalized_max": 0.0,
+      "passed": true
+    },
+    {
+      "label": "step_17_audio_velocity",
+      "relative_l2": 0.0,
+      "normalized_max": 0.0,
+      "passed": true
+    },
+    {
+      "label": "step_17_video_latent",
+      "relative_l2": 0.0,
+      "normalized_max": 0.0,
+      "passed": true
+    },
+    {
+      "label": "step_17_audio_latent",
+      "relative_l2": 0.0,
+      "normalized_max": 0.0,
+      "passed": true
+    },
+    {
+      "label": "step_18_video_velocity",
+      "relative_l2": 0.0,
+      "normalized_max": 0.0,
+      "passed": true
+    },
+    {
+      "label": "step_18_audio_velocity",
+      "relative_l2": 0.0,
+      "normalized_max": 0.0,
+      "passed": true
+    },
+    {
+      "label": "step_18_video_latent",
+      "relative_l2": 0.0,
+      "normalized_max": 0.0,
+      "passed": true
+    },
+    {
+      "label": "step_18_audio_latent",
+      "relative_l2": 0.0,
+      "normalized_max": 0.0,
+      "passed": true
+    },
+    {
+      "label": "step_19_video_velocity",
+      "relative_l2": 0.0,
+      "normalized_max": 0.0,
+      "passed": true
+    },
+    {
+      "label": "step_19_audio_velocity",
+      "relative_l2": 0.0,
+      "normalized_max": 0.0,
+      "passed": true
+    },
+    {
+      "label": "step_19_video_latent",
+      "relative_l2": 0.0,
+      "normalized_max": 0.0,
+      "passed": true
+    },
+    {
+      "label": "step_19_audio_latent",
+      "relative_l2": 0.0,
+      "normalized_max": 0.0,
+      "passed": true
+    }
+  ],
+  "timings": [
+    {
+      "step": 0,
+      "native_seconds": 0.2959716971963644,
+      "reference_seconds": 0.18211229890584946
+    },
+    {
+      "step": 1,
+      "native_seconds": 0.30636559426784515,
+      "reference_seconds": 0.1695441920310259
+    },
+    {
+      "step": 2,
+      "native_seconds": 0.3094402374699712,
+      "reference_seconds": 0.16751630790531635
+    },
+    {
+      "step": 3,
+      "native_seconds": 0.3102236818522215,
+      "reference_seconds": 0.1663961075246334
+    },
+    {
+      "step": 4,
+      "native_seconds": 0.3095401609316468,
+      "reference_seconds": 0.169145573861897
+    },
+    {
+      "step": 5,
+      "native_seconds": 0.2948666037991643,
+      "reference_seconds": 0.16817122139036655
+    },
+    {
+      "step": 6,
+      "native_seconds": 0.297101229429245,
+      "reference_seconds": 0.1684401510283351
+    },
+    {
+      "step": 7,
+      "native_seconds": 0.30327887646853924,
+      "reference_seconds": 0.1694790357723832
+    },
+    {
+      "step": 8,
+      "native_seconds": 0.2942244093865156,
+      "reference_seconds": 0.167292064987123
+    },
+    {
+      "step": 9,
+      "native_seconds": 0.3186542047187686,
+      "reference_seconds": 0.16723442822694778
+    },
+    {
+      "step": 10,
+      "native_seconds": 0.2944148136302829,
+      "reference_seconds": 0.1684119449928403
+    },
+    {
+      "step": 11,
+      "native_seconds": 0.29453506972640753,
+      "reference_seconds": 0.16702973749488592
+    },
+    {
+      "step": 12,
+      "native_seconds": 0.30542214307934046,
+      "reference_seconds": 0.16698439978063107
+    },
+    {
+      "step": 13,
+      "native_seconds": 0.2984976330772042,
+      "reference_seconds": 0.16950526367872953
+    },
+    {
+      "step": 14,
+      "native_seconds": 0.31080043129622936,
+      "reference_seconds": 0.1672795284539461
+    },
+    {
+      "step": 15,
+      "native_seconds": 0.2965195495635271,
+      "reference_seconds": 0.16725928895175457
+    },
+    {
+      "step": 16,
+      "native_seconds": 0.29627345129847527,
+      "reference_seconds": 0.16820403654128313
+    },
+    {
+      "step": 17,
+      "native_seconds": 0.3164264401420951,
+      "reference_seconds": 0.1696983426809311
+    },
+    {
+      "step": 18,
+      "native_seconds": 0.2947116270661354,
+      "reference_seconds": 0.17063757870346308
+    },
+    {
+      "step": 19,
+      "native_seconds": 0.2966082561761141,
+      "reference_seconds": 0.17068652622401714
+    }
+  ],
+  "load_seconds": {
+    "native": 23.970351045019925,
+    "reference": 4.648230969905853e-06
+  }
+}

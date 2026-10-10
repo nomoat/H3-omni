@@ -28,3 +28,11 @@ h3_real_video_vae_test
 h3_semantic_vae_test
 libh3.a
 .DS_Store
+
+# Local source checkouts and CUDA build artifacts.
+.deps/
+build-cuda/
+__pycache__/
+
+# Independent experiment repositories, worktrees and full tensor evidence.
+research/autoresearch/runs/

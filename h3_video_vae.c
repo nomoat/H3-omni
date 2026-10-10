@@ -601,8 +601,10 @@ static int unpack_frame_range(vae_context *vae, int first_frame,
         fail(error, error_size, "cannot read video VAE output patches");
         return 0;
     }
+#ifndef H3_CUDA
     static const float mean[] = {0.485f, 0.456f, 0.406f};
     static const float deviation[] = {0.229f, 0.224f, 0.225f};
+#endif
     for (int output_frame = 0; output_frame < frame_count; output_frame++) {
         int frame = first_frame + output_frame;
         int decoded_t = frame + FRAME_OFFSET;
@@ -621,10 +623,14 @@ static int unpack_frame_range(vae_context *vae, int first_frame,
                     size_t component = ((((size_t)channel * 4 +
                         (size_t)within_t) * 16 + (size_t)within_y) * 16 +
                         (size_t)within_x);
+#ifdef H3_CUDA
+                    float value = rows[patch * OUTPUT_PATCH + component];
+#else
                     float value = rows[patch * OUTPUT_PATCH + component] *
                                   deviation[channel] + mean[channel];
                     if (value < 0.0f) value = 0.0f;
                     if (value > 1.0f) value = 1.0f;
+#endif
                     size_t destination = (((size_t)output_frame *
                         (size_t)pixel_h +
                         (size_t)y) * (size_t)pixel_w + (size_t)x) * 3 +
@@ -648,6 +654,22 @@ static int unpack_frames(vae_context *vae, h3_video_frames *output,
                               error, error_size);
 }
 
+#ifdef H3_CUDA
+static void finalize_video_pixels(h3_video_frames *output) {
+    /* The reference blends raw decoder values before pixel normalization
+     * and clipping. Clipping individual tiles changes overlap pixels. */
+    static const float mean[] = {0.485f, 0.456f, 0.406f};
+    static const float deviation[] = {0.229f, 0.224f, 0.225f};
+    size_t count = (size_t)output->frames * output->height * output->width * 3;
+    for (size_t index = 0; index < count; ++index) {
+        float value = output->rgb[index] * deviation[index % 3] + mean[index % 3];
+        if (value < 0.0f) value = 0.0f;
+        if (value > 1.0f) value = 1.0f;
+        output->rgb[index] = value;
+    }
+}
+#endif
+
 static void tile_axis_free(tile_axis *axis) {
     if (!axis) return;
     free(axis->starts);
@@ -664,6 +686,13 @@ static int tile_count_for_extent(int extent, int tile_pixels) {
 }
 
 static int configured_tile_pixels(int pixel_height, int pixel_width) {
+#ifdef H3_CUDA
+    /* The released reference enables fixed 256-pixel tiles. Adaptive tile
+     * sizes change each tile's attention context and therefore its output. */
+    (void)pixel_height;
+    (void)pixel_width;
+    return TILE_PIXELS;
+#else
     const char *value = getenv("H3_VAE_TILE_PIXELS");
     if (value && *value) {
         char *end = NULL;
@@ -687,6 +716,7 @@ static int configured_tile_pixels(int pixel_height, int pixel_width) {
         }
     }
     return best;
+#endif
 }
 
 static int tile_axis_build(int extent, int tile_pixels, tile_axis *axis,
@@ -971,6 +1001,9 @@ int h3_video_vae_decoder_preview(h3_video_vae_decoder *decoder,
                                   chunk, local_frame, output,
                                   error, error_size);
     if (ok) *output_frame_index = global_frame;
+#ifdef H3_CUDA
+    if (ok) finalize_video_pixels(output);
+#endif
     return ok;
 }
 
@@ -1033,6 +1066,9 @@ int h3_video_vae_decoder_decode(h3_video_vae_decoder *decoder,
     free(final_rgb);
     free(temporal_overlap);
     if (!ok) h3_video_frames_free(output);
+#ifdef H3_CUDA
+    if (ok) finalize_video_pixels(output);
+#endif
     return ok;
 }
 
@@ -1231,6 +1267,9 @@ int h3_video_vae_decode(const char *weight_directory,
                                 tile_pixels, progress,
                                 progress_opaque, output, error, error_size);
         if (!ok) h3_video_frames_free(output);
+#ifdef H3_CUDA
+        if (ok) finalize_video_pixels(output);
+#endif
         return ok;
     }
     vae.weights = h3_weight_store_open(weight_directory, error, error_size);
@@ -1247,6 +1286,9 @@ int h3_video_vae_decode(const char *weight_directory,
         run_decoder(&vae, progress, progress_opaque, error, error_size) &&
         unpack_frames(&vae, output, error, error_size);
     if (!ok) h3_video_frames_free(output);
+#ifdef H3_CUDA
+    if (ok) finalize_video_pixels(output);
+#endif
     cleanup(&vae);
     return ok;
 }

@@ -1,0 +1,19 @@
+{
+  "h3_c": {"repository": "https://github.com/antirez/h3.c", "revision": "8974cc055ea9c02fcd14cc27dfda3e1027c05153"},
+  "pytorch_reference": {
+    "repository": "https://github.com/huggingface/diffusers",
+    "revision": "1d5d056ecff3a8c1d887a7dd1aa66ca4a0323458",
+    "provenance": "MiniMaxAI/MiniMax-H3 model card lists Diffusers; H3 modules carry MiniMax and HuggingFace copyright."
+  },
+  "checkpoint": {
+    "repository": "MiniMaxAI/MiniMax-H3",
+    "revision": "42ed227ee7df40d41602854ae760620d6eb651fe",
+    "variant": "FL2VA"
+  },
+  "nlohmann_json": {
+    "url": "https://raw.githubusercontent.com/nlohmann/json/v3.11.3/single_include/nlohmann/json.hpp",
+    "version": "3.11.3",
+    "sha256": "9bea4c8066ef4a1c206b2be5a36302f8926f7fdc6087af5d20b417d0cf103ea6",
+    "license": "MIT; embedded in cuda/vendor/json.hpp"
+  }
+}

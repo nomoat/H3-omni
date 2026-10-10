@@ -1,5 +1,8 @@
 # h3-metal
 
+An experimental H200/CUDA backend is documented in [cuda/README.md](cuda/README.md).
+Its numerical acceptance is tracked separately from the Apple Silicon backend.
+
 Native MiniMax-H3 inference for Apple Silicon. The project is being built as a
 sequence of working vertical slices: deterministic host/model metadata first,
 then portable Metal block parity, prompt encoding, prompt-to-video/audio, and

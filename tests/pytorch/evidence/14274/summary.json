@@ -1,0 +1,92 @@
+{
+  "passed": true,
+  "slurm_job": 14274,
+  "required_trajectories": 6,
+  "additional_trajectories": 1,
+  "per_step_comparisons": 560,
+  "decoder_comparisons": 28,
+  "primitive_cases": 69,
+  "host_layout_cases": 32,
+  "sampler_cases": 12,
+  "text_embeddings_exact": true,
+  "trajectory_max_relative_l2": 0.0,
+  "trajectory_max_normalized_max": 0.0,
+  "extended_configuration": {
+    "prompt": "A small wooden fishing boat moves slowly across a calm mountain lake at sunrise. The camera follows from the shore as soft golden light reaches the water and mist drifts between the pine trees. Two people in blue jackets sit quietly in the boat. Gentle waves touch the rocks, birds call in the distance, and the wooden oars make a steady splash. Keep the camera motion smooth and show the reflections changing naturally.",
+    "width": 864,
+    "height": 480,
+    "frames": 56,
+    "steps": 20,
+    "seed": 7
+  },
+  "oracle": "Official MiniMaxH3SetTimestepsStep.build_row_timesteps; one row at step 0, two thereafter",
+  "supersedes": {
+    "slurm_job": 14269,
+    "reason": "The old module-only oracle retained duplicate first-step timestep rows. Job 14271 exposed trajectory drift; job 14274 fixes native projection groups and validates against the public helper. It also fixes the non-square FP64 layout discrepancy caught in job 14273."
+  },
+  "full_artifacts": "/home/cj/h3-cuda/results/14274",
+  "release": "/home/cj/h3-cuda/releases/14274",
+  "standalone_cli": {
+    "passed": true,
+    "command": [
+      "/var/tmp/h3-cuda-14274/build-cuda/h3",
+      "-d",
+      "/var/tmp/h3-cuda-14228/local-model",
+      "-p",
+      "A cat walks through a sunny garden.",
+      "--width",
+      "256",
+      "--height",
+      "256",
+      "--frames",
+      "22",
+      "--steps",
+      "20",
+      "--layers",
+      "50",
+      "--reuse",
+      "1",
+      "--core-reuse",
+      "1",
+      "--seed",
+      "0",
+      "--profile",
+      "-o",
+      "results/cli-smoke.mp4"
+    ],
+    "frames": 22,
+    "steps": 20,
+    "layers": 50,
+    "video_size": [
+      256,
+      256
+    ],
+    "decoded_audio_bytes": 237568,
+    "elapsed_seconds": 58.622020655311644,
+    "binary_sha256": "68d11426e3f75e27b5ce19e2430694c031a69142b33183351cd992f69bff3c6e",
+    "movie_sha256": "5ef1f4c97e59fe8e464bffaef90321d415cf55d6ae75763e3e13a9fa8620ad12"
+  },
+  "decoded_video": {
+    "max_relative_l2": 1.2873744026364875e-06,
+    "max_normalized_max": 2.232193946838379e-05
+  },
+  "decoded_audio": {
+    "max_relative_l2": 4.4403586798580363e-05,
+    "max_normalized_max": 8.194174733944237e-05
+  },
+  "timings": {
+    "256": {
+      "native_seconds": 0.20721467584371567,
+      "reference_seconds": 0.05789856007322669
+    },
+    "512": {
+      "native_seconds": 0.3014070289209485,
+      "reference_seconds": 0.16872626822441816
+    },
+    "864": {
+      "native_seconds": 0.8674493967555463,
+      "reference_seconds": 0.7653253590688109
+    }
+  },
+  "timing_scope": "Harness timings include native host input/output transfers; reference returns CUDA tensors. Loading excluded. Not a matched throughput benchmark."
+}

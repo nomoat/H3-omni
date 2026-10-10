@@ -17,9 +17,12 @@ LIB_M := h3_metal.m h3_gpu.m h3_tokenizer.m
 LIB_OBJ := $(LIB_C:.c=.o) $(LIB_M:.m=.o)
 CLI_OBJ := main.o h3_cli.o linenoise.o
 
-.PHONY: all test parity real-parity clean
+.PHONY: all test parity real-parity clean cuda
 
 all: h3 libh3.a
+
+cuda:
+	$(MAKE) -f cuda/Makefile CUDA_ARCH=$(or $(CUDA_ARCH),sm_90)
 
 h3: $(CLI_OBJ) $(LIB_OBJ)
 	$(CC) -o $@ $^ $(LDLIBS)

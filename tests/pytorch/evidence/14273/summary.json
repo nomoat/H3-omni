@@ -1,0 +1,9 @@
+{
+  "passed": false,
+  "slurm_job": 14273,
+  "required_matrix_passed": true,
+  "extended_passed": false,
+  "cause": "Non-square FP64 positions differed by at most 3.552713678800501e-15 because native spatial linspace used ratio/count instead of rounded endpoint difference/count. The exact guard stopped before the extended DiT forward.",
+  "required_comparisons": 480,
+  "required_comparisons_exact": true
+}

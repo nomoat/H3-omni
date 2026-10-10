@@ -1,0 +1,38 @@
+{
+  "scope": "Decoder parity on identical latents",
+  "passed": true,
+  "cases": [
+    {
+      "component": "video",
+      "scope": "identical_latents",
+      "passed": true,
+      "relative_l2": 1.1996154398730141e-06,
+      "normalized_max": 6.854534149169922e-06,
+      "native_seconds": 10.411550434306264
+    },
+    {
+      "component": "video",
+      "scope": "independent_trajectory",
+      "passed": true,
+      "relative_l2": 5.3352665418060496e-05,
+      "normalized_max": 0.0002620220184326172,
+      "native_seconds": 10.49747056607157
+    },
+    {
+      "component": "audio",
+      "scope": "identical_latents",
+      "passed": true,
+      "relative_l2": 3.080067835981026e-05,
+      "normalized_max": 0.00017055869102478027,
+      "native_seconds": 11.798578202724457
+    },
+    {
+      "component": "audio",
+      "scope": "independent_trajectory",
+      "passed": true,
+      "relative_l2": 0.0012557581067085266,
+      "normalized_max": 0.008551210165023804,
+      "native_seconds": 11.800221594050527
+    }
+  ]
+}

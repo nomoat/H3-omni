@@ -1,0 +1,392 @@
+{
+  "passed": true,
+  "slurm_job": 14274,
+  "source_archive_sha256": "70081d0427704e0fa1588822e895c09ebbaf4c10856209f149f7c42f1d2fa5de",
+  "code_files_checked": 96,
+  "files": [
+    {
+      "path": "h3_gpu.h",
+      "sha256": "2f5c0ab28582c9baf939b4588523deb57fc076a09f245b8cd7f512102fa35a6b"
+    },
+    {
+      "path": "h3_video_encoder.h",
+      "sha256": "715486a3dffa061989766c3d327a38f353074faa5a1b6dd44655fa12a61e0f7a"
+    },
+    {
+      "path": "h3_host.c",
+      "sha256": "4869077af5d5433ad1f7c75f89975eda3018627a80fd496562648fb8f3ee3ef2"
+    },
+    {
+      "path": "h3_terminal.c",
+      "sha256": "d4a49423f6c543f81aae3ff1f66a8fef029d20dcc004dd07185401c45d963eef"
+    },
+    {
+      "path": "h3_vision_encoder.h",
+      "sha256": "3248a198d654343c38ea82f2462bde0072e03b0a1928184ef207389228a65ba7"
+    },
+    {
+      "path": "h3_cli.c",
+      "sha256": "b78ecf437e11b263c56c9f4dfeca28b49a9c591595928286bf6029c9f3cdd7f3"
+    },
+    {
+      "path": "h3_audio_vae.c",
+      "sha256": "bdbb0bea5a4056d80d67061d72f1bb9213cb008467f054f832478540c076d817"
+    },
+    {
+      "path": "h3_video_vae.c",
+      "sha256": "f5bb52766f0712f4d732024fc886f087557512d6690b34208925026447f14280"
+    },
+    {
+      "path": "h3_weights.c",
+      "sha256": "d68476becd34dee90b78797ce9fb9025f65f3e222e01bb3f498b2d005d5f1fcc"
+    },
+    {
+      "path": "h3_dit.c",
+      "sha256": "d1acff2eaa990b5a8d8dcec96b4aa2acfb9a8604ba647a86d4cddb8a3aade7d7"
+    },
+    {
+      "path": "h3_vision_encoder.c",
+      "sha256": "208820b951376a81123af20d109d40dd15b3a2bb71c6fe9fee9a5c6e8a4b47f2"
+    },
+    {
+      "path": "h3_terminal.h",
+      "sha256": "de30040bce0148bef4679d6c95572666ad41019e138b35e1b47f7ea84313d907"
+    },
+    {
+      "path": "h3_tokenizer.h",
+      "sha256": "3607647577c1bf8a85c0359027f24d94619776c827118975da71f2715aa66483"
+    },
+    {
+      "path": "h3_multimodal.c",
+      "sha256": "48a9a15e7f7e65fda6884cebe668123996d86bdefee73b39199948c9e0650c8b"
+    },
+    {
+      "path": "h3_ffmpeg.c",
+      "sha256": "c19202c955b567dc6ab6427e8dfd3c373e82fe702e9f113f7370a989dfd32bea"
+    },
+    {
+      "path": "h3_weights.h",
+      "sha256": "1593bb41730a13ad26d99fcf15863528ceb00b51ef8b482dc0ff2c9714e0bb2e"
+    },
+    {
+      "path": "h3_cli.h",
+      "sha256": "9cefb5107b171cf1515aae0884420806bfea07a0e950f3cce0d65fffba5aebee"
+    },
+    {
+      "path": "h3_video_vae.h",
+      "sha256": "341402e15fb2e1dac67e621a48e0414c1c2e286e39f76a703b01b82aff437c8b"
+    },
+    {
+      "path": "h3_internal.h",
+      "sha256": "65f98435c1290366134b79f05d19c8dd3a9616b482f7d397823dce02453d02fd"
+    },
+    {
+      "path": "h3_safetensors.c",
+      "sha256": "30a815d567fefc1b5870347719e68b7fcca651407117c6dd033c72324da2263c"
+    },
+    {
+      "path": "h3_safetensors.h",
+      "sha256": "e95d8e21572cf598f793026ac542ef75d8aaa9ba431f3daa1fe0f138b759ae18"
+    },
+    {
+      "path": "h3_dit.h",
+      "sha256": "a19f61523284d5f43b3b6d5b2716990265428a062521256af2376cfd48627904"
+    },
+    {
+      "path": "h3.h",
+      "sha256": "be11f79818a226fe7d47d31d904be50e900683cd9c07c7900a1d4857dc2e9320"
+    },
+    {
+      "path": "h3_video_encoder.c",
+      "sha256": "6b3c1ddc3abed1f7fb9828dc35d8ec32bd0f71767d06916eb292b9e73debd650"
+    },
+    {
+      "path": "tests/test_real_dit_block.c",
+      "sha256": "5ea44992dba842f008691ec8f8dea22753f635fd5004f4281eec67e89fe2ebb5"
+    },
+    {
+      "path": "tests/test_real_dit.c",
+      "sha256": "c219d1c77f0a1063579c6ce3c47064afe0c12dfd2057b576204370821de6a13e"
+    },
+    {
+      "path": "tests/test_semantic_dit.c",
+      "sha256": "fa2a66c98f828c421e0553ae396dd1774faf99d4b207f76e2c75881ab9f745c5"
+    },
+    {
+      "path": "tests/test_text_metal.c",
+      "sha256": "0b9dacc5c676d2113db8dde7ecf6b91215a28ce0152512a5ea3c113f7a9ed7d1"
+    },
+    {
+      "path": "tests/test_real_audio_encoder.c",
+      "sha256": "666162de823a052e3ebe5af9dc2f41faed7a6e72cd19338147352ee8e2c584b4"
+    },
+    {
+      "path": "tests/test_real_video_vae.c",
+      "sha256": "ec26b617144dc3ff6a319a54e749ff20a30af32e4e88c660c1dfa92600b437c4"
+    },
+    {
+      "path": "tests/test_real_audio_vae.c",
+      "sha256": "7d9176d90d81a19f55d3542a57dec257df11cc5abcd547660813d0a2d35e78f6"
+    },
+    {
+      "path": "tests/test_av_mux.c",
+      "sha256": "485a180bc7d0b95475d919208296a215db62bc14603e62b83be88220c2ec0075"
+    },
+    {
+      "path": "tests/test_audio_gpu.c",
+      "sha256": "5223a963f578653ac96a567d26fc63429190ee05011773109c9fff1eb7ebb029"
+    },
+    {
+      "path": "tests/bench_dit.c",
+      "sha256": "4347fcfb40eb89ea9fbd291c0d1c0fc572eaf24c1c21c7d5ff68c1b76dd8e28a"
+    },
+    {
+      "path": "tests/test_real_prompt.c",
+      "sha256": "eb31145fc6f17668a66ec6448689835c9a1032763ab6c4eee6c3048ebb8203e6"
+    },
+    {
+      "path": "tests/test_tokenizer.c",
+      "sha256": "3f6853923b79f7c55b86b0f400eb43556e13f37dc0061c55f1fa537976643d09"
+    },
+    {
+      "path": "tests/test_real_multimodal_text.c",
+      "sha256": "979917a8d56b393f3449cf716154006ea09b24d2c77c7139440bc9925ed45fd8"
+    },
+    {
+      "path": "tests/test_real_qwen_vision.c",
+      "sha256": "6a2d94c1ddea1d17e1f3c1a743468f54560ad32052c2526e1a0c025f6ddea363"
+    },
+    {
+      "path": "tests/test_real_dit_schedule.c",
+      "sha256": "209521e554fe923bf4706341b7d444c78fdb66539814c8cb03e96beb86541f15"
+    },
+    {
+      "path": "tests/test_semantic_vae.c",
+      "sha256": "4457594c6a5cd74a8fcf4ead933906206b14eca607757f0e7f53f877c6577efa"
+    },
+    {
+      "path": "tests/test_h3.c",
+      "sha256": "509680b971d8b75e42a318de0ebc634a3bc77962723b4f776fbde7697a80b554"
+    },
+    {
+      "path": "tests/test_metal.c",
+      "sha256": "07b61909d2dda12980ad10db9690e7c7d3f87afee67c6e6e160c18e53fba6c8d"
+    },
+    {
+      "path": "tests/test_real_ref_video_text.c",
+      "sha256": "3f128eb623307b54742bd25c128dc27c7b348cfc71d24d615ac7f10abaad0832"
+    },
+    {
+      "path": "tests/pytorch/text.py",
+      "sha256": "c13ed3b3b8dd82b77e37c7fb574fb28e0cd85773937926bd1aa8ce9ab8f70fa1"
+    },
+    {
+      "path": "tests/pytorch/extended.json",
+      "sha256": "8835cfd7d624f7723c6b6ae89ec96aab2a512acbcd21bbec15e15d22aadb2f75"
+    },
+    {
+      "path": "tests/pytorch/primitives.py",
+      "sha256": "ec0b46211ffd3679e1c9723179faf4f2f44192db232a8e3bc725d7ff6dd0713f"
+    },
+    {
+      "path": "tests/pytorch/decoder_suite.py",
+      "sha256": "f837be27584778dd50d190b5fc43c8ac6cca38b226c1bc6f3c6fbc197b377dd1"
+    },
+    {
+      "path": "tests/pytorch/model_bridge.c",
+      "sha256": "ffad73193ae3c162b6ece8b1aa6c9ca474ee6a52c4d19d5faf476a3be32f0e08"
+    },
+    {
+      "path": "tests/pytorch/real_heads.py",
+      "sha256": "5ecc87ea4b00d11fd27f300b265b01e226c6fab9adabbfc21bad477bc75e097b"
+    },
+    {
+      "path": "tests/pytorch/extended.py",
+      "sha256": "90fba08db36a4afd16263c406ccbd3968db22c9f2583c4ad50a13ae3b904b485"
+    },
+    {
+      "path": "tests/pytorch/prepare.sh",
+      "sha256": "d2574b226b0604caeabede054e3b6ffab13810bb2f8bd6898a2e9d040630c3b6"
+    },
+    {
+      "path": "tests/pytorch/trace_report.py",
+      "sha256": "18c11803cbfa0e82de1047c9ae7efbb411828d3476c6ca2661709eeca4d78aa2"
+    },
+    {
+      "path": "tests/pytorch/native.py",
+      "sha256": "b5657ebd76adf790e85065742186408fcca0636c9821521153b83ed774cc546e"
+    },
+    {
+      "path": "tests/pytorch/decoders.py",
+      "sha256": "e23d48077b2f5f9300d4a6a39676e93b5faf318c6a5cef5d5b855444d369ea98"
+    },
+    {
+      "path": "tests/pytorch/download.py",
+      "sha256": "60e52c732ca78f5cdeb2d17e27d8b77a9effe3f2d526ef516012faaea06b4f39"
+    },
+    {
+      "path": "tests/pytorch/acceptance.json",
+      "sha256": "fcece9d35dacbbf79dac53838bb0df625a1c457319dc250cb326de579fde2f72"
+    },
+    {
+      "path": "tests/pytorch/accept.py",
+      "sha256": "183aa6bb9b65351745ef0c5a923961ff82e8313a6eae723f6f841f670753e2ba"
+    },
+    {
+      "path": "tests/pytorch/real_block.py",
+      "sha256": "7b6547654114b2afb8c70a658d739205bd620aacdc54e51316279aa909b05b58"
+    },
+    {
+      "path": "tests/pytorch/real_dit.py",
+      "sha256": "415a6a9d415048fe54ec950c2acaa85fec5c0d8791c7abb9ef01ccc6d5afafc6"
+    },
+    {
+      "path": "tests/pytorch/cli_smoke.py",
+      "sha256": "6921cfcf9b6ae645aab1a590bb7e2ffe263b62b9a3dc9506d151fc7c781dad08"
+    },
+    {
+      "path": "tests/pytorch/trajectory_suite.py",
+      "sha256": "2201d91bac987a149927ea628a6bf13a84e495c60263d0c24caeca21edc4fc81"
+    },
+    {
+      "path": "tests/pytorch/host.py",
+      "sha256": "ceac96d69bb28b1d74b8c727727499d66d5a7b1f13ce247b31831bf43332c421"
+    },
+    {
+      "path": "tests/pytorch/sources.json",
+      "sha256": "2cb57568b4ad139ef5005b82df84c2899dc2fdfd598c941a558a624d48989adc"
+    },
+    {
+      "path": "tests/test_real_video_encoder.c",
+      "sha256": "e803d993efdf28dfbc83aefe1185a1d965442049785f435517f6e3e7adc88082"
+    },
+    {
+      "path": "tests/test_bf16.c",
+      "sha256": "0bf95ad01597cef164f73674cee90a167680bf3225f9aeeea96f37f7b1c95619"
+    },
+    {
+      "path": "h3_dit_schedule.c",
+      "sha256": "6e1ddf687c777730bbdaf49f1414d5ec9008641e2403ad51327fe72965f64f8d"
+    },
+    {
+      "path": "Makefile",
+      "sha256": "b6cabc1f47c010d42335dc1e61ae240127668c9400a10c1cca16cd8f782ce5ba"
+    },
+    {
+      "path": "h3_multimodal.h",
+      "sha256": "e7e54f9c7251342f64451bf42164a47119864cd0069f4375ce8cf3354d297a29"
+    },
+    {
+      "path": "h3_metal.h",
+      "sha256": "00241135c11315200b5d68ee9dc68cd96702ec24d39e2b18bb2d179edbfb44ca"
+    },
+    {
+      "path": "h3_text_encoder.h",
+      "sha256": "739631dd8bdfaf54c24c12d3035160519a27a7234fc7399aafe8d5a7e62b0052"
+    },
+    {
+      "path": "h3.c",
+      "sha256": "f71e6009350b72562b5e7aa132d41a5b3a5aaa2a47c58d36349666abe1732257"
+    },
+    {
+      "path": "h3_host.h",
+      "sha256": "2f202dbb73e7ca33152ebf83378915f6271268541d5a1d952899dfe7417db666"
+    },
+    {
+      "path": "cuda/h3_flash.h",
+      "sha256": "44d49dd9af03e981bdced01ac2ae58f4886d3af3ce93a867b55ec2460b9dd926"
+    },
+    {
+      "path": "cuda/unsupported.inc",
+      "sha256": "b9498ca3ad3a8d0dd89724df5e5eef2e5e032db2e27f1734cdd637ab283454d9"
+    },
+    {
+      "path": "cuda/acceptance.sbatch",
+      "sha256": "83080716ccf184d3b93c7d99ad043312362ff9fa30d92b1e6d5f88f91f608fd2"
+    },
+    {
+      "path": "cuda/flash_attention.cu",
+      "sha256": "e863bab9b4e3c3459470222d76f446884aaf403a1246829151d0585a6bd442e5"
+    },
+    {
+      "path": "cuda/primitives.cuh",
+      "sha256": "1a95a98af6e3632216700c6dcf04b6ad37a6b2153a2652572b2a7cbf8725c895"
+    },
+    {
+      "path": "cuda/primitive_wrappers.inc",
+      "sha256": "590575621575b88e838edad5ce8fedd08ba23aec60cac914e32a4e39be9557cd"
+    },
+    {
+      "path": "cuda/dispatch.inc",
+      "sha256": "29fd2d94c46be8dee7a15db1f5774e175865fd71a3c83ffa9c23929112687ff7"
+    },
+    {
+      "path": "cuda/Makefile",
+      "sha256": "116ea0cf94159d020c9b920c948718fed04bad97cb93336c76c057f30f80bd47"
+    },
+    {
+      "path": "cuda/h3_gpu_cuda.cu",
+      "sha256": "469cf5d3e6ca5816fc137481af9ee444ac66575c4f81624ff806bcd85f545636"
+    },
+    {
+      "path": "cuda/prepare_flash.py",
+      "sha256": "97388c9d235b965a72536b92f81a0ba4c5608aebe0748af731a9bc7717954784"
+    },
+    {
+      "path": "cuda/parity.sbatch",
+      "sha256": "23ad69d7eb996219da0f96309831a348065a7cbf003b7865c4c5521fcec72fc9"
+    },
+    {
+      "path": "cuda/h3_cuda.h",
+      "sha256": "51180b6bda40461918ed75de6bf8c61cc19ea9859b29e6309115011417c452d2"
+    },
+    {
+      "path": "cuda/translate_primitives.py",
+      "sha256": "c7838fd0f5e7ae97540d9e83469e7187aa33535c8f6b0cd4a0225e4e015b8527"
+    },
+    {
+      "path": "cuda/components.sbatch",
+      "sha256": "18ef326943ebb166185b0fa12eb2a6c6ab5e11387e1739af1fa7cb8e9ce2db78"
+    },
+    {
+      "path": "cuda/h3_tokenizer_portable.cpp",
+      "sha256": "147c45cb28dbc3e4bbc0fbd7a32a9ce873158bbd08e92440a205e6251d6be1b4"
+    },
+    {
+      "path": "cuda/build.sbatch",
+      "sha256": "71eb65790db8fc9bdce5560d549a19ad465b077e166633faec28553be66b1536"
+    },
+    {
+      "path": "cuda/prepare_icu.sh",
+      "sha256": "12963d33ee20978bbd5ab52ce70422f00e0e128eb50a05ad403ee73cd08545d8"
+    },
+    {
+      "path": "linenoise.c",
+      "sha256": "ce2248444953b66e2c9e6a9c65f4217b31d7f48a5fee86a6a96a9806a6b127c5"
+    },
+    {
+      "path": "main.c",
+      "sha256": "3fd58933eee2175bab893005a8109fa7ea2f18b6f2182d59876d4e55ebb4c846"
+    },
+    {
+      "path": "h3_ffmpeg.h",
+      "sha256": "87c55a6914b5994e8ba0975a25e695f64bbba0fc8b22ff880d2eb6673b787405"
+    },
+    {
+      "path": "h3_audio_vae.h",
+      "sha256": "f39c42eeadc4f0bfcbc16748586457a2767ef097dbe510027c7ecac2579e06c3"
+    },
+    {
+      "path": "linenoise.h",
+      "sha256": "8b491cb72a35fb2128a1975de2ac967be72f04e3687b73d31bc5e7619655bbb4"
+    },
+    {
+      "path": "h3_text_encoder.c",
+      "sha256": "c67bc35c7788f05ad73f74b10ec827a0c25f58108acbc7e015033fc35105ca44"
+    },
+    {
+      "path": "h3_dit_schedule.h",
+      "sha256": "3b5f6d00114093914df6e92afd337487a1b29730440ee4fb2c147c0d45696d32"
+    }
+  ]
+}

@@ -1,0 +1,8 @@
+{
+  "passed": true,
+  "slurm_job": 14272,
+  "scope": "Additional text-only coverage on unchanged text encoder; not whole-model acceptance",
+  "tokens": 82,
+  "relative_l2": 0.0,
+  "normalized_max": 0.0
+}

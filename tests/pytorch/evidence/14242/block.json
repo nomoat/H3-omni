@@ -1,0 +1,116 @@
+[
+  {
+    "stage": "modulation",
+    "relative_l2": 0.00012474411050789058,
+    "normalized_max": 0.0012626262614503503,
+    "unequal_fraction": 0.000816385610960424
+  },
+  {
+    "stage": "norm1",
+    "relative_l2": 7.096244189597201e-06,
+    "normalized_max": 0.000294811325147748,
+    "unequal_fraction": 3.1706574645795627e-06
+  },
+  {
+    "stage": "adaln1",
+    "relative_l2": 9.157606655207928e-06,
+    "normalized_max": 0.00042517005931586027,
+    "unequal_fraction": 1.0568858215265209e-06
+  },
+  {
+    "stage": "grouped_qkv_projection",
+    "relative_l2": 0.00017826630210038275,
+    "normalized_max": 0.003086419776082039,
+    "unequal_fraction": 0.0024265218526124954
+  },
+  {
+    "stage": "query_norm_rope",
+    "relative_l2": 1.8903010641224682e-05,
+    "normalized_max": 0.0013297871919348836,
+    "unequal_fraction": 1.4267958249547519e-05
+  },
+  {
+    "stage": "key_norm_rope",
+    "relative_l2": 2.5426283173146658e-05,
+    "normalized_max": 0.002369668334722519,
+    "unequal_fraction": 2.113771734002512e-05
+  },
+  {
+    "stage": "value_split",
+    "relative_l2": 0.0,
+    "normalized_max": 0.0,
+    "unequal_fraction": 0.0
+  },
+  {
+    "stage": "attention_default",
+    "relative_l2": 0.001672095968388021,
+    "normalized_max": 0.004830917809158564,
+    "unequal_fraction": 0.17632131278514862
+  },
+  {
+    "stage": "attention_math",
+    "relative_l2": 8.88269642018713e-05,
+    "normalized_max": 0.002415458904579282,
+    "unequal_fraction": 0.0009725991985760629
+  },
+  {
+    "stage": "pytorch_default_vs_math_attention",
+    "relative_l2": 0.001671570586040616,
+    "normalized_max": 0.004830917809158564,
+    "unequal_fraction": 0.17632633447647095
+  },
+  {
+    "stage": "attention_rounded_normalized_probability",
+    "relative_l2": 0.0023243105970323086,
+    "normalized_max": 0.004830917809158564,
+    "unequal_fraction": 0.25252702832221985
+  },
+  {
+    "stage": "attention_rounded_online_tile_64",
+    "relative_l2": 0.0014148589689284563,
+    "normalized_max": 0.004830917809158564,
+    "unequal_fraction": 0.18527895212173462
+  },
+  {
+    "stage": "attention_rounded_online_tile_128",
+    "relative_l2": 0.0013332330854609609,
+    "normalized_max": 0.002415458904579282,
+    "unequal_fraction": 0.1715991497039795
+  },
+  {
+    "stage": "attention_rounded_online_tile_256",
+    "relative_l2": 0.0012612859718501568,
+    "normalized_max": 0.002415458904579282,
+    "unequal_fraction": 0.16016602516174316
+  },
+  {
+    "stage": "attention_projection",
+    "relative_l2": 0.000207774035516195,
+    "normalized_max": 0.0042372881434857845,
+    "unequal_fraction": 0.005628973711282015
+  },
+  {
+    "stage": "attention_gate",
+    "relative_l2": 0.0,
+    "normalized_max": 0.0,
+    "unequal_fraction": 0.0
+  },
+  {
+    "stage": "adaln2",
+    "relative_l2": 1.3383208170125727e-05,
+    "normalized_max": 0.0005656108842231333,
+    "unequal_fraction": 1.4091810953686945e-06
+  },
+  {
+    "stage": "mlp",
+    "relative_l2": 0.000681685924064368,
+    "normalized_max": 0.0007225433364510536,
+    "unequal_fraction": 0.08831971883773804
+  },
+  {
+    "stage": "reference_replay",
+    "relative_l2": 0.0,
+    "normalized_max": 0.0,
+    "unequal_fraction": 0.0
+  }
+]

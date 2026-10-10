@@ -1,0 +1,7 @@
+{
+  "passed": false,
+  "slurm_job": 14271,
+  "role": "Regression reproducer: public pipeline timestep plan against the previous 14269 native binary",
+  "cause": "Native first evaluation projected two duplicate timestep rows; public pipeline projects one distinct row.",
+  "supersedes": "14269 is historical module-pair evidence and no longer satisfies the corrected acceptance gate."
+}

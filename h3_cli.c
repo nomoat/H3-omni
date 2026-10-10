@@ -17,6 +17,9 @@
 #include <sys/stat.h>
 #include <time.h>
 #include <unistd.h>
+#ifdef H3_CUDA
+#include <sys/random.h>
+#endif
 
 extern char **environ;
 
@@ -103,7 +106,22 @@ static int set_directory(char destination[H3_CLI_PATH], const char *path) {
 
 static uint64_t random_seed(void) {
     uint64_t value;
+#ifdef H3_CUDA
+    unsigned char *cursor = (unsigned char *)&value;
+    size_t remaining = sizeof(value);
+    while (remaining) {
+        ssize_t count = getrandom(cursor, remaining, 0);
+        if (count < 0 && errno == EINTR) continue;
+        if (count <= 0) {
+            perror("getrandom");
+            exit(1);
+        }
+        cursor += count;
+        remaining -= (size_t)count;
+    }
+#else
     arc4random_buf(&value, sizeof(value));
+#endif
     return value;
 }
 

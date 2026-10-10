@@ -1,0 +1,58 @@
+{
+  "scope": "DiT and sampler; text and decoded-output acceptance remain separate",
+  "arguments": {
+    "weights": "/data0/models/h3-cuda/42ed227ee7df40d41602854ae760620d6eb651fe/FL2VA",
+    "diffusers": "/var/tmp/h3-cuda-14231/diffusers",
+    "library": "build-cuda/libh3_model.so",
+    "output": "results/dit-diagnostic",
+    "text": null,
+    "width": 256,
+    "height": 256,
+    "frames": 22,
+    "steps": 20,
+    "evaluations": 1,
+    "seed": 0
+  },
+  "complete_trajectory": false,
+  "real_text": false,
+  "layers": 50,
+  "input_sha256": "402f420d0ef5d1a71525e1066427b20ad56690d7102f7007ae0c47c47c24dcd8",
+  "passed": true,
+  "results": [
+    {
+      "label": "step_0_video_velocity",
+      "relative_l2": 0.014663325622677803,
+      "normalized_max": 0.022264469414949417,
+      "passed": true
+    },
+    {
+      "label": "step_0_audio_velocity",
+      "relative_l2": 0.010934432037174702,
+      "normalized_max": 0.02238430641591549,
+      "passed": true
+    },
+    {
+      "label": "step_0_video_latent",
+      "relative_l2": 8.118279947666451e-05,
+      "normalized_max": 0.00014190273941494524,
+      "passed": true
+    },
+    {
+      "label": "step_0_audio_latent",
+      "relative_l2": 0.0001919072528835386,
+      "normalized_max": 0.0003783472056966275,
+      "passed": true
+    }
+  ],
+  "timings": [
+    {
+      "step": 0,
+      "native_seconds": 1.0673750480636954,
+      "reference_seconds": 0.44196195621043444
+    }
+  ],
+  "load_seconds": {
+    "native": 92.24810435716063,
+    "reference": 17.972389738075435
+  }
+}

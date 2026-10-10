@@ -1,4 +1,8 @@
 #include "h3_text_encoder.h"
+#ifdef H3_CUDA
+#include "cuda/h3_cuda.h"
+#define h3_gpu_rms_norm_bf16 h3_gpu_qwen_rms_norm_bf16
+#endif
 
 #include "h3_weights.h"
 
@@ -406,6 +410,27 @@ static int gpu_operation(h3_gpu *gpu, int ok, char *error, size_t error_size,
     return 0;
 }
 
+#ifdef H3_CUDA
+static int trace_text(const h3_gpu_tensor *tensor, size_t count, const char *label) {
+    const char *directory = getenv("H3_CUDA_TEXT_TRACE_DIR");
+    if (!directory) return 1;
+    char path[2048];
+    int length = snprintf(path, sizeof(path), "%s/%s.bf16", directory, label);
+    uint16_t *data = malloc(count * sizeof(*data));
+    FILE *file = data && length > 0 && (size_t)length < sizeof(path) &&
+        h3_gpu_tensor_read_bf16(tensor, data, count) ? fopen(path, "wb") : NULL;
+    int ok = file && fwrite(data, sizeof(*data), count, file) == count;
+    if (file && fclose(file)) ok = 0;
+    free(data);
+    return ok;
+}
+#define TEXT_TRACE(label, tensor, count) do { \
+    if (layer == 0 && !trace_text(tensor, count, label)) return 0; \
+} while (0)
+#else
+#define TEXT_TRACE(label, tensor, count) ((void)0)
+#endif
+
 static int encode_layer(h3_gpu *gpu, const text_layer_weights *weight,
                         uint32_t tokens, h3_gpu_tensor *hidden,
                         h3_gpu_tensor *norm, h3_gpu_tensor *query,
@@ -422,18 +447,24 @@ static int encode_layer(h3_gpu *gpu, const text_layer_weights *weight,
     OP(h3_gpu_rms_norm_bf16(gpu, norm, hidden, weight->input_norm,
                              tokens, TEXT_HIDDEN, TEXT_RMS_EPSILON),
        "input RMSNorm");
+    TEXT_TRACE("norm1", norm, tokens * TEXT_HIDDEN);
     OP(h3_gpu_linear_bf16(gpu, query, norm, weight->query, NULL, tokens,
                            TEXT_HIDDEN, TEXT_QUERY_DIM), "query projection");
+    TEXT_TRACE("query_projection", query, tokens * TEXT_QUERY_DIM);
     OP(h3_gpu_linear_bf16(gpu, key, norm, weight->key, NULL, tokens,
                            TEXT_HIDDEN, TEXT_KV_DIM), "key projection");
+    TEXT_TRACE("key_projection", key, tokens * TEXT_KV_DIM);
     OP(h3_gpu_linear_bf16(gpu, value, norm, weight->value, NULL, tokens,
                            TEXT_HIDDEN, TEXT_KV_DIM), "value projection");
+    TEXT_TRACE("value_projection", value, tokens * TEXT_KV_DIM);
     OP(h3_gpu_head_rms_norm_bf16(gpu, query, weight->query_norm, tokens,
                                   TEXT_QUERY_HEADS, TEXT_HEAD_DIM,
                                   TEXT_RMS_EPSILON), "query RMSNorm");
+    TEXT_TRACE("query_norm", query, tokens * TEXT_QUERY_DIM);
     OP(h3_gpu_head_rms_norm_bf16(gpu, key, weight->key_norm, tokens,
                                   TEXT_KV_HEADS, TEXT_HEAD_DIM,
                                   TEXT_RMS_EPSILON), "key RMSNorm");
+    TEXT_TRACE("key_norm", key, tokens * TEXT_KV_DIM);
     OP(h3_gpu_rope_text_bf16(gpu, query, key, rope_cos, rope_sin, tokens,
                               TEXT_QUERY_HEADS, TEXT_KV_HEADS, TEXT_HEAD_DIM),
        "RoPE");
@@ -441,23 +472,30 @@ static int encode_layer(h3_gpu *gpu, const text_layer_weights *weight,
                                TEXT_QUERY_HEADS, TEXT_KV_HEADS, TEXT_HEAD_DIM,
                                1.0f / sqrtf((float)TEXT_HEAD_DIM)),
        "causal GQA");
+    TEXT_TRACE("attention_heads", attention_heads, tokens * TEXT_QUERY_DIM);
     OP(h3_gpu_linear_bf16(gpu, attention_output, attention_heads,
                            weight->attention_output, NULL, tokens,
                            TEXT_QUERY_DIM, TEXT_HIDDEN),
        "attention output projection");
+    TEXT_TRACE("attention_output", attention_output, tokens * TEXT_HIDDEN);
     OP(h3_gpu_add_bf16(gpu, hidden, hidden, attention_output,
                         tokens * TEXT_HIDDEN), "attention residual");
     OP(h3_gpu_rms_norm_bf16(gpu, norm, hidden, weight->post_norm, tokens,
                              TEXT_HIDDEN, TEXT_RMS_EPSILON),
        "post-attention RMSNorm");
+    TEXT_TRACE("norm2", norm, tokens * TEXT_HIDDEN);
     OP(h3_gpu_linear_bf16(gpu, gate, norm, weight->gate, NULL, tokens,
                            TEXT_HIDDEN, TEXT_INTERMEDIATE), "MLP gate");
+    TEXT_TRACE("mlp_gate", gate, tokens * TEXT_INTERMEDIATE);
     OP(h3_gpu_linear_bf16(gpu, up, norm, weight->up, NULL, tokens,
                            TEXT_HIDDEN, TEXT_INTERMEDIATE), "MLP up");
+    TEXT_TRACE("mlp_up", up, tokens * TEXT_INTERMEDIATE);
     OP(h3_gpu_silu_mul_bf16(gpu, gate, gate, up,
                              tokens * TEXT_INTERMEDIATE), "fused SwiGLU");
+    TEXT_TRACE("mlp_activation", gate, tokens * TEXT_INTERMEDIATE);
     OP(h3_gpu_linear_bf16(gpu, mlp_output, gate, weight->down, NULL, tokens,
                            TEXT_INTERMEDIATE, TEXT_HIDDEN), "MLP down");
+    TEXT_TRACE("mlp_output", mlp_output, tokens * TEXT_HIDDEN);
     OP(h3_gpu_add_bf16(gpu, hidden, hidden, mlp_output,
                         tokens * TEXT_HIDDEN), "MLP residual");
 #undef OP
@@ -681,6 +719,13 @@ static int text_encode_bf16_impl(
                           "layer stream submit", layer);
 
         retire_deferred(&load);
+#ifdef H3_CUDA
+        if (layer_ok && getenv("H3_CUDA_TEXT_TRACE_DIR")) {
+            char label[32];
+            snprintf(label, sizeof(label), "block-%02d", layer);
+            layer_ok = trace_text(hidden, hidden_count, label);
+        }
+#endif
         if (!layer_ok) {
             prefetch_slots_retire(slots, prefetch_depth);
             goto cleanup;

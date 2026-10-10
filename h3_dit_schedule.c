@@ -1,4 +1,18 @@
 #include "h3_dit_schedule.h"
+#ifdef H3_CUDA
+#include "cuda/h3_cuda.h"
+#define schedule_linear_f32(schedule, ...) \
+    h3_gpu_time_linear_f32((schedule)->gpu, __VA_ARGS__, \
+        (schedule)->projection_row_counts, (schedule)->projection_group_count)
+#define schedule_linear_bf16(schedule, ...) \
+    h3_gpu_time_linear_bf16((schedule)->gpu, __VA_ARGS__, \
+        (schedule)->projection_row_counts, (schedule)->projection_group_count)
+#else
+#define schedule_linear_f32(schedule, ...) \
+    h3_gpu_linear_f32((schedule)->gpu, __VA_ARGS__)
+#define schedule_linear_bf16(schedule, ...) \
+    h3_gpu_linear_bf16((schedule)->gpu, __VA_ARGS__)
+#endif
 
 #include <math.h>
 #include <stdarg.h>
@@ -21,6 +35,10 @@ struct h3_dit_schedule {
     uint32_t *audio_rows;
     uint32_t *visual_condition_rows;
     uint32_t *audio_condition_rows;
+#ifdef H3_CUDA
+    uint32_t *projection_row_counts;
+    uint32_t projection_group_count;
+#endif
     h3_gpu_tensor *blocks[H3_DIT_BLOCKS];
     h3_gpu_tensor *final;
 };
@@ -91,6 +109,14 @@ static int prepare_rows(h3_dit_schedule *schedule,
     if (audio_condition)
         schedule->audio_condition_rows = calloc(
             (size_t)sigmas->steps, sizeof(*schedule->audio_condition_rows));
+#ifdef H3_CUDA
+    schedule->projection_row_counts = calloc((size_t)sigmas->steps + 2,
+                                              sizeof(*schedule->projection_row_counts));
+    if (!schedule->projection_row_counts) {
+        fail(error, error_size, "out of memory allocating timestep projection groups");
+        return 0;
+    }
+#endif
     if (!schedule->video_rows || !schedule->audio_rows ||
         (visual_condition && !schedule->visual_condition_rows) ||
         (audio_condition && !schedule->audio_condition_rows)) {
@@ -99,6 +125,9 @@ static int prepare_rows(h3_dit_schedule *schedule,
     }
     uint32_t count = 0;
     for (int step = 0; step < sigmas->steps; step++) {
+#ifdef H3_CUDA
+        uint32_t first_row = count;
+#endif
         float video = 1.0f - sigmas->video[step];
         float audio = 1.0f - sigmas->audio[step];
         if (video == audio) {
@@ -111,11 +140,23 @@ static int prepare_rows(h3_dit_schedule *schedule,
             schedule->audio_rows[step] = count++;
             schedule->video_rows[step] = count++;
         }
+#ifdef H3_CUDA
+        /* The public pipeline projects the sorted distinct levels of each
+         * evaluation. Preserve that GEMM batch shape throughout precompute. */
+        schedule->projection_row_counts[schedule->projection_group_count++] = count - first_row;
+#endif
     }
     uint32_t visual_condition_row = UINT32_MAX;
     uint32_t audio_condition_row = UINT32_MAX;
     if (visual_condition) visual_condition_row = count++;
     if (audio_condition) audio_condition_row = count++;
+#ifdef H3_CUDA
+    /* Condition-only rows are stored separately from the per-step groups. */
+    if (visual_condition)
+        schedule->projection_row_counts[schedule->projection_group_count++] = 1;
+    if (audio_condition)
+        schedule->projection_row_counts[schedule->projection_group_count++] = 1;
+#endif
     for (int step = 0; step < sigmas->steps; step++) {
         float video = 1.0f - sigmas->video[step];
         float audio = 1.0f - sigmas->audio[step];
@@ -145,6 +186,21 @@ static int prepare_rows(h3_dit_schedule *schedule,
     }
     if (visual_condition) times[visual_condition_row] = 0.999f;
     if (audio_condition) times[audio_condition_row] = 1.0f;
+#ifdef H3_CUDA
+    h3_gpu_tensor *gpu_times = h3_gpu_tensor_from_f32(schedule->gpu, times, count);
+    h3_gpu_tensor *gpu_features = h3_gpu_tensor_new_f32(schedule->gpu, (size_t)count * TIME_INPUT);
+    int features_ok = gpu_times && gpu_features &&
+        h3_gpu_time_features_f32(schedule->gpu, gpu_features, gpu_times, count, TIME_INPUT) &&
+        h3_gpu_tensor_read_f32(gpu_features, features, (size_t)count * TIME_INPUT);
+    h3_gpu_tensor_free(gpu_times);
+    h3_gpu_tensor_free(gpu_features);
+    if (!features_ok) {
+        free(times);
+        free(features);
+        fail(error, error_size, "cannot compute timestep features: %s", h3_gpu_error(schedule->gpu));
+        return 0;
+    }
+#else
     for (uint32_t row = 0; row < count; row++) {
         for (uint32_t index = 0; index < TIME_INPUT / 2; index++) {
             float frequency = expf(-logf(10000.0f) *
@@ -155,15 +211,18 @@ static int prepare_rows(h3_dit_schedule *schedule,
                 sinf(angle);
         }
     }
+#endif
     free(times);
     *features_out = features;
     return 1;
 }
 
 static h3_gpu_tensor *time_embeddings(const h3_weight_store *weights,
-                                      h3_gpu *gpu, uint32_t rows,
+                                      h3_dit_schedule *schedule,
                                       const float *features, char *error,
                                       size_t error_size) {
+    h3_gpu *gpu = schedule->gpu;
+    uint32_t rows = schedule->time_rows;
     h3_gpu_tensor *input = h3_gpu_tensor_from_f32(
         gpu, features, (size_t)rows * TIME_INPUT);
     h3_gpu_tensor *in_w = weight_f32_2d(weights, gpu,
@@ -199,26 +258,54 @@ static h3_gpu_tensor *time_embeddings(const h3_weight_store *weights,
     }
     if (!gpu_op(gpu, h3_gpu_begin(gpu), error, error_size,
                 "begin timestep embedding") ||
-        !gpu_op(gpu, h3_gpu_linear_f32(gpu, hidden, input, in_w, in_b, rows,
+        !gpu_op(gpu, schedule_linear_f32(schedule, hidden, input, in_w, in_b, rows,
                                        TIME_INPUT, TIME_HIDDEN),
                 error, error_size, "timestep input projection") ||
         !gpu_op(gpu, h3_gpu_silu_f32(gpu, activated, hidden,
                                      rows * TIME_HIDDEN),
                 error, error_size, "timestep SiLU") ||
-        !gpu_op(gpu, h3_gpu_linear_f32(gpu, output, activated, out_w, out_b,
+        !gpu_op(gpu, schedule_linear_f32(schedule, output, activated, out_w, out_b,
                                        rows, TIME_HIDDEN, H3_DIT_TIME_DIM),
                 error, error_size, "timestep output projection") ||
+#ifdef H3_CUDA
+        !gpu_op(gpu, h3_gpu_silu_f32(gpu, output, output,
+                                     rows * H3_DIT_TIME_DIM),
+                error, error_size, "FP32 timestep AdaLN SiLU") ||
+        !gpu_op(gpu, h3_gpu_cast_f32_to_bf16(
+                        gpu, silu, output, rows * H3_DIT_TIME_DIM),
+                error, error_size, "activated timestep BF16 cast") ||
+#else
         !gpu_op(gpu, h3_gpu_cast_f32_to_bf16(
                         gpu, bf16, output, rows * H3_DIT_TIME_DIM),
                 error, error_size, "timestep BF16 cast") ||
         !gpu_op(gpu, h3_gpu_silu_bf16(gpu, silu, bf16,
                                       rows * H3_DIT_TIME_DIM),
                 error, error_size, "timestep AdaLN SiLU") ||
+#endif
         !gpu_op(gpu, h3_gpu_submit(gpu), error, error_size,
                 "submit timestep embedding")) {
         goto cleanup;
     }
     result = silu;
+#ifdef H3_CUDA
+    const char *trace_directory = getenv("H3_CUDA_TRACE_DIR");
+    if (trace_directory) {
+        char path[2048];
+        size_t count = (size_t)rows * H3_DIT_TIME_DIM;
+        uint16_t *values = malloc(count * sizeof(*values));
+        int length = snprintf(path, sizeof(path), "%s/time-activated.bf16", trace_directory);
+        FILE *file = values && length > 0 && (size_t)length < sizeof(path) &&
+                     h3_gpu_tensor_read_bf16(silu, values, count) ? fopen(path, "wb") : NULL;
+        int ok = file && fwrite(values, sizeof(*values), count, file) == count;
+        if (file && fclose(file)) ok = 0;
+        free(values);
+        if (!ok) {
+            fail(error, error_size, "cannot write timestep diagnostic");
+            result = NULL;
+            goto cleanup;
+        }
+    }
+#endif
     silu = NULL;
 cleanup:
     free_tensor(&input);
@@ -255,7 +342,7 @@ h3_dit_schedule *h3_dit_schedule_precompute(
     float *features = NULL;
     if (!prepare_rows(schedule, sigmas, visual_condition, audio_condition,
                       &features, error, error_size)) goto failed;
-    h3_gpu_tensor *time = time_embeddings(weights, gpu, schedule->time_rows,
+    h3_gpu_tensor *time = time_embeddings(weights, schedule,
                                            features, error, error_size);
     free(features);
     features = NULL;
@@ -285,8 +372,8 @@ h3_dit_schedule *h3_dit_schedule_precompute(
         }
         snprintf(operation, sizeof(operation), "AdaLN block %u", block);
         int ok = gpu_op(gpu, h3_gpu_begin(gpu), error, error_size, operation) &&
-            gpu_op(gpu, h3_gpu_linear_bf16(
-                gpu, schedule->blocks[block], time, weight, bias,
+            gpu_op(gpu, schedule_linear_bf16(
+                schedule, schedule->blocks[block], time, weight, bias,
                 schedule->time_rows, H3_DIT_TIME_DIM, BLOCK_OUTPUT),
                 error, error_size, operation) &&
             gpu_op(gpu, h3_gpu_submit(gpu), error, error_size, operation);
@@ -311,8 +398,8 @@ h3_dit_schedule *h3_dit_schedule_precompute(
     if (!final_w || !final_b || !schedule->final ||
         !gpu_op(gpu, h3_gpu_begin(gpu), error, error_size,
                 "begin final AdaLN") ||
-        !gpu_op(gpu, h3_gpu_linear_bf16(
-            gpu, schedule->final, time, final_w, final_b, schedule->time_rows,
+        !gpu_op(gpu, schedule_linear_bf16(
+            schedule, schedule->final, time, final_w, final_b, schedule->time_rows,
             H3_DIT_TIME_DIM, FINAL_OUTPUT), error, error_size,
             "final AdaLN projection") ||
         !gpu_op(gpu, h3_gpu_submit(gpu), error, error_size,
@@ -345,6 +432,9 @@ void h3_dit_schedule_free(h3_dit_schedule *schedule) {
     free(schedule->audio_rows);
     free(schedule->visual_condition_rows);
     free(schedule->audio_condition_rows);
+#ifdef H3_CUDA
+    free(schedule->projection_row_counts);
+#endif
     free(schedule);
 }
 

@@ -1,0 +1,673 @@
+{
+  "torch": "2.9.1+cu128",
+  "device": "NVIDIA H200",
+  "passed": true,
+  "cases": [
+    {
+      "name": "silu",
+      "shape": [
+        1,
+        7
+      ],
+      "dtype": "torch.float32",
+      "max_abs": 0.0,
+      "relative_l2": 0.0,
+      "passed": true
+    },
+    {
+      "name": "rms_norm",
+      "shape": [
+        1,
+        7
+      ],
+      "dtype": "torch.float32",
+      "max_abs": 0.0,
+      "relative_l2": 0.0,
+      "passed": true
+    },
+    {
+      "name": "layer_norm",
+      "shape": [
+        1,
+        7
+      ],
+      "dtype": "torch.float32",
+      "max_abs": 1.1920928955078125e-07,
+      "relative_l2": 8.62325322259494e-08,
+      "passed": true
+    },
+    {
+      "name": "swiglu",
+      "shape": [
+        1,
+        7
+      ],
+      "dtype": "torch.float32",
+      "max_abs": 0.0,
+      "relative_l2": 0.0,
+      "passed": true
+    },
+    {
+      "name": "adaln",
+      "shape": [
+        1,
+        7
+      ],
+      "dtype": "torch.float32",
+      "max_abs": 0.0,
+      "relative_l2": 0.0,
+      "passed": true
+    },
+    {
+      "name": "gate",
+      "shape": [
+        1,
+        7
+      ],
+      "dtype": "torch.float32",
+      "max_abs": 0.0,
+      "relative_l2": 0.0,
+      "passed": true
+    },
+    {
+      "name": "silu",
+      "shape": [
+        17,
+        128
+      ],
+      "dtype": "torch.float32",
+      "max_abs": 0.0,
+      "relative_l2": 0.0,
+      "passed": true
+    },
+    {
+      "name": "rms_norm",
+      "shape": [
+        17,
+        128
+      ],
+      "dtype": "torch.float32",
+      "max_abs": 4.76837158203125e-07,
+      "relative_l2": 2.803725429600945e-08,
+      "passed": true
+    },
+    {
+      "name": "layer_norm",
+      "shape": [
+        17,
+        128
+      ],
+      "dtype": "torch.float32",
+      "max_abs": 4.76837158203125e-07,
+      "relative_l2": 7.192758744167804e-08,
+      "passed": true
+    },
+    {
+      "name": "swiglu",
+      "shape": [
+        17,
+        128
+      ],
+      "dtype": "torch.float32",
+      "max_abs": 0.0,
+      "relative_l2": 0.0,
+      "passed": true
+    },
+    {
+      "name": "adaln",
+      "shape": [
+        17,
+        128
+      ],
+      "dtype": "torch.float32",
+      "max_abs": 9.5367431640625e-07,
+      "relative_l2": 1.1222017803902418e-07,
+      "passed": true
+    },
+    {
+      "name": "gate",
+      "shape": [
+        17,
+        128
+      ],
+      "dtype": "torch.float32",
+      "max_abs": 0.0,
+      "relative_l2": 0.0,
+      "passed": true
+    },
+    {
+      "name": "silu",
+      "shape": [
+        3,
+        5376
+      ],
+      "dtype": "torch.float32",
+      "max_abs": 0.0,
+      "relative_l2": 0.0,
+      "passed": true
+    },
+    {
+      "name": "rms_norm",
+      "shape": [
+        3,
+        5376
+      ],
+      "dtype": "torch.float32",
+      "max_abs": 0.0,
+      "relative_l2": 0.0,
+      "passed": true
+    },
+    {
+      "name": "layer_norm",
+      "shape": [
+        3,
+        5376
+      ],
+      "dtype": "torch.float32",
+      "max_abs": 7.152557373046875e-07,
+      "relative_l2": 9.157248115343464e-08,
+      "passed": true
+    },
+    {
+      "name": "swiglu",
+      "shape": [
+        3,
+        5376
+      ],
+      "dtype": "torch.float32",
+      "max_abs": 0.0,
+      "relative_l2": 0.0,
+      "passed": true
+    },
+    {
+      "name": "adaln",
+      "shape": [
+        3,
+        5376
+      ],
+      "dtype": "torch.float32",
+      "max_abs": 1.9073486328125e-06,
+      "relative_l2": 2.542534502936178e-07,
+      "passed": true
+    },
+    {
+      "name": "gate",
+      "shape": [
+        3,
+        5376
+      ],
+      "dtype": "torch.float32",
+      "max_abs": 0.0,
+      "relative_l2": 0.0,
+      "passed": true
+    },
+    {
+      "name": "linear_bias",
+      "shape": [
+        1,
+        9
+      ],
+      "dtype": "torch.float32",
+      "max_abs": 0.0,
+      "relative_l2": 0.0,
+      "passed": true
+    },
+    {
+      "name": "linear_bias",
+      "shape": [
+        17,
+        256
+      ],
+      "dtype": "torch.float32",
+      "max_abs": 1.430511474609375e-06,
+      "relative_l2": 2.1836808627995197e-07,
+      "passed": true
+    },
+    {
+      "name": "linear_bias",
+      "shape": [
+        24,
+        96
+      ],
+      "dtype": "torch.float32",
+      "max_abs": 2.4139881134033203e-06,
+      "relative_l2": 5.055105702922447e-07,
+      "passed": true
+    },
+    {
+      "name": "sdpa",
+      "shape": [
+        7,
+        2,
+        8
+      ],
+      "dtype": "torch.float32",
+      "max_abs": 2.384185791015625e-07,
+      "relative_l2": 1.1294517321402964e-07,
+      "passed": true
+    },
+    {
+      "name": "sdpa",
+      "shape": [
+        263,
+        3,
+        32
+      ],
+      "dtype": "torch.float32",
+      "max_abs": 3.2782554626464844e-07,
+      "relative_l2": 3.732974391823518e-07,
+      "passed": true
+    },
+    {
+      "name": "sdpa",
+      "shape": [
+        24,
+        56,
+        128
+      ],
+      "dtype": "torch.float32",
+      "max_abs": 2.384185791015625e-06,
+      "relative_l2": 4.041824297473795e-07,
+      "passed": true
+    },
+    {
+      "name": "silu",
+      "shape": [
+        1,
+        7
+      ],
+      "dtype": "torch.bfloat16",
+      "max_abs": 0.0,
+      "relative_l2": 0.0,
+      "passed": true
+    },
+    {
+      "name": "rms_norm",
+      "shape": [
+        1,
+        7
+      ],
+      "dtype": "torch.bfloat16",
+      "max_abs": 0.0,
+      "relative_l2": 0.0,
+      "passed": true
+    },
+    {
+      "name": "qwen_rms_norm",
+      "shape": [
+        1,
+        7
+      ],
+      "dtype": "torch.bfloat16",
+      "max_abs": 0.0,
+      "relative_l2": 0.0,
+      "passed": true
+    },
+    {
+      "name": "layer_norm",
+      "shape": [
+        1,
+        7
+      ],
+      "dtype": "torch.bfloat16",
+      "max_abs": 0.0,
+      "relative_l2": 0.0,
+      "passed": true
+    },
+    {
+      "name": "swiglu",
+      "shape": [
+        1,
+        7
+      ],
+      "dtype": "torch.bfloat16",
+      "max_abs": 0.0,
+      "relative_l2": 0.0,
+      "passed": true
+    },
+    {
+      "name": "adaln",
+      "shape": [
+        1,
+        7
+      ],
+      "dtype": "torch.bfloat16",
+      "max_abs": 0.0,
+      "relative_l2": 0.0,
+      "passed": true
+    },
+    {
+      "name": "gate",
+      "shape": [
+        1,
+        7
+      ],
+      "dtype": "torch.bfloat16",
+      "max_abs": 0.0,
+      "relative_l2": 0.0,
+      "passed": true
+    },
+    {
+      "name": "silu",
+      "shape": [
+        17,
+        128
+      ],
+      "dtype": "torch.bfloat16",
+      "max_abs": 0.0,
+      "relative_l2": 0.0,
+      "passed": true
+    },
+    {
+      "name": "rms_norm",
+      "shape": [
+        17,
+        128
+      ],
+      "dtype": "torch.bfloat16",
+      "max_abs": 0.0,
+      "relative_l2": 0.0,
+      "passed": true
+    },
+    {
+      "name": "qwen_rms_norm",
+      "shape": [
+        17,
+        128
+      ],
+      "dtype": "torch.bfloat16",
+      "max_abs": 0.0,
+      "relative_l2": 0.0,
+      "passed": true
+    },
+    {
+      "name": "layer_norm",
+      "shape": [
+        17,
+        128
+      ],
+      "dtype": "torch.bfloat16",
+      "max_abs": 0.0,
+      "relative_l2": 0.0,
+      "passed": true
+    },
+    {
+      "name": "swiglu",
+      "shape": [
+        17,
+        128
+      ],
+      "dtype": "torch.bfloat16",
+      "max_abs": 0.0,
+      "relative_l2": 0.0,
+      "passed": true
+    },
+    {
+      "name": "adaln",
+      "shape": [
+        17,
+        128
+      ],
+      "dtype": "torch.bfloat16",
+      "max_abs": 0.0,
+      "relative_l2": 0.0,
+      "passed": true
+    },
+    {
+      "name": "gate",
+      "shape": [
+        17,
+        128
+      ],
+      "dtype": "torch.bfloat16",
+      "max_abs": 0.0,
+      "relative_l2": 0.0,
+      "passed": true
+    },
+    {
+      "name": "silu",
+      "shape": [
+        3,
+        5376
+      ],
+      "dtype": "torch.bfloat16",
+      "max_abs": 0.0,
+      "relative_l2": 0.0,
+      "passed": true
+    },
+    {
+      "name": "rms_norm",
+      "shape": [
+        3,
+        5376
+      ],
+      "dtype": "torch.bfloat16",
+      "max_abs": 0.0,
+      "relative_l2": 0.0,
+      "passed": true
+    },
+    {
+      "name": "qwen_rms_norm",
+      "shape": [
+        3,
+        5376
+      ],
+      "dtype": "torch.bfloat16",
+      "max_abs": 0.0,
+      "relative_l2": 0.0,
+      "passed": true
+    },
+    {
+      "name": "layer_norm",
+      "shape": [
+        3,
+        5376
+      ],
+      "dtype": "torch.bfloat16",
+      "max_abs": 0.0,
+      "relative_l2": 0.0,
+      "passed": true
+    },
+    {
+      "name": "swiglu",
+      "shape": [
+        3,
+        5376
+      ],
+      "dtype": "torch.bfloat16",
+      "max_abs": 0.0,
+      "relative_l2": 0.0,
+      "passed": true
+    },
+    {
+      "name": "adaln",
+      "shape": [
+        3,
+        5376
+      ],
+      "dtype": "torch.bfloat16",
+      "max_abs": 0.0,
+      "relative_l2": 0.0,
+      "passed": true
+    },
+    {
+      "name": "gate",
+      "shape": [
+        3,
+        5376
+      ],
+      "dtype": "torch.bfloat16",
+      "max_abs": 0.0,
+      "relative_l2": 0.0,
+      "passed": true
+    },
+    {
+      "name": "linear_bias",
+      "shape": [
+        1,
+        9
+      ],
+      "dtype": "torch.bfloat16",
+      "max_abs": 0.0,
+      "relative_l2": 0.0,
+      "passed": true
+    },
+    {
+      "name": "linear_bias",
+      "shape": [
+        17,
+        256
+      ],
+      "dtype": "torch.bfloat16",
+      "max_abs": 0.0,
+      "relative_l2": 0.0,
+      "passed": true
+    },
+    {
+      "name": "linear_bias",
+      "shape": [
+        24,
+        96
+      ],
+      "dtype": "torch.bfloat16",
+      "max_abs": 0.001953125,
+      "relative_l2": 4.046646427013911e-05,
+      "passed": true
+    },
+    {
+      "name": "sdpa",
+      "shape": [
+        7,
+        2,
+        8
+      ],
+      "dtype": "torch.bfloat16",
+      "max_abs": 0.0,
+      "relative_l2": 0.0,
+      "passed": true
+    },
+    {
+      "name": "sdpa",
+      "shape": [
+        263,
+        3,
+        32
+      ],
+      "dtype": "torch.bfloat16",
+      "max_abs": 0.0001220703125,
+      "relative_l2": 1.3646195839100983e-05,
+      "passed": true
+    },
+    {
+      "name": "sdpa",
+      "shape": [
+        24,
+        56,
+        128
+      ],
+      "dtype": "torch.bfloat16",
+      "max_abs": 0.001953125,
+      "relative_l2": 1.8418319086777046e-05,
+      "passed": true
+    },
+    {
+      "name": "gqa_causal",
+      "shape": [
+        8,
+        8,
+        128
+      ],
+      "dtype": "torch.bfloat16",
+      "max_abs": 1.9073486328125e-06,
+      "relative_l2": 2.998300985268543e-08,
+      "passed": true
+    },
+    {
+      "name": "gqa_causal",
+      "shape": [
+        263,
+        8,
+        128
+      ],
+      "dtype": "torch.bfloat16",
+      "max_abs": 0.001953125,
+      "relative_l2": 2.9956045182188973e-05,
+      "passed": true
+    },
+    {
+      "name": "sdpa_causal_batch",
+      "shape": [
+        2,
+        19,
+        8,
+        64
+      ],
+      "dtype": "torch.float32",
+      "max_abs": 4.76837158203125e-07,
+      "relative_l2": 1.108419240836156e-07,
+      "passed": true
+    },
+    {
+      "name": "conv1d",
+      "shape": [
+        2,
+        37,
+        7
+      ],
+      "dtype": "torch.float32",
+      "max_abs": 0.0,
+      "relative_l2": 0.0,
+      "passed": true
+    },
+    {
+      "name": "conv1d",
+      "shape": [
+        2,
+        19,
+        7
+      ],
+      "dtype": "torch.float32",
+      "max_abs": 0.0,
+      "relative_l2": 0.0,
+      "passed": true
+    },
+    {
+      "name": "conv1d",
+      "shape": [
+        2,
+        33,
+        7
+      ],
+      "dtype": "torch.float32",
+      "max_abs": 0.0,
+      "relative_l2": 0.0,
+      "passed": true
+    },
+    {
+      "name": "conv_transpose1d",
+      "shape": [
+        2,
+        34,
+        7
+      ],
+      "dtype": "torch.float32",
+      "max_abs": 0.0,
+      "relative_l2": 0.0,
+      "passed": true
+    },
+    {
+      "name": "conv3d",
+      "shape": [
+        1,
+        4,
+        3,
+        3,
+        4
+      ],
+      "dtype": "torch.float32",
+      "max_abs": 0.0,
+      "relative_l2": 0.0,
+      "passed": true
+    }
+  ]
+}

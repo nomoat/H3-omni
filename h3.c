@@ -4,6 +4,9 @@
 #include "h3_dit.h"
 #include "h3_ffmpeg.h"
 #include "h3_metal.h"
+#ifdef H3_CUDA
+#define st_mtimespec st_mtim
+#endif
 #include "h3_multimodal.h"
 #include "h3_safetensors.h"
 #include "h3_text_encoder.h"
@@ -519,6 +522,17 @@ static int h3_valid_params(h3_ctx *ctx, const h3_params *params) {
         h3_set_error(ctx, "denoising steps must be in [2, 1000]");
         return 0;
     }
+#ifdef H3_CUDA
+    if (params->dit_layers != 50 || params->denoise_reuse != 1 ||
+        params->core_reuse != 1 || params->token_reduction ||
+        params->use_int8_row_fc2 || params->ssd_streaming ||
+        (params->render_width && params->render_width != params->width) ||
+        (params->render_height && params->render_height != params->height)) {
+        h3_set_error(ctx, "CUDA phase one requires 50 layers, no reuse, no "
+                         "token reduction, no quantization or internal scaling");
+        return 0;
+    }
+#endif
     if (params->denoise_reuse < 1 || params->denoise_reuse > 3) {
         h3_set_error(ctx, "denoise reuse must be in [1, 3]");
         return 0;
@@ -1462,6 +1476,9 @@ h3_result *h3_generate(h3_ctx *ctx, const char *prompt,
     }
     float spatial_rope_scale = !params->use_reference_rope &&
         render_width == 256 && render_height == 256 ? 0.5f : 1.0f;
+#ifdef H3_CUDA
+    spatial_rope_scale = 1.0f;
+#endif
     if (ctx->cache_enabled && ctx->dit && ctx->dit_key &&
         !strcmp(ctx->dit_key, prepared_key)) {
         dit = ctx->dit;

@@ -1,0 +1,26 @@
+[
+  {
+    "case": "256x256x22-seed0",
+    "passed": true
+  },
+  {
+    "case": "256x256x22-seed1",
+    "passed": true
+  },
+  {
+    "case": "256x256x22-seed42",
+    "passed": true
+  },
+  {
+    "case": "512x512x22-seed0",
+    "passed": true
+  },
+  {
+    "case": "512x512x22-seed1",
+    "passed": true
+  },
+  {
+    "case": "512x512x22-seed42",
+    "passed": true
+  }
+]

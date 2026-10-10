@@ -1,0 +1,42 @@
+{
+  "passed": true,
+  "slurm_job": 14269,
+  "required_trajectories": 6,
+  "per_step_comparisons": 480,
+  "decoder_comparisons": 24,
+  "primitive_cases": 69,
+  "text_embeddings_exact": true,
+  "trajectory_max_relative_l2": 0.0,
+  "trajectory_max_normalized_max": 0.0,
+  "decoded_video": {
+    "max_relative_l2": 1.2922595260533853e-06,
+    "max_normalized_max": 1.0073184967041016e-05
+  },
+  "decoded_audio": {
+    "max_relative_l2": 2.3254789994098246e-05,
+    "max_normalized_max": 8.121228165691718e-05
+  },
+  "timings": {
+    "256": {
+      "native_median_forward_seconds": 0.2048210953362286,
+      "reference_median_forward_seconds": 0.0579570340923965
+    },
+    "512": {
+      "native_median_forward_seconds": 0.29890914261341095,
+      "reference_median_forward_seconds": 0.16871139267459512
+    }
+  },
+  "timing_scope": "Harness measurements: native includes host input/output transfers; reference returns CUDA tensors. Loading excluded; not a matched throughput benchmark.",
+  "full_artifacts": "/home/cj/h3-cuda/results/14269",
+  "standalone_cli": {
+    "passed": true,
+    "frames": 22,
+    "video_size": [
+      256,
+      256
+    ],
+    "decoded_audio_bytes": 237568,
+    "elapsed_seconds": 58.59309061430395,
+    "movie_sha256": "0afe39aa678d67e363a96d8d21f23d775ad008593e945563db42413e1acf7ce8"
+  }
+}

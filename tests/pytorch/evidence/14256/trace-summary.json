@@ -1,0 +1,308 @@
+[
+  {
+    "stage": "packed_input",
+    "relative_l2": 0.0,
+    "normalized_max": 0.0,
+    "unequal_fraction": 0.0
+  },
+  {
+    "stage": "block-00",
+    "relative_l2": 0.0,
+    "normalized_max": 0.0,
+    "unequal_fraction": 0.0
+  },
+  {
+    "stage": "block-01",
+    "relative_l2": 0.0,
+    "normalized_max": 0.0,
+    "unequal_fraction": 0.0
+  },
+  {
+    "stage": "block-02",
+    "relative_l2": 0.0,
+    "normalized_max": 0.0,
+    "unequal_fraction": 0.0
+  },
+  {
+    "stage": "block-03",
+    "relative_l2": 0.0,
+    "normalized_max": 0.0,
+    "unequal_fraction": 0.0
+  },
+  {
+    "stage": "block-04",
+    "relative_l2": 0.0,
+    "normalized_max": 0.0,
+    "unequal_fraction": 0.0
+  },
+  {
+    "stage": "block-05",
+    "relative_l2": 0.0,
+    "normalized_max": 0.0,
+    "unequal_fraction": 0.0
+  },
+  {
+    "stage": "block-06",
+    "relative_l2": 0.0,
+    "normalized_max": 0.0,
+    "unequal_fraction": 0.0
+  },
+  {
+    "stage": "block-07",
+    "relative_l2": 0.0,
+    "normalized_max": 0.0,
+    "unequal_fraction": 0.0
+  },
+  {
+    "stage": "block-08",
+    "relative_l2": 0.0,
+    "normalized_max": 0.0,
+    "unequal_fraction": 0.0
+  },
+  {
+    "stage": "block-09",
+    "relative_l2": 0.0,
+    "normalized_max": 0.0,
+    "unequal_fraction": 0.0
+  },
+  {
+    "stage": "block-10",
+    "relative_l2": 0.0,
+    "normalized_max": 0.0,
+    "unequal_fraction": 0.0
+  },
+  {
+    "stage": "block-11",
+    "relative_l2": 0.0,
+    "normalized_max": 0.0,
+    "unequal_fraction": 0.0
+  },
+  {
+    "stage": "block-12",
+    "relative_l2": 0.0,
+    "normalized_max": 0.0,
+    "unequal_fraction": 0.0
+  },
+  {
+    "stage": "block-13",
+    "relative_l2": 0.0,
+    "normalized_max": 0.0,
+    "unequal_fraction": 0.0
+  },
+  {
+    "stage": "block-14",
+    "relative_l2": 0.0,
+    "normalized_max": 0.0,
+    "unequal_fraction": 0.0
+  },
+  {
+    "stage": "block-15",
+    "relative_l2": 0.0,
+    "normalized_max": 0.0,
+    "unequal_fraction": 0.0
+  },
+  {
+    "stage": "block-16",
+    "relative_l2": 0.0,
+    "normalized_max": 0.0,
+    "unequal_fraction": 0.0
+  },
+  {
+    "stage": "block-17",
+    "relative_l2": 0.0,
+    "normalized_max": 0.0,
+    "unequal_fraction": 0.0
+  },
+  {
+    "stage": "block-18",
+    "relative_l2": 0.0,
+    "normalized_max": 0.0,
+    "unequal_fraction": 0.0
+  },
+  {
+    "stage": "block-19",
+    "relative_l2": 0.0,
+    "normalized_max": 0.0,
+    "unequal_fraction": 0.0
+  },
+  {
+    "stage": "block-20",
+    "relative_l2": 0.0,
+    "normalized_max": 0.0,
+    "unequal_fraction": 0.0
+  },
+  {
+    "stage": "block-21",
+    "relative_l2": 0.0,
+    "normalized_max": 0.0,
+    "unequal_fraction": 0.0
+  },
+  {
+    "stage": "block-22",
+    "relative_l2": 0.0,
+    "normalized_max": 0.0,
+    "unequal_fraction": 0.0
+  },
+  {
+    "stage": "block-23",
+    "relative_l2": 0.0,
+    "normalized_max": 0.0,
+    "unequal_fraction": 0.0
+  },
+  {
+    "stage": "block-24",
+    "relative_l2": 0.0,
+    "normalized_max": 0.0,
+    "unequal_fraction": 0.0
+  },
+  {
+    "stage": "block-25",
+    "relative_l2": 0.0,
+    "normalized_max": 0.0,
+    "unequal_fraction": 0.0
+  },
+  {
+    "stage": "block-26",
+    "relative_l2": 0.0,
+    "normalized_max": 0.0,
+    "unequal_fraction": 0.0
+  },
+  {
+    "stage": "block-27",
+    "relative_l2": 0.0,
+    "normalized_max": 0.0,
+    "unequal_fraction": 0.0
+  },
+  {
+    "stage": "block-28",
+    "relative_l2": 0.0,
+    "normalized_max": 0.0,
+    "unequal_fraction": 0.0
+  },
+  {
+    "stage": "block-29",
+    "relative_l2": 0.0,
+    "normalized_max": 0.0,
+    "unequal_fraction": 0.0
+  },
+  {
+    "stage": "block-30",
+    "relative_l2": 0.0,
+    "normalized_max": 0.0,
+    "unequal_fraction": 0.0
+  },
+  {
+    "stage": "block-31",
+    "relative_l2": 0.0,
+    "normalized_max": 0.0,
+    "unequal_fraction": 0.0
+  },
+  {
+    "stage": "block-32",
+    "relative_l2": 0.0,
+    "normalized_max": 0.0,
+    "unequal_fraction": 0.0
+  },
+  {
+    "stage": "block-33",
+    "relative_l2": 0.0,
+    "normalized_max": 0.0,
+    "unequal_fraction": 0.0
+  },
+  {
+    "stage": "block-34",
+    "relative_l2": 0.0,
+    "normalized_max": 0.0,
+    "unequal_fraction": 0.0
+  },
+  {
+    "stage": "block-35",
+    "relative_l2": 0.0,
+    "normalized_max": 0.0,
+    "unequal_fraction": 0.0
+  },
+  {
+    "stage": "block-36",
+    "relative_l2": 0.0,
+    "normalized_max": 0.0,
+    "unequal_fraction": 0.0
+  },
+  {
+    "stage": "block-37",
+    "relative_l2": 0.0,
+    "normalized_max": 0.0,
+    "unequal_fraction": 0.0
+  },
+  {
+    "stage": "block-38",
+    "relative_l2": 0.0,
+    "normalized_max": 0.0,
+    "unequal_fraction": 0.0
+  },
+  {
+    "stage": "block-39",
+    "relative_l2": 0.0,
+    "normalized_max": 0.0,
+    "unequal_fraction": 0.0
+  },
+  {
+    "stage": "block-40",
+    "relative_l2": 0.0,
+    "normalized_max": 0.0,
+    "unequal_fraction": 0.0
+  },
+  {
+    "stage": "block-41",
+    "relative_l2": 0.0,
+    "normalized_max": 0.0,
+    "unequal_fraction": 0.0
+  },
+  {
+    "stage": "block-42",
+    "relative_l2": 0.0,
+    "normalized_max": 0.0,
+    "unequal_fraction": 0.0
+  },
+  {
+    "stage": "block-43",
+    "relative_l2": 0.0,
+    "normalized_max": 0.0,
+    "unequal_fraction": 0.0
+  },
+  {
+    "stage": "block-44",
+    "relative_l2": 0.0,
+    "normalized_max": 0.0,
+    "unequal_fraction": 0.0
+  },
+  {
+    "stage": "block-45",
+    "relative_l2": 0.0,
+    "normalized_max": 0.0,
+    "unequal_fraction": 0.0
+  },
+  {
+    "stage": "block-46",
+    "relative_l2": 0.0,
+    "normalized_max": 0.0,
+    "unequal_fraction": 0.0
+  },
+  {
+    "stage": "block-47",
+    "relative_l2": 0.0,
+    "normalized_max": 0.0,
+    "unequal_fraction": 0.0
+  },
+  {
+    "stage": "block-48",
+    "relative_l2": 0.0,
+    "normalized_max": 0.0,
+    "unequal_fraction": 0.0
+  },
+  {
+    "stage": "block-49",
+    "relative_l2": 0.0,
+    "normalized_max": 0.0,
+    "unequal_fraction": 0.0
+  }
+]

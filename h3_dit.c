@@ -1,4 +1,7 @@
 #include "h3_dit.h"
+#ifdef H3_CUDA
+#include "cuda/h3_cuda.h"
+#endif
 
 #include "h3_dit_schedule.h"
 #include "h3_weights.h"
@@ -225,6 +228,29 @@ static int gpu_op(h3_dit *dit, int ok, char *error, size_t error_size,
     return 0;
 }
 
+#ifdef H3_CUDA
+/* Opt-in diagnostic snapshots. Never enabled during timing or acceptance. */
+static int cuda_trace(h3_dit *dit, const char *label, int step,
+                      const h3_gpu_tensor *tensor, size_t elements) {
+    const char *directory = getenv("H3_CUDA_TRACE_DIR");
+    if (!directory || step != 0) return 1;
+    char path[2048];
+    int length = snprintf(path, sizeof(path), "%s/%s.bf16", directory, label);
+    if (length < 0 || (size_t)length >= sizeof(path)) return 0;
+    uint16_t *values = malloc(elements * sizeof(*values));
+    if (!values) return 0;
+    int ok = h3_gpu_tensor_read_bf16(tensor, values, elements);
+    FILE *file = ok ? fopen(path, "wb") : NULL;
+    if (!file) ok = 0;
+    if (file) {
+        ok = fwrite(values, sizeof(*values), elements, file) == elements;
+        if (fclose(file)) ok = 0;
+    }
+    free(values);
+    return ok;
+}
+#endif
+
 static void report(h3_dit_progress progress, void *opaque, const char *phase,
                    int completed, int total) {
     if (progress) progress(phase, completed, total, opaque);
@@ -378,6 +404,12 @@ static int validate_layout(h3_dit *dit, const h3_text_embedding *text,
 static int configure_token_reduction(h3_dit *dit, int requested,
                                      char *error, size_t error_size) {
     const char *enabled = getenv("H3_TOKEN_REDUCTION");
+#ifdef H3_CUDA
+    if (requested || (enabled && *enabled && strcmp(enabled, "0"))) {
+        fail(error, error_size, "CUDA phase one does not support token reduction");
+        return 0;
+    }
+#endif
     if (!requested &&
         (!enabled || !*enabled || !strcmp(enabled, "0"))) return 1;
     unsigned begin = 4, end = 30;
@@ -1593,6 +1625,14 @@ static h3_dit *load_dit(const char *weight_directory,
         fail(error, error_size, "invalid DiT load arguments");
         return NULL;
     }
+#ifdef H3_CUDA
+    if (active_blocks != H3_DIT_BLOCKS || core_reuse_interval != 1 ||
+        ssd_streaming || use_int8_row_fc2 || spatial_rope_scale != 1.0f) {
+        fail(error, error_size, "CUDA phase one requires all blocks, original "
+                               "precision and unmodified RoPE");
+        return NULL;
+    }
+#endif
     h3_dit *dit = calloc(1, sizeof(*dit));
     if (!dit) {
         fail(error, error_size, "out of memory creating DiT model");
@@ -1604,6 +1644,9 @@ static h3_dit *load_dit(const char *weight_directory,
      * linear and eliminates two full-width casts plus the scalar F32 kernel.
      * Keep the old path available for close-reference diagnosis. */
     dit->bf16_final = getenv("H3_DIT_F32_FINAL") == NULL;
+#ifdef H3_CUDA
+    dit->bf16_final = 0;
+#endif
     dit->core_reuse_interval = core_reuse_interval;
     dit->ssd_streaming = ssd_streaming;
     dit->spatial_rope_scale = spatial_rope_scale;
@@ -2158,6 +2201,18 @@ static int encode_forward(h3_dit *dit, int step, int begin, int submit,
         fail(error, error_size, "DiT segment packing did not consume row sources");
         return 0;
     }
+#ifdef H3_CUDA
+    OP(cuda_trace(dit, "packed_input", step, dit->hidden,
+                  (size_t)dit->sequence * HIDDEN), "trace packed input");
+    OP(cuda_trace(dit, "modulation-00", step,
+                  h3_dit_schedule_block(dit->schedule, 0),
+                  (size_t)h3_dit_schedule_time_rows(dit->schedule) * 3 * 6 * HIDDEN),
+       "trace modulation table");
+    OP(cuda_trace(dit, "rope-cos", step, dit->rope_cos,
+                  (size_t)dit->sequence * ROPE_HALF), "trace RoPE cosine");
+    OP(cuda_trace(dit, "rope-sin", step, dit->rope_sin,
+                  (size_t)dit->sequence * ROPE_HALF), "trace RoPE sine");
+#endif
     int evaluate_core = dit->core_reuse_interval == 1 ||
         !dit->core_residual_ready ||
         dit->core_forward_count % dit->core_reuse_interval == 0 ||
@@ -2267,6 +2322,14 @@ static int encode_forward(h3_dit *dit, int step, int begin, int submit,
                 if (stream_started) (void)pthread_join(stream_thread, NULL);
                 return 0;
             }
+#ifdef H3_CUDA
+            if (getenv("H3_CUDA_TRACE_DIR") && step == 0) {
+                char label[32];
+                snprintf(label, sizeof(label), "block-%02u", block);
+                OP(cuda_trace(dit, label, step, dit->hidden, hidden_elements),
+                   "trace block output");
+            }
+#endif
             completed_blocks++;
             if (command_blocks &&
                 completed_blocks < dit->active_block_count &&
@@ -2316,6 +2379,13 @@ static int encode_forward(h3_dit *dit, int step, int begin, int submit,
     }
     dit->core_forward_count++;
     const h3_gpu_tensor *final = h3_dit_schedule_final(dit->schedule);
+#ifdef H3_CUDA
+    OP(h3_gpu_final_heads_f32(dit->gpu, dit->video_output, dit->audio_output,
+        dit->hidden, dit->final_norm, final, dit->row_maps[step],
+        dit->final_video_w, dit->final_video_b, dit->final_audio_w, dit->final_audio_b,
+        dit->sequence, HIDDEN, dit->video_target_start, dit->video_rows,
+        dit->audio_target_start, dit->audio_rows), "full-sequence final heads");
+#else
     int fused_final_head = dit->bf16_final &&
         !getenv("H3_DISABLE_FUSED_FINAL_HEAD") &&
         !getenv("H3_DISABLE_FUSED_FINAL_SLICE");
@@ -2390,6 +2460,7 @@ static int encode_forward(h3_dit *dit, int step, int begin, int submit,
             dit->video_output, dit->video_rows * VIDEO_PATCH),
            "final video output cast");
     }
+#endif
     if (submit) OP(h3_gpu_submit(dit->gpu), "submit DiT forward");
 #undef OP
     return 1;
@@ -2479,6 +2550,13 @@ int h3_dit_forward(h3_dit *dit, int step,
             audio_rows, audio_row_elements);
     if (!ok) fail(error, error_size, "cannot pack/write DiT input latents");
     if (ok) ok = encode_forward(dit, step, 1, 1, 0, error, error_size);
+#ifdef H3_CUDA
+    if (ok) ok = h3_gpu_tensor_read_f32(dit->video_output, video_f32,
+                                        video_row_elements) &&
+                 h3_gpu_tensor_read_f32(dit->audio_output, audio_f32,
+                                        audio_row_elements);
+    if (!ok && (!error || !*error)) fail(error, error_size, "cannot read DiT output");
+#else
     if (ok) ok = h3_gpu_tensor_read_bf16(dit->video_output_bf16, video_out,
                                          video_row_elements) &&
                  h3_gpu_tensor_read_bf16(dit->audio_output_bf16, audio_out,
@@ -2494,6 +2572,7 @@ int h3_dit_forward(h3_dit *dit, int step,
             memcpy(&audio_f32[index], &bits, sizeof(bits));
         }
     }
+#endif
     if (ok) ok = h3_dit_unpatchify_video(video_f32, VIDEO_CHANNELS,
         dit->latent_t, dit->latent_h, dit->latent_w, video_velocity,
         h3_dit_video_elements(dit)) &&
@@ -2577,11 +2656,16 @@ static int parse_reuse_steps(int steps, uint8_t *selected) {
 }
 
 static int gpu_sampler_requested(const h3_dit *dit) {
+#ifdef H3_CUDA
+    (void)dit;
+    return 0; /* Phase one preserves FP32 head outputs and solver state. */
+#else
     const char *cpu = getenv("H3_CPU_SAMPLER");
     if (cpu && *cpu && strcmp(cpu, "0")) return 0;
     const char *value = getenv("H3_GPU_SAMPLER");
     if (value) return *value && strcmp(value, "0");
     return h3_gpu_is_m5(dit->gpu);
+#endif
 }
 
 static unsigned gpu_sampler_window(void) {
@@ -2865,6 +2949,12 @@ int h3_dit_denoise_euler_preview(
                          h3_dit_preview preview, void *preview_opaque,
                          char *error, size_t error_size) {
     if (error && error_size) error[0] = '\0';
+#ifdef H3_CUDA
+    if (reuse_interval != 1) {
+        fail(error, error_size, "CUDA phase one requires every model evaluation");
+        return 0;
+    }
+#endif
     if (!dit || !video_latent || !audio_latent || reuse_interval < 1 ||
         reuse_interval > 32 ||
         dit->sigmas.steps != h3_dit_schedule_steps(dit->schedule)) {

@@ -1,0 +1,619 @@
+{
+  "scope": "DiT and sampler; text and decoded-output acceptance remain separate",
+  "arguments": {
+    "weights": "/var/tmp/h3-cuda-14228/local-model/FL2VA",
+    "diffusers": "/var/tmp/h3-cuda-14248/diffusers",
+    "library": "build-cuda/libh3_model.so",
+    "output": "results/trajectories/256x256x22-seed0",
+    "text": "results/text/text-0.safetensors",
+    "width": 256,
+    "height": 256,
+    "frames": 22,
+    "steps": 20,
+    "evaluations": null,
+    "seed": 0,
+    "trace": false,
+    "attention_math_diagnostic": false
+  },
+  "complete_trajectory": true,
+  "real_text": true,
+  "layers": 50,
+  "diagnostic_attention": false,
+  "trace_enabled": false,
+  "exact_checks": {
+    "positions": true,
+    "token_tags": true,
+    "packing_indices": true,
+    "latent_packing": true
+  },
+  "input_sha256": "100c1031bddd5160d27c2629a675b61a631f3a27773b3d4720196f283d9cbbe2",
+  "passed": false,
+  "results": [
+    {
+      "label": "step_0_video_velocity",
+      "relative_l2": 0.013119864277541637,
+      "normalized_max": 0.025643885135650635,
+      "passed": true
+    },
+    {
+      "label": "step_0_audio_velocity",
+      "relative_l2": 0.012795310467481613,
+      "normalized_max": 0.053749553859233856,
+      "passed": true
+    },
+    {
+      "label": "step_0_video_latent",
+      "relative_l2": 0.0001086484917323105,
+      "normalized_max": 0.00023593723017256707,
+      "passed": true
+    },
+    {
+      "label": "step_0_audio_latent",
+      "relative_l2": 0.00025697980890981853,
+      "normalized_max": 0.0008849262376315892,
+      "passed": true
+    },
+    {
+      "label": "step_1_video_velocity",
+      "relative_l2": 0.017693568021059036,
+      "normalized_max": 0.029003800824284554,
+      "passed": true
+    },
+    {
+      "label": "step_1_audio_velocity",
+      "relative_l2": 0.013388879597187042,
+      "normalized_max": 0.048682041466236115,
+      "passed": true
+    },
+    {
+      "label": "step_1_video_latent",
+      "relative_l2": 0.00015519469161517918,
+      "normalized_max": 0.00028612802270799875,
+      "passed": true
+    },
+    {
+      "label": "step_1_audio_latent",
+      "relative_l2": 0.00037913580308668315,
+      "normalized_max": 0.0016850963002070785,
+      "passed": true
+    },
+    {
+      "label": "step_2_video_velocity",
+      "relative_l2": 0.016195403411984444,
+      "normalized_max": 0.03797255456447601,
+      "passed": true
+    },
+    {
+      "label": "step_2_audio_velocity",
+      "relative_l2": 0.00767182931303978,
+      "normalized_max": 0.017887234687805176,
+      "passed": true
+    },
+    {
+      "label": "step_2_video_latent",
+      "relative_l2": 0.0001879235205706209,
+      "normalized_max": 0.00031538025359623134,
+      "passed": true
+    },
+    {
+      "label": "step_2_audio_latent",
+      "relative_l2": 0.00042192451655864716,
+      "normalized_max": 0.00168709980789572,
+      "passed": true
+    },
+    {
+      "label": "step_3_video_velocity",
+      "relative_l2": 0.014564168639481068,
+      "normalized_max": 0.022079048678278923,
+      "passed": true
+    },
+    {
+      "label": "step_3_audio_velocity",
+      "relative_l2": 0.010269899852573872,
+      "normalized_max": 0.014210226014256477,
+      "passed": true
+    },
+    {
+      "label": "step_3_video_latent",
+      "relative_l2": 0.00020239729201421142,
+      "normalized_max": 0.0002856224309653044,
+      "passed": true
+    },
+    {
+      "label": "step_3_audio_latent",
+      "relative_l2": 0.0005655892309732735,
+      "normalized_max": 0.0017732458654791117,
+      "passed": true
+    },
+    {
+      "label": "step_4_video_velocity",
+      "relative_l2": 0.017312124371528625,
+      "normalized_max": 0.03349163383245468,
+      "passed": true
+    },
+    {
+      "label": "step_4_audio_velocity",
+      "relative_l2": 0.007199940737336874,
+      "normalized_max": 0.0191626138985157,
+      "passed": true
+    },
+    {
+      "label": "step_4_video_latent",
+      "relative_l2": 0.0003077827859669924,
+      "normalized_max": 0.000426512531703338,
+      "passed": true
+    },
+    {
+      "label": "step_4_audio_latent",
+      "relative_l2": 0.000510131474584341,
+      "normalized_max": 0.0014986572787165642,
+      "passed": true
+    },
+    {
+      "label": "step_5_video_velocity",
+      "relative_l2": 0.024158652871847153,
+      "normalized_max": 0.05944710597395897,
+      "passed": true
+    },
+    {
+      "label": "step_5_audio_velocity",
+      "relative_l2": 0.010626887902617455,
+      "normalized_max": 0.038915302604436874,
+      "passed": true
+    },
+    {
+      "label": "step_5_video_latent",
+      "relative_l2": 0.00039236628799699247,
+      "normalized_max": 0.00044274365063756704,
+      "passed": true
+    },
+    {
+      "label": "step_5_audio_latent",
+      "relative_l2": 0.0005748334806412458,
+      "normalized_max": 0.0014945896109566092,
+      "passed": true
+    },
+    {
+      "label": "step_6_video_velocity",
+      "relative_l2": 0.020877333357930183,
+      "normalized_max": 0.0676824077963829,
+      "passed": true
+    },
+    {
+      "label": "step_6_audio_velocity",
+      "relative_l2": 0.009614590555429459,
+      "normalized_max": 0.02044299803674221,
+      "passed": true
+    },
+    {
+      "label": "step_6_video_latent",
+      "relative_l2": 0.0004858044267166406,
+      "normalized_max": 0.0007183822453953326,
+      "passed": true
+    },
+    {
+      "label": "step_6_audio_latent",
+      "relative_l2": 0.0006763798301108181,
+      "normalized_max": 0.001568182255141437,
+      "passed": true
+    },
+    {
+      "label": "step_7_video_velocity",
+      "relative_l2": 0.02703290991485119,
+      "normalized_max": 0.056269727647304535,
+      "passed": true
+    },
+    {
+      "label": "step_7_audio_velocity",
+      "relative_l2": 0.013860632665455341,
+      "normalized_max": 0.024848518893122673,
+      "passed": true
+    },
+    {
+      "label": "step_7_video_latent",
+      "relative_l2": 0.0006249806610867381,
+      "normalized_max": 0.0009969336679205298,
+      "passed": true
+    },
+    {
+      "label": "step_7_audio_latent",
+      "relative_l2": 0.0009388315374962986,
+      "normalized_max": 0.0015621577622368932,
+      "passed": true
+    },
+    {
+      "label": "step_8_video_velocity",
+      "relative_l2": 0.026040535420179367,
+      "normalized_max": 0.08758334070444107,
+      "passed": true
+    },
+    {
+      "label": "step_8_audio_velocity",
+      "relative_l2": 0.010336172766983509,
+      "normalized_max": 0.012496091425418854,
+      "passed": true
+    },
+    {
+      "label": "step_8_video_latent",
+      "relative_l2": 0.0008907834417186677,
+      "normalized_max": 0.0014042389811947942,
+      "passed": true
+    },
+    {
+      "label": "step_8_audio_latent",
+      "relative_l2": 0.0011677967850118876,
+      "normalized_max": 0.0018508153734728694,
+      "passed": true
+    },
+    {
+      "label": "step_9_video_velocity",
+      "relative_l2": 0.03893137723207474,
+      "normalized_max": 0.09455422312021255,
+      "passed": false
+    },
+    {
+      "label": "step_9_audio_velocity",
+      "relative_l2": 0.010195806622505188,
+      "normalized_max": 0.046702031046152115,
+      "passed": true
+    },
+    {
+      "label": "step_9_video_latent",
+      "relative_l2": 0.001018243026919663,
+      "normalized_max": 0.001616584020666778,
+      "passed": true
+    },
+    {
+      "label": "step_9_audio_latent",
+      "relative_l2": 0.001352861407212913,
+      "normalized_max": 0.0017483269330114126,
+      "passed": true
+    },
+    {
+      "label": "step_10_video_velocity",
+      "relative_l2": 0.026012128219008446,
+      "normalized_max": 0.08291547000408173,
+      "passed": true
+    },
+    {
+      "label": "step_10_audio_velocity",
+      "relative_l2": 0.025340920314192772,
+      "normalized_max": 0.06676153838634491,
+      "passed": true
+    },
+    {
+      "label": "step_10_video_latent",
+      "relative_l2": 0.0013462218921631575,
+      "normalized_max": 0.0022696906235069036,
+      "passed": true
+    },
+    {
+      "label": "step_10_audio_latent",
+      "relative_l2": 0.0017687601502984762,
+      "normalized_max": 0.002285018563270569,
+      "passed": true
+    },
+    {
+      "label": "step_11_video_velocity",
+      "relative_l2": 0.03152070194482803,
+      "normalized_max": 0.1454802006483078,
+      "passed": false
+    },
+    {
+      "label": "step_11_audio_velocity",
+      "relative_l2": 0.03759799897670746,
+      "normalized_max": 0.10156029462814331,
+      "passed": false
+    },
+    {
+      "label": "step_11_video_latent",
+      "relative_l2": 0.002121745375916362,
+      "normalized_max": 0.004947634879499674,
+      "passed": true
+    },
+    {
+      "label": "step_11_audio_latent",
+      "relative_l2": 0.002678987802937627,
+      "normalized_max": 0.003696878906339407,
+      "passed": true
+    },
+    {
+      "label": "step_12_video_velocity",
+      "relative_l2": 0.032855696976184845,
+      "normalized_max": 0.14409251511096954,
+      "passed": false
+    },
+    {
+      "label": "step_12_audio_velocity",
+      "relative_l2": 0.0139539185911417,
+      "normalized_max": 0.018867211416363716,
+      "passed": true
+    },
+    {
+      "label": "step_12_video_latent",
+      "relative_l2": 0.003043827833607793,
+      "normalized_max": 0.005935694091022015,
+      "passed": true
+    },
+    {
+      "label": "step_12_audio_latent",
+      "relative_l2": 0.0027951402589678764,
+      "normalized_max": 0.003776069264858961,
+      "passed": true
+    },
+    {
+      "label": "step_13_video_velocity",
+      "relative_l2": 0.03704969957470894,
+      "normalized_max": 0.13673894107341766,
+      "passed": false
+    },
+    {
+      "label": "step_13_audio_velocity",
+      "relative_l2": 0.014021254144608974,
+      "normalized_max": 0.014391486532986164,
+      "passed": true
+    },
+    {
+      "label": "step_13_video_latent",
+      "relative_l2": 0.004553457256406546,
+      "normalized_max": 0.01039667148143053,
+      "passed": true
+    },
+    {
+      "label": "step_13_audio_latent",
+      "relative_l2": 0.0032641056459397078,
+      "normalized_max": 0.003443293273448944,
+      "passed": true
+    },
+    {
+      "label": "step_14_video_velocity",
+      "relative_l2": 0.02786865271627903,
+      "normalized_max": 0.13377901911735535,
+      "passed": false
+    },
+    {
+      "label": "step_14_audio_velocity",
+      "relative_l2": 0.010533282533288002,
+      "normalized_max": 0.01027345098555088,
+      "passed": true
+    },
+    {
+      "label": "step_14_video_latent",
+      "relative_l2": 0.005911413114517927,
+      "normalized_max": 0.012437356635928154,
+      "passed": true
+    },
+    {
+      "label": "step_14_audio_latent",
+      "relative_l2": 0.00422676419839263,
+      "normalized_max": 0.004259796347469091,
+      "passed": true
+    },
+    {
+      "label": "step_15_video_velocity",
+      "relative_l2": 0.03705742582678795,
+      "normalized_max": 0.1379198431968689,
+      "passed": false
+    },
+    {
+      "label": "step_15_audio_velocity",
+      "relative_l2": 0.009262699633836746,
+      "normalized_max": 0.022981157526373863,
+      "passed": true
+    },
+    {
+      "label": "step_15_video_latent",
+      "relative_l2": 0.00901788379997015,
+      "normalized_max": 0.024163775146007538,
+      "passed": true
+    },
+    {
+      "label": "step_15_audio_latent",
+      "relative_l2": 0.005609831307083368,
+      "normalized_max": 0.005387954879552126,
+      "passed": true
+    },
+    {
+      "label": "step_16_video_velocity",
+      "relative_l2": 0.03048231638967991,
+      "normalized_max": 0.11983364820480347,
+      "passed": false
+    },
+    {
+      "label": "step_16_audio_velocity",
+      "relative_l2": 0.008974269032478333,
+      "normalized_max": 0.03568929433822632,
+      "passed": true
+    },
+    {
+      "label": "step_16_video_latent",
+      "relative_l2": 0.013185550458729267,
+      "normalized_max": 0.048312243074178696,
+      "passed": true
+    },
+    {
+      "label": "step_16_audio_latent",
+      "relative_l2": 0.006695096381008625,
+      "normalized_max": 0.006317760795354843,
+      "passed": true
+    },
+    {
+      "label": "step_17_video_velocity",
+      "relative_l2": 0.0369475893676281,
+      "normalized_max": 0.15916164219379425,
+      "passed": false
+    },
+    {
+      "label": "step_17_audio_velocity",
+      "relative_l2": 0.006797002628445625,
+      "normalized_max": 0.011997195892035961,
+      "passed": true
+    },
+    {
+      "label": "step_17_video_latent",
+      "relative_l2": 0.02118777297437191,
+      "normalized_max": 0.08094751834869385,
+      "passed": true
+    },
+    {
+      "label": "step_17_audio_latent",
+      "relative_l2": 0.008268044330179691,
+      "normalized_max": 0.007147226482629776,
+      "passed": true
+    },
+    {
+      "label": "step_18_video_velocity",
+      "relative_l2": 0.022292975336313248,
+      "normalized_max": 0.0985039472579956,
+      "passed": true
+    },
+    {
+      "label": "step_18_audio_velocity",
+      "relative_l2": 0.014117916114628315,
+      "normalized_max": 0.06401113420724869,
+      "passed": true
+    },
+    {
+      "label": "step_18_video_latent",
+      "relative_l2": 0.03241198882460594,
+      "normalized_max": 0.10690318048000336,
+      "passed": false
+    },
+    {
+      "label": "step_18_audio_latent",
+      "relative_l2": 0.01051206886768341,
+      "normalized_max": 0.013611841015517712,
+      "passed": true
+    },
+    {
+      "label": "step_19_video_velocity",
+      "relative_l2": 0.026950491592288017,
+      "normalized_max": 0.12147998064756393,
+      "passed": false
+    },
+    {
+      "label": "step_19_audio_velocity",
+      "relative_l2": 0.010252019390463829,
+      "normalized_max": 0.01720728538930416,
+      "passed": true
+    },
+    {
+      "label": "step_19_video_latent",
+      "relative_l2": 0.05045383423566818,
+      "normalized_max": 0.2023448795080185,
+      "passed": false
+    },
+    {
+      "label": "step_19_audio_latent",
+      "relative_l2": 0.013989031314849854,
+      "normalized_max": 0.016029469668865204,
+      "passed": true
+    }
+  ],
+  "timings": [
+    {
+      "step": 0,
+      "native_seconds": 1.1114487824961543,
+      "reference_seconds": 0.22086976002901793
+    },
+    {
+      "step": 1,
+      "native_seconds": 1.1020747609436512,
+      "reference_seconds": 0.05784819275140762
+    },
+    {
+      "step": 2,
+      "native_seconds": 1.1069525172933936,
+      "reference_seconds": 0.057785626500844955
+    },
+    {
+      "step": 3,
+      "native_seconds": 1.100919564254582,
+      "reference_seconds": 0.05768503621220589
+    },
+    {
+      "step": 4,
+      "native_seconds": 1.101816762238741,
+      "reference_seconds": 0.05794489290565252
+    },
+    {
+      "step": 5,
+      "native_seconds": 1.1033656978979707,
+      "reference_seconds": 0.05795843340456486
+    },
+    {
+      "step": 6,
+      "native_seconds": 1.1066258810460567,
+      "reference_seconds": 0.05769863910973072
+    },
+    {
+      "step": 7,
+      "native_seconds": 1.1034189453348517,
+      "reference_seconds": 0.05813742522150278
+    },
+    {
+      "step": 8,
+      "native_seconds": 1.1130507849156857,
+      "reference_seconds": 0.057895793579518795
+    },
+    {
+      "step": 9,
+      "native_seconds": 1.101469256915152,
+      "reference_seconds": 0.05833190027624369
+    },
+    {
+      "step": 10,
+      "native_seconds": 1.1072023790329695,
+      "reference_seconds": 0.05798992794007063
+    },
+    {
+      "step": 11,
+      "native_seconds": 1.1035073278471828,
+      "reference_seconds": 0.05800335202366114
+    },
+    {
+      "step": 12,
+      "native_seconds": 1.102057084441185,
+      "reference_seconds": 0.0579542787745595
+    },
+    {
+      "step": 13,
+      "native_seconds": 1.1033692378550768,
+      "reference_seconds": 0.057730890810489655
+    },
+    {
+      "step": 14,
+      "native_seconds": 1.1159004038199782,
+      "reference_seconds": 0.057834750041365623
+    },
+    {
+      "step": 15,
+      "native_seconds": 1.1082361340522766,
+      "reference_seconds": 0.05791269801557064
+    },
+    {
+      "step": 16,
+      "native_seconds": 1.1016047345474362,
+      "reference_seconds": 0.0577913261950016
+    },
+    {
+      "step": 17,
+      "native_seconds": 1.1243658745661378,
+      "reference_seconds": 0.05789494048804045
+    },
+    {
+      "step": 18,
+      "native_seconds": 1.0988360093906522,
+      "reference_seconds": 0.057824620977044106
+    },
+    {
+      "step": 19,
+      "native_seconds": 1.1177645586431026,
+      "reference_seconds": 0.05837170407176018
+    }
+  ],
+  "load_seconds": {
+    "native": 24.186765193007886,
+    "reference": 12.639115395024419
+  }
+}

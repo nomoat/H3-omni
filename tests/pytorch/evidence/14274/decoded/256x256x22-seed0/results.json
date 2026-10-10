@@ -1,0 +1,39 @@
+{
+  "scope": "Decoder parity on identical latents and independent trajectories",
+  "latents": "/var/tmp/h3-cuda-14274/results/trajectories/256x256x22-seed0/latents.safetensors",
+  "passed": true,
+  "cases": [
+    {
+      "component": "video",
+      "scope": "identical_latents",
+      "passed": true,
+      "relative_l2": 7.493139264624915e-07,
+      "normalized_max": 4.410743713378906e-06,
+      "native_load_and_decode_seconds": 10.589668666943908
+    },
+    {
+      "component": "video",
+      "scope": "independent_trajectory",
+      "passed": true,
+      "relative_l2": 7.493139264624915e-07,
+      "normalized_max": 4.410743713378906e-06,
+      "native_load_and_decode_seconds": 10.701061083935201
+    },
+    {
+      "component": "audio",
+      "scope": "identical_latents",
+      "passed": true,
+      "relative_l2": 1.1688114682328887e-05,
+      "normalized_max": 4.092220478923991e-05,
+      "native_load_and_decode_seconds": 12.29787437710911
+    },
+    {
+      "component": "audio",
+      "scope": "independent_trajectory",
+      "passed": true,
+      "relative_l2": 1.1688114682328887e-05,
+      "normalized_max": 4.092220478923991e-05,
+      "native_load_and_decode_seconds": 12.299637285992503
+    }
+  ]
+}

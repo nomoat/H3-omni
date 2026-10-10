@@ -1,0 +1,272 @@
+[
+  {
+    "stage": "packed_input_video",
+    "relative_l2": 0.0,
+    "normalized_max": 0.0,
+    "unequal_fraction": 0.0
+  },
+  {
+    "stage": "packed_input_text",
+    "relative_l2": 0.0,
+    "normalized_max": 0.0,
+    "unequal_fraction": 0.0
+  },
+  {
+    "stage": "packed_input_audio",
+    "relative_l2": 0.0,
+    "normalized_max": 0.0,
+    "unequal_fraction": 0.0
+  },
+  {
+    "stage": "rope-cos",
+    "relative_l2": 0.0,
+    "normalized_max": 0.0,
+    "unequal_fraction": 0.0
+  },
+  {
+    "stage": "rope-sin",
+    "relative_l2": 0.0,
+    "normalized_max": 0.0,
+    "unequal_fraction": 0.0
+  },
+  {
+    "stage": "time_linear1",
+    "relative_l2": 0.0,
+    "normalized_max": 0.0,
+    "unequal_fraction": 0.0
+  },
+  {
+    "stage": "time_silu",
+    "relative_l2": 0.0,
+    "normalized_max": 0.0,
+    "unequal_fraction": 0.0
+  },
+  {
+    "stage": "time_linear2",
+    "relative_l2": 0.0,
+    "normalized_max": 0.0,
+    "unequal_fraction": 0.0
+  },
+  {
+    "stage": "time_chain_linear1_2",
+    "relative_l2": 0.0,
+    "normalized_max": 0.0,
+    "unequal_fraction": 0.0
+  },
+  {
+    "stage": "time_chain_silu_2",
+    "relative_l2": 0.0,
+    "normalized_max": 0.0,
+    "unequal_fraction": 0.0
+  },
+  {
+    "stage": "time_chain_linear2_2",
+    "relative_l2": 0.0,
+    "normalized_max": 0.0,
+    "unequal_fraction": 0.0
+  },
+  {
+    "stage": "time_chain_activation_2",
+    "relative_l2": 0.0,
+    "normalized_max": 0.0,
+    "unequal_fraction": 0.0
+  },
+  {
+    "stage": "time_chain_bf16_2",
+    "relative_l2": 0.0,
+    "normalized_max": 0.0,
+    "unequal_fraction": 0.0
+  },
+  {
+    "stage": "time_chain_linear1_39",
+    "relative_l2": 1.454080006624281e-06,
+    "normalized_max": 1.5242491144817905e-06,
+    "unequal_fraction": 0.948846697807312
+  },
+  {
+    "stage": "time_chain_silu_39",
+    "relative_l2": 5.526975655811839e-06,
+    "normalized_max": 2.7830908493342577e-06,
+    "unequal_fraction": 0.9486607313156128
+  },
+  {
+    "stage": "time_chain_linear2_39",
+    "relative_l2": 1.0803410987136886e-05,
+    "normalized_max": 1.0995308912242763e-05,
+    "unequal_fraction": 0.9732142686843872
+  },
+  {
+    "stage": "time_chain_activation_39",
+    "relative_l2": 9.166777999780606e-06,
+    "normalized_max": 8.795286703389138e-06,
+    "unequal_fraction": 0.9732142686843872
+  },
+  {
+    "stage": "time_chain_bf16_39",
+    "relative_l2": 6.489112274721265e-05,
+    "normalized_max": 2.9818702387274243e-05,
+    "unequal_fraction": 0.01413690485060215
+  },
+  {
+    "stage": "actual_time_embedding",
+    "relative_l2": 0.0,
+    "normalized_max": 0.0,
+    "unequal_fraction": 0.0
+  },
+  {
+    "stage": "actual_modulation_table",
+    "relative_l2": 0.0,
+    "normalized_max": 0.0,
+    "unequal_fraction": 0.0
+  },
+  {
+    "stage": "modulation",
+    "relative_l2": 0.0,
+    "normalized_max": 0.0,
+    "unequal_fraction": 0.0
+  },
+  {
+    "stage": "norm1",
+    "relative_l2": 0.0,
+    "normalized_max": 0.0,
+    "unequal_fraction": 0.0
+  },
+  {
+    "stage": "adaln1",
+    "relative_l2": 0.0,
+    "normalized_max": 0.0,
+    "unequal_fraction": 0.0
+  },
+  {
+    "stage": "query_projection",
+    "relative_l2": 0.0,
+    "normalized_max": 0.0,
+    "unequal_fraction": 0.0
+  },
+  {
+    "stage": "key_projection",
+    "relative_l2": 0.0,
+    "normalized_max": 0.0,
+    "unequal_fraction": 0.0
+  },
+  {
+    "stage": "value_projection",
+    "relative_l2": 0.0,
+    "normalized_max": 0.0,
+    "unequal_fraction": 0.0
+  },
+  {
+    "stage": "grouped_qkv_projection",
+    "relative_l2": 0.0,
+    "normalized_max": 0.0,
+    "unequal_fraction": 0.0
+  },
+  {
+    "stage": "query_norm_rope",
+    "relative_l2": 0.0,
+    "normalized_max": 0.0,
+    "unequal_fraction": 0.0
+  },
+  {
+    "stage": "key_norm_rope",
+    "relative_l2": 0.0,
+    "normalized_max": 0.0,
+    "unequal_fraction": 0.0
+  },
+  {
+    "stage": "value_split",
+    "relative_l2": 0.0,
+    "normalized_max": 0.0,
+    "unequal_fraction": 0.0
+  },
+  {
+    "stage": "attention_default",
+    "relative_l2": 0.0,
+    "normalized_max": 0.0,
+    "unequal_fraction": 0.0
+  },
+  {
+    "stage": "attention_math",
+    "relative_l2": 0.0014932549092918634,
+    "normalized_max": 0.005025125574320555,
+    "unequal_fraction": 0.1719960868358612
+  },
+  {
+    "stage": "pytorch_default_vs_math_attention",
+    "relative_l2": 0.0014932549092918634,
+    "normalized_max": 0.005025125574320555,
+    "unequal_fraction": 0.1719960868358612
+  },
+  {
+    "stage": "attention_rounded_normalized_probability",
+    "relative_l2": 0.002450681757181883,
+    "normalized_max": 0.005025125574320555,
+    "unequal_fraction": 0.2582820951938629
+  },
+  {
+    "stage": "attention_rounded_online_tile_64",
+    "relative_l2": 0.0012482788879424334,
+    "normalized_max": 0.005025125574320555,
+    "unequal_fraction": 0.17855826020240784
+  },
+  {
+    "stage": "attention_rounded_online_tile_128",
+    "relative_l2": 0.0011802511289715767,
+    "normalized_max": 0.005025125574320555,
+    "unequal_fraction": 0.1663341224193573
+  },
+  {
+    "stage": "attention_rounded_online_tile_256",
+    "relative_l2": 0.0011200602166354656,
+    "normalized_max": 0.0025125627871602774,
+    "unequal_fraction": 0.1546124815940857
+  },
+  {
+    "stage": "attention_projection",
+    "relative_l2": 0.0,
+    "normalized_max": 0.0,
+    "unequal_fraction": 0.0
+  },
+  {
+    "stage": "attention_gate",
+    "relative_l2": 0.0,
+    "normalized_max": 0.0,
+    "unequal_fraction": 0.0
+  },
+  {
+    "stage": "adaln2",
+    "relative_l2": 0.0,
+    "normalized_max": 0.0,
+    "unequal_fraction": 0.0
+  },
+  {
+    "stage": "mlp_fc1",
+    "relative_l2": 0.0,
+    "normalized_max": 0.0,
+    "unequal_fraction": 0.0
+  },
+  {
+    "stage": "mlp_swiglu",
+    "relative_l2": 0.0,
+    "normalized_max": 0.0,
+    "unequal_fraction": 0.0
+  },
+  {
+    "stage": "mlp_fc2",
+    "relative_l2": 0.0,
+    "normalized_max": 0.0,
+    "unequal_fraction": 0.0
+  },
+  {
+    "stage": "mlp",
+    "relative_l2": 0.0,
+    "normalized_max": 0.0,
+    "unequal_fraction": 0.0
+  },
+  {
+    "stage": "reference_replay",
+    "relative_l2": 0.0,
+    "normalized_max": 0.0,
+    "unequal_fraction": 0.0
+  }
+]

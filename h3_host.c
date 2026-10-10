@@ -1,6 +1,8 @@
 #include "h3_host.h"
 
+#ifndef H3_CUDA
 #include <Accelerate/Accelerate.h>
+#endif
 
 #include <float.h>
 #include <limits.h>
@@ -153,7 +155,15 @@ int h3_serving_schedule_build(int evaluations, h3_sigma_schedule *schedule) {
     schedule->steps = evaluations;
     float denominator = (float)evaluations;
     for (int index = 0; index <= evaluations; index++) {
+#ifdef H3_CUDA
+        /* Match torch.linspace's FP32 CPU grid, built from each endpoint. */
+        float step = -1.0f / denominator;
+        float base = index < (evaluations + 1) / 2 ?
+            fmaf(step, (float)index, 1.0f) :
+            -step * (float)(evaluations - index);
+#else
         float base = 1.0f - (float)index / denominator;
+#endif
         schedule->video[index] = (float)H3_VIDEO_SIGMA_SHIFT * base /
             (1.0f + ((float)H3_VIDEO_SIGMA_SHIFT - 1.0f) * base);
         schedule->audio[index] = (float)H3_AUDIO_SIGMA_SHIFT * base /
@@ -245,10 +255,18 @@ static int h3_frame_grid(int latent_h, int latent_w, h3_position **positions,
     double area = sqrt((double)latent_h * (double)latent_w);
     double ratio_h = latent_h / area;
     double ratio_w = latent_w / area;
-    double step_h = ratio_h / (double)nh;
-    double step_w = ratio_w / (double)nw;
     double base_h = (1.0 - ratio_h) / 2.0;
     double base_w = (1.0 - ratio_w) / 2.0;
+#ifdef H3_CUDA
+    /* Match numpy.linspace(left, left + ratio, count, endpoint=False).
+     * Its step uses the rounded endpoints' difference, which can differ
+     * from ratio by one ulp for a non-square canvas. */
+    double step_h = ((base_h + ratio_h) - base_h) / (double)nh;
+    double step_w = ((base_w + ratio_w) - base_w) / (double)nw;
+#else
+    double step_h = ratio_h / (double)nh;
+    double step_w = ratio_w / (double)nw;
+#endif
     for (size_t column = 0; column < nw; column++) {
         widths[column] = ((double)column * step_w + base_w) * 32.0;
     }
@@ -299,10 +317,18 @@ static h3_position *h3_video_grid(double cursor, int latent_t,
     h3_position *grid = malloc((rows ? rows : 1) * sizeof(*grid));
     if (!grid) return NULL;
     size_t offset = 0;
+#ifdef H3_CUDA
+    double time = 0.0;
+#else
     double time = cursor;
+#endif
     for (int index = 0; index < latent_t; index++) {
         for (size_t spatial = 0; spatial < frame_rows; spatial++) {
+#ifdef H3_CUDA
+            grid[offset++] = (h3_position){cursor + time, frame[spatial].h, frame[spatial].w};
+#else
             grid[offset++] = (h3_position){time, frame[spatial].h, frame[spatial].w};
+#endif
         }
         time += h3_frame_rescale * h3_frame_per_token[index % 5];
     }
@@ -555,6 +581,11 @@ int h3_resize_rgb24_high_quality(const uint8_t *input, int frames,
         free(pixels);
         return 0;
     }
+#ifdef H3_CUDA
+    /* Internal upscaling is outside the phase-one numerical contract. */
+    free(pixels);
+    return 0;
+#else
     uint8_t *source_argb = malloc(input_area * 4);
     uint8_t *output_argb = malloc(output_area * 4);
     if (!source_argb || !output_argb) {
@@ -596,6 +627,7 @@ int h3_resize_rgb24_high_quality(const uint8_t *input, int frames,
     free(source_argb); free(output_argb);
     *output = pixels;
     return 1;
+#endif
 }
 
 static double h3_phi1(double value) {
@@ -640,8 +672,18 @@ int h3_euler_velocity_step(float *sample, const float *velocity, size_t count,
                            float sigma, float sigma_next) {
     if (!sample || !velocity || !isfinite(sigma) || !isfinite(sigma_next) ||
         !(sigma > sigma_next) || sigma_next < 0.0f) return 0;
+#ifdef H3_CUDA
+    float timestep = 1.0f - sigma;
+    float sigma_from_timestep = 1.0f - timestep;
+    float ratio = sigma_next / sigma;
+    for (size_t index = 0; index < count; index++) {
+        float denoised = sample[index] + sigma_from_timestep * velocity[index];
+        sample[index] = ratio * sample[index] + (1.0f - ratio) * denoised;
+    }
+#else
     float delta = sigma - sigma_next;
     for (size_t index = 0; index < count; index++)
         sample[index] += delta * velocity[index];
+#endif
     return 1;
 }
