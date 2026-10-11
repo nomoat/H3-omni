@@ -1,0 +1,9 @@
+node gpu-h200x8-1 scenario long15s
+{"mode":"reference","build":"old","status":"ok","seconds":404.4}
+{"mode":"reference","build":"new","status":"ok","seconds":397.5}
+{"mode":"default","build":"old","status":"ok","seconds":259.9}
+{"mode":"default","build":"new","status":"ok","seconds":235.4}
+peak GPU memory MiB: 48765
+REFERENCE MODE BIT-IDENTICAL: yes
+DEFAULT LATENTS+AUDIO BIT-IDENTICAL: yes
+{"new": {"relative_l2": 2.5931051481844015e-07, "max_abs": 8.791685104370117e-06, "range": [0.0, 0.9817429780960083], "pixels_equal": 0.9999757408046859, "pixels_off_by_1": 2.425919531409863e-05, "pixels_off_by_more": 0.0, "max_8bit": 1}}

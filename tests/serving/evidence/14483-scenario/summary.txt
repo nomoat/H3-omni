@@ -1,0 +1,9 @@
+node gpu-h200x8-1 scenario portrait768
+{"mode":"reference","build":"old","status":"ok","seconds":135.9}
+{"mode":"reference","build":"new","status":"ok","seconds":130.5}
+{"mode":"default","build":"old","status":"ok","seconds":107.5}
+{"mode":"default","build":"new","status":"ok","seconds":101.2}
+peak GPU memory MiB: 42045
+REFERENCE MODE BIT-IDENTICAL: yes
+DEFAULT LATENTS+AUDIO BIT-IDENTICAL: yes
+{"new": {"relative_l2": 4.516220047077504e-07, "max_abs": 5.990266799926758e-06, "range": [0.0, 1.0], "pixels_equal": 0.9999719390523136, "pixels_off_by_1": 2.8060947686366213e-05, "pixels_off_by_more": 0.0, "max_8bit": 1}}

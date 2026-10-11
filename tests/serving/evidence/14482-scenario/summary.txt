@@ -1,0 +1,9 @@
+node gpu-h200x8-1 scenario landscape768
+{"mode":"reference","build":"old","status":"ok","seconds":138.2}
+{"mode":"reference","build":"new","status":"ok","seconds":131.4}
+{"mode":"default","build":"old","status":"ok","seconds":108.0}
+{"mode":"default","build":"new","status":"ok","seconds":101.4}
+peak GPU memory MiB: 42045
+REFERENCE MODE BIT-IDENTICAL: yes
+DEFAULT LATENTS+AUDIO BIT-IDENTICAL: yes
+{"new": {"relative_l2": 2.5165402312075835e-07, "max_abs": 9.059906005859375e-06, "range": [0.0, 0.918969988822937], "pixels_equal": 0.9999728155965077, "pixels_off_by_1": 2.7184403492299698e-05, "pixels_off_by_more": 0.0, "max_8bit": 1}}

@@ -9,11 +9,18 @@ unless stated otherwise. Evidence paths are relative to `tests/serving/evidence/
 
 ## Current result
 
-| Request | Start (job 14419) | Now (job 14436) | Change |
-| --- | --- | --- | --- |
-| 2.3 s video (56 frames) | 33.0 s (job 14416) | 20.8 s (job 14438) | -37% |
-| 5 s video (124 frames) | 81.7 s | 51.0 s | -38% |
-| 10 s video (243 frames) | 201.3 s | 118.7 s | -41% |
+| Request | Start (job 14419) | Experiments 1-8 (job 14436) | Experiments 9-11 merged (job 14480) | Change |
+| --- | --- | --- | --- | --- |
+| 2.3 s video (56 frames) | 33.0 s (job 14416) | 20.8 s (job 14438) | about 19 s ¹ | -42% |
+| 5 s video (124 frames) | 81.7 s | 51.0 s | 41.0 s | -50% |
+| 10 s video (243 frames) | 201.3 s | 118.7 s | 98.5 s | -51% |
+| 15 s video (362 frames) | - | - | 174.3 s (job 14488) | - |
+
+¹ Agent profiles of #9-#11 separately (jobs 14458, 14477); not remeasured
+after the merge.
+
+Peak GPU memory in resident serving: 114 GB at 10 s, 118 GB for 1344x768,
+768x1344 and 15 s in one process (job 14488); the H200 has 141 GB.
 
 Two modes:
 
@@ -106,6 +113,10 @@ softmax, GEMM per layer) and a 0.15 s tail (last tile, final blend and RGB24
 conversion). `tests/serving/profile/gap_histogram.py` sorts idle time by gap
 length. The audio VAE (0.27 s at 10 s) runs before the video VAE in its own
 CUDA context; overlapping the two was not tried.
+| 12 | Merge #9, #10, #11. Git merged #10 into the unfused block path, which the default mode no longer uses; fixed by hand to select the fused attention in #11's 3xTF32 path | Default latents and audio bit-identical to 14438, RGB 99.996% pixels identical, rest +-1 (14478); reference mode bit-identical to 14416 (14481); full acceptance incl. calibrated passes (14479); 5 s 41.0 s, 10 s 98.5 s (14480) | Worked | 14478-mergecheck, 14479-merged-accept, 14480-duration, 14481-bitcheck-reference |
+| 12a | Differential test outside the serving set, old (14438 source) vs merged build, both modes: 1344x768, 768x1344, 15 s, first/last frame | Reference mode bit-identical in all four; default latents and audio bit-identical, RGB at most 1 level off (99.997%+ identical) | Passed | 14482-14485-scenario |
+| 12b | Ref2VA image and reference video | Not testable: the cluster has only the FL2VA checkpoint ("ordered references require the Ref2VA checkpoint"); old and new builds fail the same way | Not tested | 14486-14487-scenario |
+| 12c | Resident serving at the largest shapes | 1344x768 44.1 s, 768x1344 44.4 s, 15 s 174.3 s; peak 118 GB of 141 GB | Passed | 14488-resident-large |
 
 Why 3xTF32 is not as accurate as FP32 here: the Hopper tensor-core FP32
 accumulator is not a full IEEE accumulator; the error grows with K (K=8192

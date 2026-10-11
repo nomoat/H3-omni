@@ -1,0 +1,5 @@
+warmup: 90.6 s, peak GPU memory 111033 MiB
+land768: 44.1 s, peak GPU memory 111033 MiB
+port768: 44.4 s, peak GPU memory 117785 MiB
+s15: 174.3 s, peak GPU memory 117785 MiB
+overall peak GPU memory MiB: 117785

@@ -1,0 +1,12 @@
+node gpu-h200x8-1 scenario refimage
+h3: ordered references require the Ref2VA checkpoint
+{"mode":"reference","build":"old","status":"FAILED(1)","seconds":2.4}
+h3: ordered references require the Ref2VA checkpoint
+{"mode":"reference","build":"new","status":"FAILED(1)","seconds":1.5}
+h3: ordered references require the Ref2VA checkpoint
+{"mode":"default","build":"old","status":"FAILED(1)","seconds":1.5}
+h3: ordered references require the Ref2VA checkpoint
+{"mode":"default","build":"new","status":"FAILED(1)","seconds":1.5}
+peak GPU memory MiB: 4
+REFERENCE MODE BIT-IDENTICAL: NO
+DEFAULT LATENTS+AUDIO BIT-IDENTICAL: NO

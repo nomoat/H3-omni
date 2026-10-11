@@ -1,0 +1,14 @@
+r2-fox {'video_latent.f32': True, 'audio_latent.f32': True, 'audio_pcm.f32': True, 'video_rgb.f32': False, 'output.mp4': False}
+r4-cat {'video_latent.f32': True, 'audio_latent.f32': True, 'audio_pcm.f32': True, 'video_rgb.f32': False, 'output.mp4': False}
+r6-city {'video_latent.f32': True, 'audio_latent.f32': True, 'audio_pcm.f32': True, 'video_rgb.f32': False, 'output.mp4': False}
+{"latents_and_audio_bit_identical": true}
+== RGB vs previous default mode
+{"r1-boat": {"relative_l2": 2.7353454628353926e-07, "max_abs": 7.18235969543457e-06, "range": [0.0, 1.0], "pixels_equal": 0.9999756289958113, "pixels_off_by_1": 2.4371004188712522e-05, "pixels_off_by_more": 0.0, "max_8bit": 1}}
+{"r2-fox": {"relative_l2": 2.5039437441946066e-07, "max_abs": 5.334615707397461e-06, "range": [0.0, 0.925359845161438], "pixels_equal": 0.9999732033776088, "pixels_off_by_1": 2.6796622391240446e-05, "pixels_off_by_more": 0.0, "max_8bit": 1}}
+{"r4-cat": {"relative_l2": 5.311674244819021e-07, "max_abs": 2.086162567138672e-06, "range": [0.0, 1.0], "pixels_equal": 0.9999695980187618, "pixels_off_by_1": 3.040198123816288e-05, "pixels_off_by_more": 0.0, "max_8bit": 1}}
+{"r6-city": {"relative_l2": 7.649900364316924e-07, "max_abs": 4.32133674621582e-06, "range": [0.0, 1.0], "pixels_equal": 0.9999600034771543, "pixels_off_by_1": 3.999652284564394e-05, "pixels_off_by_more": 0.0, "max_8bit": 1}}
+== RGB vs FP32 reference
+{"r1-boat": {"relative_l2": 0.2365958627791626, "max_abs": 0.9272489547729492, "range": [0.0, 1.0], "pixels_equal": 0.07192263684505439, "pixels_off_by_1": 0.11938940156984862, "pixels_off_by_more": 0.808687961585097, "max_8bit": 237}}
+{"r2-fox": {"relative_l2": 0.049539026252626184, "max_abs": 0.7583098113536835, "range": [0.0, 0.9492274522781372], "pixels_equal": 0.24660308676421958, "pixels_off_by_1": 0.2793975309790197, "pixels_off_by_more": 0.47399938225676075, "max_8bit": 193}}
+{"r4-cat": {"relative_l2": 0.1732940045356555, "max_abs": 0.8002371490001678, "range": [0.0, 1.0], "pixels_equal": 0.0897185585715554, "pixels_off_by_1": 0.155680107347893, "pixels_off_by_more": 0.7546013340805516, "max_8bit": 204}}
+{"r6-city": {"relative_l2": 0.14135438986532267, "max_abs": 0.7686148285865784, "range": [0.0, 1.0], "pixels_equal": 0.09870055227568655, "pixels_off_by_1": 0.1760908184629498, "pixels_off_by_more": 0.7252086292613636, "max_8bit": 196}}
