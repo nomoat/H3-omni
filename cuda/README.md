@@ -211,6 +211,35 @@ one, and FFmpeg encodes each finished chunk during the decode. Both modes
 give the same bytes as the serial path (job 14473/14474 bit checks); a warm
 10 s request spends 32.1 of its 33.0 s video VAE on the GPU (job 14476).
 
+## Multi-GPU
+
+`--gpus N` (or `H3_GPUS=N`) runs one request on N GPUs of one node, in one
+process: one thread and one complete model copy per GPU, NCCL between them.
+
+- DiT: Ulysses sequence parallelism (`h3_dit.c`, `cuda/parallel.cuh`). Each
+  GPU runs the 50 blocks on 1/N of the sequence rows; around attention an
+  NCCL all-to-all trades rows for heads, so each GPU attends over the whole
+  sequence with 56/N heads. Input packing, final heads and the sampler run
+  on every GPU, so all GPUs hold the same latents. N divides the 56 heads:
+  1, 2, 4, 7 or 8.
+- Video VAE: tile i runs on GPU i % N; one host thread per GPU unpacks its
+  tiles, and one thread stitches them in order.
+- Text encoder and audio VAE stay on GPU 0.
+
+Output is bit-identical to one GPU (latents, audio and RGB) for N = 2, 4 and
+7, in two requests each (jobs 14780, 14781, 14783, 14785, 14789;
+`tests/serving/multigpu.sbatch`, `compare_gpus.py`). FastH3, token
+reduction, core reuse and SSD streaming are refused with N > 1.
+
+| Request (warm, 864x480, 20 steps) | 1 GPU | 2 GPUs | 4 GPUs | vLLM-Omni 2 / 4 GPUs |
+| --- | --- | --- | --- | --- |
+| 5 s video | 32.0 s | 18.1-18.3 s | 9.2-9.4 s | 18.9 / 10.2 s |
+| 10 s video | 80.4 s | 44.2-44.7 s | 22.2-22.4 s | 45.4 / 24.0 s |
+
+2 GPUs: job 14781 (before the parallel host passes of the video VAE);
+4 GPUs: job 14789. Memory: GPU 0 holds the text encoder, VAEs and its DiT
+copy (about 101 GB); the other GPUs about 53 GB each.
+
 ## Deployment requirements
 
 - Weights: `FL2VA/` (prompt-only and first/last-frame requests). Ordered

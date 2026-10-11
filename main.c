@@ -60,6 +60,10 @@ static void usage(const char *program) {
         "      --show             Display a frame after every denoising step (M5)\n"
         "      --zoom N           Terminal image zoom (default: 2 for Retina)\n"
         "      --profile          Print per-phase Metal timing and allocation data\n"
+#ifdef H3_CUDA
+        "      --gpus N           CUDA GPUs for the DiT and video VAE: 1, 2, 4, 7\n"
+        "                         or 8 (sets H3_GPUS; default 1)\n"
+#endif
         "      --info             Inspect model/device without mapping weights\n"
         "  -h, --help             Show this help\n",
         program, program, program);
@@ -261,7 +265,7 @@ int main(int argc, char **argv) {
            OPT_FIRST, OPT_LAST, OPT_REF_IMAGE, OPT_REF_IMAGE_SIZE,
            OPT_REF_VIDEO, OPT_REF_SILENT_VIDEO, OPT_REF_VIDEO_AUDIO,
            OPT_REF_AUDIO, OPT_FRAMES_DIR, OPT_SHOW, OPT_ZOOM,
-           OPT_PROFILE, OPT_INFO, OPT_RESIDENT_WEIGHTS };
+           OPT_PROFILE, OPT_INFO, OPT_RESIDENT_WEIGHTS, OPT_GPUS };
     static const struct option options[] = {
         {"model-dir", required_argument, NULL, 'd'},
         {"prompt", required_argument, NULL, 'p'},
@@ -313,6 +317,7 @@ int main(int argc, char **argv) {
         {"show", no_argument, NULL, OPT_SHOW},
         {"zoom", required_argument, NULL, OPT_ZOOM},
         {"profile", no_argument, NULL, OPT_PROFILE},
+        {"gpus", required_argument, NULL, OPT_GPUS},
         {"info", no_argument, NULL, OPT_INFO},
         {"resident-weights", required_argument, NULL, OPT_RESIDENT_WEIGHTS},
         {"help", no_argument, NULL, 'h'},
@@ -473,6 +478,7 @@ int main(int argc, char **argv) {
                 }
                 break;
             case OPT_PROFILE: profile = 1; break;
+            case OPT_GPUS: setenv("H3_GPUS", optarg, 1); break;
             case OPT_INFO: info = 1; break;
             case OPT_RESIDENT_WEIGHTS:
                 if (!strcmp(optarg, "on")) resident_weights = 1;
