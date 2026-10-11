@@ -291,7 +291,8 @@ template <int TERMS = 3, bool PROMOTE = true, int WARPS = 8, bool INTERLEAVE = t
 inline cudaError_t launch(float *y, const float *q, const float *k, const float *v,
                           unsigned *split_k, unsigned *split_v, int n, int heads, float scale,
                           cudaStream_t stream) {
-    static cudaError_t configured = cudaFuncSetAttribute(
+    // Per call: the attribute belongs to the current device (multi-GPU).
+    cudaError_t configured = cudaFuncSetAttribute(
         attention<TERMS, PROMOTE, WARPS, INTERLEAVE>, cudaFuncAttributeMaxDynamicSharedMemorySize,
         int(SMEM));
     if (configured != cudaSuccess) return configured;
