@@ -210,3 +210,30 @@ extern "C" void h3_gpu_enable_peer_access(int peer) {
         return;
     if (cudaDeviceEnablePeerAccess(peer, 0) != cudaSuccess) cudaGetLastError();
 }
+
+// h3_euler_velocity_step (CUDA branch), on the patch rows of the sampler:
+// denoised = x + sigma' * v; x = r * x + (1 - r) * denoised, with
+// sigma' = 1 - (1 - sigma) and r = sigma_next / sigma, as on the host.
+__global__ void euler_velocity(float *sample, const float *velocity, size_t count,
+                               float sigma, float sigma_next) {
+    float timestep = 1.0f - sigma;
+    float sigma_from_timestep = 1.0f - timestep;
+    float ratio = sigma_next / sigma;
+    for (size_t i = (size_t)blockIdx.x * blockDim.x + threadIdx.x; i < count;
+         i += (size_t)gridDim.x * blockDim.x) {
+        float denoised = sample[i] + sigma_from_timestep * velocity[i];
+        sample[i] = ratio * sample[i] + (1.0f - ratio) * denoised;
+    }
+}
+
+extern "C" int h3_gpu_euler_velocity_f32(h3_gpu *g, h3_gpu_tensor *sample, size_t offset,
+                                         const h3_gpu_tensor *velocity, size_t count,
+                                         float sigma, float sigma_next) {
+    if (!post_tensor(g, sample, offset + count, H3_GPU_F32, "Euler sample") ||
+        !post_tensor(g, velocity, count, H3_GPU_F32, "Euler velocity"))
+        return 0;
+    uint blocks = uint(std::min<size_t>((count + 255) / 256, 65535));
+    euler_velocity<<<blocks, 256, 0, g->stream>>>((float *)sample->data + offset,
+        (const float *)velocity->data, count, sigma, sigma_next);
+    return launch_ok(g);
+}

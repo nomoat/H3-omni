@@ -648,6 +648,7 @@ struct h3_ffmpeg_av_stream {
     av_segment *tail;
     int closed;      /* no more segments */
     int video_error; /* errno of a failed write */
+    int audio_cancel; /* deferred audio will not come */
     struct sigaction previous_sigpipe;
 };
 
@@ -703,21 +704,56 @@ static void av_stream_release(h3_ffmpeg_av_stream *stream) {
 }
 
 /* Interleave the PCM, start FFmpeg and the two writer threads. */
+/* Planar PCM to interleaved f32le for FFmpeg. */
+static float *interleave_pcm(const float *pcm, int samples, int channels) {
+    size_t pcm_elements = (size_t)samples * (size_t)channels;
+    float *interleaved = malloc(pcm_elements * sizeof(*interleaved));
+    if (!interleaved) return NULL;
+    for (int sample = 0; sample < samples; sample++)
+        for (int channel = 0; channel < channels; channel++)
+            interleaved[(size_t)sample * (size_t)channels + (size_t)channel] =
+                pcm[(size_t)channel * (size_t)samples + (size_t)sample];
+    return interleaved;
+}
+
+/* Audio writer for a stream opened without PCM: waits for
+ * h3_ffmpeg_av_stream_set_audio (FFmpeg meanwhile buffers video), then
+ * writes as stream_thread does. */
+static void *deferred_audio_thread(void *opaque) {
+    h3_ffmpeg_av_stream *stream = opaque;
+    pthread_mutex_lock(&stream->lock);
+    while (!stream->pcm && !stream->audio_cancel)
+        pthread_cond_wait(&stream->changed, &stream->lock);
+    const float *pcm = stream->audio_cancel ? NULL : stream->pcm;
+    pthread_mutex_unlock(&stream->lock);
+    float *interleaved = pcm ? interleave_pcm(pcm, stream->samples, stream->channels) : NULL;
+    if (!interleaved) {
+        stream->audio.error = pcm ? ENOMEM : ECANCELED;
+        close(stream->audio.descriptor);
+        stream->audio.descriptor = -1;
+        return NULL;
+    }
+    stream->interleaved = interleaved;
+    stream->audio.data = (const uint8_t *)interleaved;
+    stream->audio.bytes = (size_t)stream->samples * (size_t)stream->channels *
+                          sizeof(*interleaved);
+    return stream_thread(&stream->audio);
+}
+
 static void *av_stream_start(void *opaque) {
     h3_ffmpeg_av_stream *stream = opaque;
     char *error = stream->start_error;
     size_t error_size = sizeof(stream->start_error);
     size_t pcm_elements = (size_t)stream->samples * (size_t)stream->channels;
-    float *interleaved = malloc(pcm_elements * sizeof(*interleaved));
-    if (!interleaved) {
-        fail(error, error_size, "out of memory interleaving generated PCM");
-        return NULL;
+    float *interleaved = NULL;
+    if (stream->pcm) {
+        interleaved = interleave_pcm(stream->pcm, stream->samples, stream->channels);
+        if (!interleaved) {
+            fail(error, error_size, "out of memory interleaving generated PCM");
+            return NULL;
+        }
+        stream->interleaved = interleaved;
     }
-    stream->interleaved = interleaved;
-    for (int sample = 0; sample < stream->samples; sample++)
-        for (int channel = 0; channel < stream->channels; channel++)
-            interleaved[(size_t)sample * (size_t)stream->channels + (size_t)channel] =
-                stream->pcm[(size_t)channel * (size_t)stream->samples + (size_t)sample];
 
     int video_pipe[2] = {-1, -1}, audio_pipe[2] = {-1, -1};
     if (pipe(video_pipe) != 0 || pipe(audio_pipe) != 0) {
@@ -789,8 +825,9 @@ static void *av_stream_start(void *opaque) {
     };
     int video_code = pthread_create(&stream->video_thread, NULL,
                                     segment_thread, stream);
-    int audio_code = pthread_create(&stream->audio_thread, NULL,
-                                    stream_thread, &stream->audio);
+    int audio_code = interleaved ?
+        pthread_create(&stream->audio_thread, NULL, stream_thread, &stream->audio) :
+        pthread_create(&stream->audio_thread, NULL, deferred_audio_thread, stream);
     stream->video_started = !video_code;
     stream->audio_started = !audio_code;
     if (video_code) {
@@ -813,8 +850,8 @@ h3_ffmpeg_av_stream *h3_ffmpeg_av_stream_open(
         char *error, size_t error_size) {
     if (error && error_size) error[0] = '\0';
     if (!path || !*path || frame_count < 1 || width < 2 ||
-        height < 2 || fps < 1 || width % 2 || height % 2 || !pcm ||
-        samples < 1 || channels < 1 || sample_rate < 1) {
+        height < 2 || fps < 1 || width % 2 || height % 2 ||
+        (pcm ? samples < 1 : samples != 0) || channels < 1 || sample_rate < 1) {
         fail(error, error_size, "invalid FFmpeg A/V output arguments");
         return NULL;
     }
@@ -914,6 +951,14 @@ int h3_ffmpeg_av_stream_finish(h3_ffmpeg_av_stream *stream,
         av_stream_release(stream);
         return 0;
     }
+    pthread_mutex_lock(&stream->lock);
+    int have_audio = stream->pcm != NULL;
+    pthread_mutex_unlock(&stream->lock);
+    if (!have_audio) {
+        h3_ffmpeg_av_stream_abort(stream);
+        fail(error, error_size, "FFmpeg A/V stream received no audio");
+        return 0;
+    }
     if (stream->pushed_bytes != stream->total_bytes) {
         h3_ffmpeg_av_stream_abort(stream);
         fail(error, error_size, "FFmpeg A/V stream received incomplete video");
@@ -940,6 +985,20 @@ int h3_ffmpeg_av_stream_finish(h3_ffmpeg_av_stream *stream,
     return ok;
 }
 
+int h3_ffmpeg_av_stream_set_audio(h3_ffmpeg_av_stream *stream,
+                                  const float *pcm, int samples) {
+    if (!stream || !pcm || samples < 1) return 0;
+    pthread_mutex_lock(&stream->lock);
+    int ok = !stream->pcm && !stream->audio_cancel;
+    if (ok) {
+        stream->pcm = pcm;
+        stream->samples = samples;
+        pthread_cond_broadcast(&stream->changed);
+    }
+    pthread_mutex_unlock(&stream->lock);
+    return ok;
+}
+
 void h3_ffmpeg_av_stream_abort(h3_ffmpeg_av_stream *stream) {
     if (!stream) return;
     av_stream_wait_start(stream);
@@ -948,6 +1007,8 @@ void h3_ffmpeg_av_stream_abort(h3_ffmpeg_av_stream *stream) {
         kill(stream->child, SIGTERM);
         pthread_mutex_lock(&stream->lock);
         if (!stream->video_error) stream->video_error = ECANCELED;
+        stream->audio_cancel = 1;
+        pthread_cond_broadcast(&stream->changed);
         pthread_mutex_unlock(&stream->lock);
         int status = 0;
         av_stream_join(stream, &status, NULL, 0);

@@ -17,6 +17,7 @@
 
 #include <errno.h>
 #include <math.h>
+#include <pthread.h>
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -986,6 +987,36 @@ typedef struct {
     h3_ffmpeg_av_stream *stream;
     size_t frame_bytes;
 } h3_frame_stream;
+
+/* Audio VAE decode on its own thread while the video VAE runs; the PCM goes
+ * to FFmpeg as soon as it exists, so encoding is not held up until the
+ * video decode ends. No progress callbacks from this thread. */
+typedef struct {
+    h3_audio_vae_decoder *decoder;
+    const float *latent;
+    int latent_t;
+    h3_audio_waveform *waveform;
+    h3_ffmpeg_av_stream *stream;
+    int ok;
+    char detail[512];
+} h3_audio_job;
+
+static void *h3_audio_job_run(void *opaque) {
+    h3_audio_job *job = opaque;
+    job->ok = h3_audio_vae_decoder_decode(job->decoder, job->latent,
+                                          job->latent_t, NULL, NULL,
+                                          job->waveform, job->detail,
+                                          sizeof(job->detail));
+    if (job->ok && (job->waveform->channels != H3_AUDIO_VAE_CHANNELS ||
+                    job->waveform->sample_rate != H3_AUDIO_VAE_SAMPLE_RATE ||
+                    !h3_ffmpeg_av_stream_set_audio(job->stream, job->waveform->pcm,
+                                                   job->waveform->samples))) {
+        snprintf(job->detail, sizeof(job->detail),
+                 "cannot pass generated audio to FFmpeg");
+        job->ok = 0;
+    }
+    return NULL;
+}
 
 static void h3_stream_frames(void *opaque, const uint8_t *rgb8,
                              int first_frame, int frame_count) {
@@ -1959,27 +1990,6 @@ h3_result *h3_generate(h3_ctx *ctx, const char *prompt,
             goto cleanup;
         }
     }
-    h3_progress_emit(&progress, "audio VAE", 0, 7);
-    int audio_ok = audio_decoder ?
-        h3_audio_vae_decoder_decode(
-            audio_decoder, audio, temporal.audio_t,
-            h3_audio_vae_progress_bridge, &progress, &waveform,
-            detail, sizeof(detail)) :
-        h3_audio_vae_decode(audio_vae_path, "h3_shaders.metal", audio,
-                            temporal.audio_t, h3_audio_vae_progress_bridge,
-                            &progress, &waveform, detail, sizeof(detail));
-    if (!audio_ok) {
-        h3_set_error(ctx, "%s", detail);
-        goto cleanup;
-    }
-    if (!h3_dump_f32("audio_pcm", waveform.pcm,
-                     (size_t)waveform.channels * (size_t)waveform.samples)) {
-        h3_set_error(ctx, "cannot write H3_DUMP_DIR audio");
-        goto cleanup;
-    }
-    free(audio);
-    audio = NULL;
-    if (progress.cancelled) goto cleanup;
     if (!preview_decoder && ctx->cache_enabled) {
         h3_progress_emit(&progress, "video VAE load", 0, 36);
         preview_decoder = h3_acquire_video_decoder(
@@ -1995,25 +2005,68 @@ h3_result *h3_generate(h3_ctx *ctx, const char *prompt,
     }
     /* With the resident decoder and no resize, FFmpeg starts now and encodes
      * each chunk of frames as soon as it is final, overlapping the rest of
-     * the decode. It receives the same bytes as after a complete decode. */
+     * the decode. It receives the same bytes as after a complete decode.
+     * With the resident audio decoder as well, the audio VAE runs on its own
+     * thread during the video decode and FFmpeg gets the PCM when it is
+     * ready (same PCM as the serial order). */
     int stream_width = latent_w * H3_VAE_SPATIAL_RATIO;
     int stream_height = latent_h * H3_VAE_SPATIAL_RATIO;
     h3_frame_stream frame_stream = {
         NULL, (size_t)stream_width * (size_t)stream_height * 3
     };
-    if (preview_decoder && params->output_path && *params->output_path &&
-        stream_width == params->width && stream_height == params->height &&
-        temporal.video_t >= 7 && (temporal.video_t - 2) % 5 == 0) {
+    int streaming = preview_decoder && params->output_path &&
+        *params->output_path && stream_width == params->width &&
+        stream_height == params->height && temporal.video_t >= 7 &&
+        (temporal.video_t - 2) % 5 == 0;
+    int stream_frames = (temporal.video_t - 2) / 5 * 17 + 5;
+    h3_audio_job audio_job = {audio_decoder, audio, temporal.audio_t,
+                              &waveform, NULL, 0, ""};
+    pthread_t audio_thread;
+    int audio_threaded = 0;
+    h3_progress_emit(&progress, "audio VAE", 0, 7);
+    if (streaming && audio_decoder) {
         av_stream = h3_ffmpeg_av_stream_open(
-            params->output_path, (temporal.video_t - 2) / 5 * 17 + 5,
-            stream_width, stream_height, H3_FPS, waveform.pcm,
-            waveform.samples, waveform.channels, waveform.sample_rate,
+            params->output_path, stream_frames, stream_width, stream_height,
+            H3_FPS, NULL, 0, H3_AUDIO_VAE_CHANNELS, H3_AUDIO_VAE_SAMPLE_RATE,
             detail, sizeof(detail));
         if (!av_stream) {
             h3_set_error(ctx, "%s", detail);
             goto cleanup;
         }
         frame_stream.stream = av_stream;
+        audio_job.stream = av_stream;
+        audio_threaded = !pthread_create(&audio_thread, NULL, h3_audio_job_run,
+                                         &audio_job);
+    }
+    if (!audio_threaded) {
+        int audio_ok = audio_decoder ?
+            h3_audio_vae_decoder_decode(
+                audio_decoder, audio, temporal.audio_t,
+                h3_audio_vae_progress_bridge, &progress, &waveform,
+                detail, sizeof(detail)) :
+            h3_audio_vae_decode(audio_vae_path, "h3_shaders.metal", audio,
+                                temporal.audio_t, h3_audio_vae_progress_bridge,
+                                &progress, &waveform, detail, sizeof(detail));
+        if (!audio_ok) {
+            h3_set_error(ctx, "%s", detail);
+            goto cleanup;
+        }
+        if (av_stream && !h3_ffmpeg_av_stream_set_audio(
+                av_stream, waveform.pcm, waveform.samples)) {
+            h3_set_error(ctx, "cannot pass generated audio to FFmpeg");
+            goto cleanup;
+        }
+        if (streaming && !av_stream) {
+            av_stream = h3_ffmpeg_av_stream_open(
+                params->output_path, stream_frames, stream_width,
+                stream_height, H3_FPS, waveform.pcm, waveform.samples,
+                waveform.channels, waveform.sample_rate, detail, sizeof(detail));
+            if (!av_stream) {
+                h3_set_error(ctx, "%s", detail);
+                goto cleanup;
+            }
+            frame_stream.stream = av_stream;
+        }
     }
     h3_progress_emit(&progress, "video VAE", 0, 1);
     int video_ok = preview_decoder ?
@@ -2030,6 +2083,21 @@ h3_result *h3_generate(h3_ctx *ctx, const char *prompt,
             temporal.video_t, latent_h, latent_w,
             h3_vae_progress_bridge, &progress, &frames,
             detail, sizeof(detail));
+    if (audio_threaded) {
+        pthread_join(audio_thread, NULL);
+        h3_progress_emit(&progress, "audio VAE", 7, 7);
+        if (!audio_job.ok) {
+            h3_set_error(ctx, "%s", audio_job.detail);
+            goto cleanup;
+        }
+    }
+    if (!h3_dump_f32("audio_pcm", waveform.pcm,
+                     (size_t)waveform.channels * (size_t)waveform.samples)) {
+        h3_set_error(ctx, "cannot write H3_DUMP_DIR audio");
+        goto cleanup;
+    }
+    free(audio);
+    audio = NULL;
     if (!video_ok) {
         h3_set_error(ctx, "%s", detail);
         goto cleanup;

@@ -3463,6 +3463,97 @@ static int dit_denoise(h3_dit *dit, float *video_latent, float *audio_latent,
     return ok;
 }
 
+#ifdef H3_CUDA
+/* Euler sampler with the latent kept on the GPU, as patch rows in the
+ * transformer's input tensors. Each step runs the forward and the Euler
+ * update (h3_gpu_euler_velocity_f32, the host formula) on the GPU; the
+ * latent is read back only for a preview and at the end. Patchifying is a
+ * permutation, so the values equal the host sampler's. */
+static int denoise_euler_device(h3_dit *dit, float *video_latent,
+                                float *audio_latent,
+                                h3_dit_progress progress, void *progress_opaque,
+                                h3_dit_preview preview, void *preview_opaque,
+                                char *error, size_t error_size) {
+    size_t video_count = (size_t)dit->video_rows * VIDEO_PATCH;
+    size_t audio_count = (size_t)dit->audio_rows * AUDIO_CHANNELS;
+    size_t video_offset = (size_t)dit->video_condition_rows * VIDEO_PATCH;
+    size_t audio_offset = (size_t)dit->audio_condition_rows * AUDIO_CHANNELS;
+    float *video_rows = malloc(video_count * sizeof(*video_rows));
+    float *audio_rows = malloc(audio_count * sizeof(*audio_rows));
+    if (!video_rows || !audio_rows) {
+        fail(error, error_size, "out of memory packing DiT latents");
+        free(video_rows);
+        free(audio_rows);
+        return 0;
+    }
+    int ok = h3_dit_patchify_video(video_latent, VIDEO_CHANNELS, dit->latent_t,
+            dit->latent_h, dit->latent_w, video_rows, video_count) &&
+        h3_dit_pack_audio(audio_latent, AUDIO_CHANNELS, dit->audio_t,
+                          audio_rows, audio_count) &&
+        h3_gpu_tensor_write_f32_range(dit->video_input, video_offset,
+                                      video_rows, video_count) &&
+        h3_gpu_tensor_write_f32_range(dit->audio_input, audio_offset,
+                                      audio_rows, audio_count);
+    if (!ok) fail(error, error_size, "cannot pack/write DiT input latents");
+    for (int step = 0; step < dit->sigmas.steps && ok; step++) {
+        report(progress, progress_opaque, "denoise", step, dit->sigmas.steps);
+        float video_sigma = dit->sigmas.video[step];
+        float video_next = dit->sigmas.video[step + 1];
+        float audio_sigma = dit->sigmas.audio[step];
+        float audio_next = dit->sigmas.audio[step + 1];
+        if (!isfinite(video_sigma) || !isfinite(video_next) ||
+            !(video_sigma > video_next) || video_next < 0.0f ||
+            !isfinite(audio_sigma) || !isfinite(audio_next) ||
+            !(audio_sigma > audio_next) || audio_next < 0.0f) {
+            fail(error, error_size, "Euler solver rejected step %d", step);
+            ok = 0;
+            break;
+        }
+        ok = encode_forward(dit, step, 1, 0, 0, error, error_size) &&
+             gpu_op(dit, h3_gpu_euler_velocity_f32(dit->gpu, dit->video_input,
+                 video_offset, dit->video_output, video_count, video_sigma,
+                 video_next), error, error_size, "GPU video Euler step") &&
+             gpu_op(dit, h3_gpu_euler_velocity_f32(dit->gpu, dit->audio_input,
+                 audio_offset, dit->audio_output, audio_count, audio_sigma,
+                 audio_next), error, error_size, "GPU audio Euler step") &&
+             gpu_op(dit, h3_gpu_submit(dit->gpu), error, error_size,
+                    "submit DiT step");
+        if (ok && preview) {
+            ok = h3_gpu_tensor_read_f32_range(dit->video_input, video_offset,
+                                              video_rows, video_count) &&
+                 h3_dit_unpatchify_video(video_rows, VIDEO_CHANNELS,
+                     dit->latent_t, dit->latent_h, dit->latent_w, video_latent,
+                     h3_dit_video_elements(dit));
+            if (!ok) {
+                fail(error, error_size, "cannot read preview latent at step %d", step);
+            } else if (preview(step + 1, dit->sigmas.steps, video_latent,
+                               h3_dit_video_elements(dit), preview_opaque)) {
+                fail(error, error_size, "denoising preview stopped at step %d",
+                     step + 1);
+                ok = 0;
+            }
+        }
+        if (ok) report(progress, progress_opaque, "denoise", step + 1,
+                       dit->sigmas.steps);
+    }
+    if (ok) ok = h3_gpu_tensor_read_f32_range(dit->video_input, video_offset,
+                                              video_rows, video_count) &&
+                 h3_gpu_tensor_read_f32_range(dit->audio_input, audio_offset,
+                                              audio_rows, audio_count) &&
+                 h3_dit_unpatchify_video(video_rows, VIDEO_CHANNELS,
+                     dit->latent_t, dit->latent_h, dit->latent_w, video_latent,
+                     h3_dit_video_elements(dit)) &&
+                 h3_dit_unpack_audio(audio_rows, AUDIO_CHANNELS, dit->audio_t,
+                                     audio_latent, h3_dit_audio_elements(dit));
+    if (!ok && (!error || !*error))
+        fail(error, error_size, "cannot read DiT latents");
+    free(video_rows);
+    free(audio_rows);
+    h3_gpu_profile_mark(dit->gpu, "Euler denoise");
+    return ok;
+}
+#endif
+
 static int dit_denoise_euler_preview(
                          h3_dit *dit, float *video_latent,
                          float *audio_latent, int reuse_interval,
@@ -3482,6 +3573,12 @@ static int dit_denoise_euler_preview(
         fail(error, error_size, "invalid Euler denoising arguments");
         return 0;
     }
+#ifdef H3_CUDA
+    if (reuse_interval == 1 && !getenv("H3_HOST_SAMPLER"))
+        return denoise_euler_device(dit, video_latent, audio_latent, progress,
+                                    progress_opaque, preview, preview_opaque,
+                                    error, error_size);
+#endif
     if (gpu_sampler_requested(dit))
         return denoise_euler_gpu(dit, video_latent, audio_latent,
                                  reuse_interval, progress, progress_opaque,

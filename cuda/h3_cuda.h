@@ -48,6 +48,10 @@ int h3_gpu_vae_temporal_blend_f32(h3_gpu *gpu, h3_gpu_tensor *rgb,
                                   const h3_gpu_tensor *overlap, size_t frame_elements,
                                   int frames);
 int h3_gpu_vae_finalize_f32(h3_gpu *gpu, h3_gpu_tensor *rgb, size_t offset, size_t count);
+/* h3_euler_velocity_step on the GPU, same float operations. */
+int h3_gpu_euler_velocity_f32(h3_gpu *gpu, h3_gpu_tensor *sample, size_t offset,
+                              const h3_gpu_tensor *velocity, size_t count, float sigma,
+                              float sigma_next);
 int h3_gpu_vae_rgb8(h3_gpu *gpu, h3_gpu_tensor *output, const h3_gpu_tensor *rgb,
                     size_t offset, size_t count);
 typedef struct h3_gpu_vsa h3_gpu_vsa;

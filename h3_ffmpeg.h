@@ -60,6 +60,10 @@ h3_ffmpeg_av_stream *h3_ffmpeg_av_stream_open(
     char *error, size_t error_size);
 int h3_ffmpeg_av_stream_push(h3_ffmpeg_av_stream *stream,
                              const uint8_t *frames, size_t bytes);
+/* For a stream opened with pcm NULL and samples 0: hand over the PCM
+ * (valid until finish or abort). FFmpeg buffers the video until then. */
+int h3_ffmpeg_av_stream_set_audio(h3_ffmpeg_av_stream *stream,
+                                  const float *pcm, int samples);
 int h3_ffmpeg_av_stream_finish(h3_ffmpeg_av_stream *stream,
                                char *error, size_t error_size);
 void h3_ffmpeg_av_stream_abort(h3_ffmpeg_av_stream *stream);

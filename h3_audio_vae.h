@@ -5,6 +5,10 @@
 
 #include <stddef.h>
 
+/* Decoded waveform format: stereo at 32 kHz. */
+#define H3_AUDIO_VAE_CHANNELS 2
+#define H3_AUDIO_VAE_SAMPLE_RATE 32000
+
 typedef struct {
     int channels;
     int samples;

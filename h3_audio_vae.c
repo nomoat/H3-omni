@@ -2,6 +2,10 @@
 
 #include "h3_weights.h"
 
+#ifdef H3_CUDA
+#include "cuda/h3_cuda.h"
+#include <pthread.h>
+#endif
 #include <errno.h>
 #include <math.h>
 #include <stdarg.h>
@@ -14,12 +18,12 @@ enum {
     LATENT_CHANNELS = 32,
     LATENT_DIM = 2048,
     DECODER_DIM = 1024,
-    STEREO = 2,
+    STEREO = H3_AUDIO_VAE_CHANNELS,
     STAGES = 7,
     RESBLOCKS = 3,
     RESIDUAL_PAIRS = 3,
     FILTER_SIZE = 12,
-    SAMPLE_RATE = 32000,
+    SAMPLE_RATE = H3_AUDIO_VAE_SAMPLE_RATE,
     HOP_LENGTH = 800
 };
 
@@ -725,6 +729,7 @@ int h3_audio_vae_decode(const char *weight_directory,
 
 struct h3_audio_vae_decoder {
     h3_gpu *gpu;
+    int device;  /* CUDA device of gpu; load, decode and free run there */
     h3_gpu_tensor *upsample_filter;
     h3_gpu_tensor *downsample_filter;
     float mean[LATENT_CHANNELS];
@@ -747,7 +752,7 @@ static int normalize_resident_conv(audio_context *audio, audio_conv *conv,
     return ok;
 }
 
-h3_audio_vae_decoder *h3_audio_vae_decoder_load(
+static h3_audio_vae_decoder *decoder_load_here(
                         const char *weight_directory,
                         const char *shader_source_path,
                         char *error, size_t error_size) {
@@ -809,7 +814,7 @@ h3_audio_vae_decoder *h3_audio_vae_decoder_load(
     return decoder;
 }
 
-void h3_audio_vae_decoder_free(h3_audio_vae_decoder *decoder) {
+static void decoder_free_here(h3_audio_vae_decoder *decoder) {
     if (!decoder) return;
     free_conv(&decoder->projection);
     free_conv(&decoder->pre);
@@ -823,7 +828,7 @@ void h3_audio_vae_decoder_free(h3_audio_vae_decoder *decoder) {
     free(decoder);
 }
 
-int h3_audio_vae_decoder_decode(h3_audio_vae_decoder *decoder,
+static int decoder_decode_here(h3_audio_vae_decoder *decoder,
                                 const float *normalized_latent,
                                 int latent_length,
                                 h3_audio_vae_progress progress,
@@ -902,6 +907,114 @@ static void encoder_trace(audio_context *audio, const char *label,
         fprintf(stderr, " % .7g", values[index]);
     fputc('\n', stderr);
     free(values);
+}
+
+/* With H3_GPUS=N > 1 the resident decoder lives on the last GPU, so it can
+ * run during the video VAE without sharing GPU 0. Every call then runs on a
+ * thread with that device selected. */
+typedef struct {
+    int action;  /* 0 load, 1 decode, 2 free */
+    const char *weight_directory;
+    const char *shader_source_path;
+    h3_audio_vae_decoder *decoder;
+    const float *latent;
+    int latent_length;
+    h3_audio_vae_progress progress;
+    void *progress_opaque;
+    h3_audio_waveform *output;
+    int device;
+    int ok;
+    char *error;
+    size_t error_size;
+} decoder_call;
+
+static void *decoder_call_run(void *opaque) {
+    decoder_call *call = opaque;
+#ifdef H3_CUDA
+    if (!h3_gpu_select_device(call->device, call->error, call->error_size))
+        return NULL;
+#endif
+    if (call->action == 0) {
+        call->decoder = decoder_load_here(call->weight_directory,
+                                          call->shader_source_path,
+                                          call->error, call->error_size);
+        if (call->decoder) call->decoder->device = call->device;
+        call->ok = call->decoder != NULL;
+    } else if (call->action == 1) {
+        call->ok = decoder_decode_here(call->decoder, call->latent,
+                                       call->latent_length, call->progress,
+                                       call->progress_opaque, call->output,
+                                       call->error, call->error_size);
+    } else {
+        decoder_free_here(call->decoder);
+        call->ok = 1;
+    }
+    return NULL;
+}
+
+/* Runs the call here for device 0, otherwise on a thread for its device. */
+static int decoder_call_dispatch(decoder_call *call) {
+#ifdef H3_CUDA
+    if (call->device) {
+        pthread_t thread;
+        if (pthread_create(&thread, NULL, decoder_call_run, call)) {
+            fail(call->error, call->error_size, "cannot start audio VAE thread");
+            return 0;
+        }
+        pthread_join(thread, NULL);
+        return call->ok;
+    }
+#endif
+    decoder_call_run(call);
+    return call->ok;
+}
+
+static int resident_device(void) {
+#ifdef H3_CUDA
+    const char *value = getenv("H3_GPUS");
+    long world = value && *value ? strtol(value, NULL, 10) : 1;
+    int devices = h3_gpu_device_count();
+    if (world > devices) world = devices;
+    return world > 1 ? (int)world - 1 : 0;
+#else
+    return 0;
+#endif
+}
+
+h3_audio_vae_decoder *h3_audio_vae_decoder_load(
+                        const char *weight_directory,
+                        const char *shader_source_path,
+                        char *error, size_t error_size) {
+    decoder_call call = {.action = 0, .weight_directory = weight_directory,
+                         .shader_source_path = shader_source_path,
+                         .device = resident_device(), .error = error,
+                         .error_size = error_size};
+    return decoder_call_dispatch(&call) ? call.decoder : NULL;
+}
+
+int h3_audio_vae_decoder_decode(h3_audio_vae_decoder *decoder,
+                                const float *normalized_latent,
+                                int latent_length,
+                                h3_audio_vae_progress progress,
+                                void *progress_opaque,
+                                h3_audio_waveform *output,
+                                char *error, size_t error_size) {
+    decoder_call call = {.action = 1, .decoder = decoder,
+                         .latent = normalized_latent,
+                         .latent_length = latent_length, .progress = progress,
+                         .progress_opaque = progress_opaque, .output = output,
+                         .device = decoder ? decoder->device : 0,
+                         .error = error, .error_size = error_size};
+    return decoder_call_dispatch(&call);
+}
+
+void h3_audio_vae_decoder_free(h3_audio_vae_decoder *decoder) {
+    if (!decoder) return;
+    char error[256];
+    decoder_call call = {.action = 2, .decoder = decoder,
+                         .device = decoder->device, .error = error,
+                         .error_size = sizeof(error)};
+    decoder_call_dispatch(&call);
 }
 
 static int encoder_conv_length(uint32_t length, uint32_t kernel,
