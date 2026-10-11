@@ -56,7 +56,7 @@ the archived build source. Documentation and compact reports were added
 afterward. Later, Chinese test prompts in `tests/pytorch/text.py` and
 `tests/test_tokenizer.c` were rewritten as escape sequences (the same bytes at
 run time), and Chinese text in compact JSON/log reports as `\uXXXX` escapes, so
-the repository contains only ASCII-range English text.
+the repository contains no Chinese text.
 
 ## Contract
 
