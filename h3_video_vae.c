@@ -7,9 +7,7 @@
 
 #include <errno.h>
 #include <math.h>
-#ifdef H3_CUDA
 #include <pthread.h>
-#endif
 #include <stdarg.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -915,12 +913,58 @@ static int unpack_frames(vae_context *vae, h3_video_frames *output,
 
 #ifdef H3_CUDA
 /* rgb holds whole pixels (count is a multiple of 3). */
-static void finalize_pixel_range(float *rgb, size_t count) {
+/* Host-side parallel loop for the per-frame and per-element passes of the
+ * tile pipeline: [0, count) split into contiguous ranges, one thread each.
+ * Every element is computed exactly as in a single pass. The thread count is
+ * H3_VAE_HOST_THREADS (default 8). */
+typedef void (*range_fn)(void *context, size_t begin, size_t end);
+
+typedef struct {
+    range_fn fn;
+    void *context;
+    size_t begin;
+    size_t end;
+} range_job;
+
+static void *range_thread(void *opaque) {
+    range_job *job = opaque;
+    job->fn(job->context, job->begin, job->end);
+    return NULL;
+}
+
+static void parallel_ranges(size_t count, size_t minimum, range_fn fn,
+                            void *context) {
+    enum { MAX_HOST_THREADS = 32 };
+    const char *value = getenv("H3_VAE_HOST_THREADS");
+    long threads = value && *value ? strtol(value, NULL, 10) : 8;
+    if (threads > MAX_HOST_THREADS) threads = MAX_HOST_THREADS;
+    if (minimum && (size_t)threads > count / minimum) threads = (long)(count / minimum);
+    if (threads <= 1) {
+        fn(context, 0, count);
+        return;
+    }
+    range_job jobs[MAX_HOST_THREADS];
+    pthread_t ids[MAX_HOST_THREADS];
+    int started[MAX_HOST_THREADS] = {0};
+    for (long index = 0; index < threads; index++) {
+        jobs[index] = (range_job){fn, context, count * (size_t)index / (size_t)threads,
+                                  count * (size_t)(index + 1) / (size_t)threads};
+        if (index) started[index] = !pthread_create(&ids[index], NULL, range_thread,
+                                                    &jobs[index]);
+        if (index && !started[index]) range_thread(&jobs[index]);
+    }
+    range_thread(&jobs[0]);
+    for (long index = 1; index < threads; index++)
+        if (started[index]) pthread_join(ids[index], NULL);
+}
+
+static void finalize_pixels(void *context, size_t begin, size_t end) {
     /* The reference blends raw decoder values before pixel normalization
      * and clipping. Clipping individual tiles changes overlap pixels. */
     static const float mean[] = {0.485f, 0.456f, 0.406f};
     static const float deviation[] = {0.229f, 0.224f, 0.225f};
-    for (size_t index = 0; index < count; ++index) {
+    float *rgb = context;
+    for (size_t index = begin; index < end; ++index) {
         float value = rgb[index] * deviation[index % 3] + mean[index % 3];
         if (value < 0.0f) value = 0.0f;
         if (value > 1.0f) value = 1.0f;
@@ -928,14 +972,29 @@ static void finalize_pixel_range(float *rgb, size_t count) {
     }
 }
 
+static void finalize_pixel_range(float *rgb, size_t count) {
+    parallel_ranges(count, 1u << 20, finalize_pixels, rgb);
+}
+
 /* Same conversion as h3.c's RGB24 output. */
-static void pixels_to_rgb8(const float *rgb, uint8_t *output, size_t count) {
-    for (size_t index = 0; index < count; index++) {
-        float scaled = rgb[index] * 255.0f;
+typedef struct {
+    const float *rgb;
+    uint8_t *output;
+} rgb8_job;
+
+static void rgb8_range(void *context, size_t begin, size_t end) {
+    rgb8_job *job = context;
+    for (size_t index = begin; index < end; index++) {
+        float scaled = job->rgb[index] * 255.0f;
         if (scaled < 0.0f) scaled = 0.0f;
         if (scaled > 255.0f) scaled = 255.0f;
-        output[index] = (uint8_t)lrintf(scaled);
+        job->output[index] = (uint8_t)lrintf(scaled);
     }
+}
+
+static void pixels_to_rgb8(const float *rgb, uint8_t *output, size_t count) {
+    rgb8_job job = {rgb, output};
+    parallel_ranges(count, 1u << 20, rgb8_range, &job);
 }
 
 static void finalize_video_pixels(h3_video_frames *output) {
@@ -1065,9 +1124,9 @@ static float *extract_latent_tile(const float *latent, int full_t,
 /* Write the region of tile `index` that it owns, blended with the tiles
  * above and to the left. It reads only those three tiles, so tiles can be
  * stitched in row-major order as they arrive. */
-static void stitch_tile(float *const *tiles, const tile_axis *y_axis,
-                        const tile_axis *x_axis, int frame_count, int index,
-                        float *rgb) {
+static void stitch_tile_frames(float *const *tiles, const tile_axis *y_axis,
+                               const tile_axis *x_axis, int first_frame,
+                               int end_frame, int index, float *rgb) {
     int full_h = y_axis->starts[y_axis->count - 1] + y_axis->length;
     int full_w = x_axis->starts[x_axis->count - 1] + x_axis->length;
     int tile_y = index / x_axis->count;
@@ -1081,7 +1140,7 @@ static void stitch_tile(float *const *tiles, const tile_axis *y_axis,
         (tile_y + 1 < y_axis->count ? y_axis->overlaps[tile_y] : 0);
     int keep_w = x_axis->length -
         (tile_x + 1 < x_axis->count ? x_axis->overlaps[tile_x] : 0);
-    for (int frame = 0; frame < frame_count; frame++)
+    for (int frame = first_frame; frame < end_frame; frame++)
         for (int y = 0; y < keep_h; y++)
             for (int x = 0; x < keep_w; x++)
                 for (int channel = 0; channel < 3; channel++) {
@@ -1118,6 +1177,33 @@ static void stitch_tile(float *const *tiles, const tile_axis *y_axis,
                         (size_t)channel;
                     rgb[destination] = value;
                 }
+}
+
+#ifdef H3_CUDA
+typedef struct {
+    float *const *tiles;
+    const tile_axis *y_axis;
+    const tile_axis *x_axis;
+    int index;
+    float *rgb;
+} stitch_job;
+
+static void stitch_range(void *context, size_t begin, size_t end) {
+    stitch_job *job = context;
+    stitch_tile_frames(job->tiles, job->y_axis, job->x_axis, (int)begin,
+                       (int)end, job->index, job->rgb);
+}
+#endif
+
+static void stitch_tile(float *const *tiles, const tile_axis *y_axis,
+                        const tile_axis *x_axis, int frame_count, int index,
+                        float *rgb) {
+#ifdef H3_CUDA
+    stitch_job job = {tiles, y_axis, x_axis, index, rgb};
+    parallel_ranges((size_t)frame_count, 1, stitch_range, &job);
+#else
+    stitch_tile_frames(tiles, y_axis, x_axis, 0, frame_count, index, rgb);
+#endif
 }
 
 static int stitch_tiles(float **tiles, const tile_axis *y_axis,
@@ -1576,18 +1662,33 @@ static void emit_final_frames(video_sink_state *state, int first_frame,
                      frame_count);
 }
 
+/* The first five frames of a chunk fade in over the previous chunk's
+ * overlap: frame f weighs the new chunk by f / 5. */
+typedef struct {
+    float *rgb;
+    const float *overlap;
+    size_t frame_elements;
+} temporal_blend_job;
+
+static void temporal_blend_range(void *context, size_t begin, size_t end) {
+    temporal_blend_job *job = context;
+    for (size_t index = begin; index < end; index++) {
+        float alpha = (float)(index / job->frame_elements) / 5.0f;
+        job->rgb[index] = job->overlap[index] * (1.0f - alpha) +
+                          job->rgb[index] * alpha;
+    }
+}
+
 static int video_chunk_sink(vae_pipeline *pipeline, int chunk,
                             h3_video_frames *decoded, char *error,
                             size_t error_size) {
     (void)error; (void)error_size;
     video_sink_state *state = pipeline->sink_state;
     size_t frame_elements = state->frame_elements;
-    if (chunk) for (int frame = 0; frame < 5; frame++) {
-        float alpha = (float)frame / 5.0f;
-        size_t base = (size_t)frame * frame_elements;
-        for (size_t index = 0; index < frame_elements; index++)
-            decoded->rgb[base + index] = state->temporal_overlap[base + index] *
-                (1.0f - alpha) + decoded->rgb[base + index] * alpha;
+    if (chunk) {
+        temporal_blend_job job = {decoded->rgb, state->temporal_overlap,
+                                  frame_elements};
+        parallel_ranges(5 * frame_elements, 1u << 20, temporal_blend_range, &job);
     }
     float *final_frames = state->final_rgb + (size_t)chunk * 17 * frame_elements;
     memcpy(final_frames, decoded->rgb, 17 * frame_elements * sizeof(float));
