@@ -1,0 +1,7 @@
+{
+  "passed": true,
+  "source_tensors": 688,
+  "native_tensors": 585,
+  "learned_gates": 50,
+  "native_parameters": 35049751312
+}

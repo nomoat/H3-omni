@@ -1,0 +1,97 @@
+{
+  "passed": true,
+  "cases": [
+    {
+      "case": "missing manifest keeps original H3",
+      "passed": true
+    },
+    {
+      "case": "vsa/video: exact four-step sigmas and Euler",
+      "passed": true,
+      "sigmas": [
+        0.9999165534973145,
+        0.9728325009346008,
+        0.9230769276618958,
+        0.800000011920929,
+        0.0
+      ]
+    },
+    {
+      "case": "vsa/audio: exact four-step sigmas and Euler",
+      "passed": true,
+      "sigmas": [
+        0.9996663928031921,
+        0.8995195627212524,
+        0.75,
+        0.5,
+        0.0
+      ]
+    },
+    {
+      "case": "dense/video: exact four-step sigmas and Euler",
+      "passed": true,
+      "sigmas": [
+        0.9999165534973145,
+        0.9728325009346008,
+        0.9230769276618958,
+        0.800000011920929,
+        0.0
+      ]
+    },
+    {
+      "case": "dense/audio: exact four-step sigmas and Euler",
+      "passed": true,
+      "sigmas": [
+        0.9996663928031921,
+        0.8995195627212524,
+        0.75,
+        0.5,
+        0.0
+      ]
+    },
+    {
+      "case": "reject attention=unknown",
+      "passed": true
+    },
+    {
+      "case": "reject task=ref2va",
+      "passed": true
+    },
+    {
+      "case": "reject guidance_scale=7.5",
+      "passed": true
+    },
+    {
+      "case": "reject dmd_denoising_steps=[1000, 750, 500, 250]",
+      "passed": true
+    },
+    {
+      "case": "reject dmd_denoising_steps=[999.0, 749.0, 500.0, 250.0]",
+      "passed": true
+    },
+    {
+      "case": "reject video_shift=3",
+      "passed": true
+    },
+    {
+      "case": "reject audio_shift=12",
+      "passed": true
+    },
+    {
+      "case": "reject tile_size=128",
+      "passed": true
+    },
+    {
+      "case": "reject sparsity=0.8",
+      "passed": true
+    },
+    {
+      "case": "reject invalid manifest syntax/shape/size",
+      "passed": true
+    },
+    {
+      "case": "exported derived RoPE buffer equals official reference",
+      "passed": true
+    }
+  ]
+}

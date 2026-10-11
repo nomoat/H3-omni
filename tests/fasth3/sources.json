@@ -1,0 +1,40 @@
+{
+  "checkpoint": {
+    "repository": "FastVideo/FastVideo-FastH3-4-step-Preview-v1-VSA-DataFree",
+    "revision": "5ea076f35b84da4c3c82217112fa733d8eea2ae1",
+    "variant": "full transformer; not the LoRA adapter"
+  },
+  "fastvideo": {
+    "repository": "https://github.com/hao-ai-lab/FastVideo",
+    "revision": "d5253fd71055927f12aa6c4aa679b93a00238851",
+    "scope": "unchanged tile/mask helpers and Hopper sparse forward arithmetic"
+  },
+  "diffusers": {
+    "repository": "https://github.com/huggingface/diffusers",
+    "revision": "1d5d056ecff3a8c1d887a7dd1aa66ca4a0323458"
+  },
+  "reduction_order": {
+    "repository": "https://github.com/pytorch/pytorch",
+    "revision": "v2.9.1",
+    "files": [
+      "aten/src/ATen/native/cuda/Reduce.cuh",
+      "aten/src/ATen/native/cuda/PersistentSoftmax.cuh",
+      "aten/src/ATen/native/cuda/SoftMax.cu",
+      "aten/src/ATen/native/cuda/block_reduce.cuh"
+    ],
+    "scope": "Native pooling and softmax preserve the reference's FP32 addition order and BF16 rounding boundaries. No ATen runtime is linked."
+  },
+  "base_components": {
+    "repository": "MiniMaxAI/MiniMax-H3",
+    "revision": "42ed227ee7df40d41602854ae760620d6eb651fe",
+    "components": ["FL2VA/tokenizer", "FL2VA/text_encoder", "FL2VA/video_vae", "FL2VA/audio_vae"]
+  },
+  "environment": {
+    "gpu": "NVIDIA H200",
+    "container": "/data0/apptainer/pytorch_291_cu128.sif",
+    "torch": "2.9.1",
+    "cuda": "12.8",
+    "native_arch": "sm_90; sparse Hopper kernel sm_90a"
+  },
+  "validation_scope": "Independent math-SDPA primitive checks. Full model uses independent PyTorch orchestration and unconverted weights, sharing only the separately checked upstream Hopper sparse kernel. Full FastVideo application and B200 latency are not reproduced."
+}

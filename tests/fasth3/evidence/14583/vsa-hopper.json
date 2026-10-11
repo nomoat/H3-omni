@@ -1,0 +1,186 @@
+{
+  "passed": true,
+  "oracle": "hopper",
+  "cases": [
+    {
+      "text": 3,
+      "audio": 11,
+      "shape": [
+        1,
+        2,
+        3
+      ],
+      "heads": 2,
+      "gate_scale": 0.0,
+      "relative_l2": 0.0,
+      "normalized_max": 0.0,
+      "exact": true,
+      "passed": true
+    },
+    {
+      "text": 3,
+      "audio": 11,
+      "shape": [
+        1,
+        2,
+        3
+      ],
+      "heads": 2,
+      "gate_scale": 0.3,
+      "relative_l2": 0.0,
+      "normalized_max": 0.0,
+      "exact": true,
+      "passed": true
+    },
+    {
+      "text": 65,
+      "audio": 67,
+      "shape": [
+        5,
+        7,
+        9
+      ],
+      "heads": 4,
+      "gate_scale": 0.0,
+      "relative_l2": 0.0,
+      "normalized_max": 0.0,
+      "exact": true,
+      "passed": true
+    },
+    {
+      "text": 65,
+      "audio": 67,
+      "shape": [
+        5,
+        7,
+        9
+      ],
+      "heads": 4,
+      "gate_scale": 0.3,
+      "relative_l2": 0.0,
+      "normalized_max": 0.0,
+      "exact": true,
+      "passed": true
+    },
+    {
+      "text": 17,
+      "audio": 30,
+      "shape": [
+        7,
+        8,
+        8
+      ],
+      "heads": 56,
+      "gate_scale": 0.0,
+      "relative_l2": 0.0,
+      "normalized_max": 0.0,
+      "exact": true,
+      "passed": true
+    },
+    {
+      "text": 17,
+      "audio": 30,
+      "shape": [
+        7,
+        8,
+        8
+      ],
+      "heads": 56,
+      "gate_scale": 0.3,
+      "relative_l2": 0.0,
+      "normalized_max": 0.0,
+      "exact": true,
+      "passed": true
+    },
+    {
+      "text": 5,
+      "audio": 13,
+      "shape": [
+        4,
+        4,
+        44
+      ],
+      "heads": 4,
+      "gate_scale": 0.0,
+      "relative_l2": 0.0,
+      "normalized_max": 0.0,
+      "exact": true,
+      "passed": true
+    },
+    {
+      "text": 5,
+      "audio": 13,
+      "shape": [
+        4,
+        4,
+        44
+      ],
+      "heads": 4,
+      "gate_scale": 0.3,
+      "relative_l2": 0.0,
+      "normalized_max": 0.0,
+      "exact": true,
+      "passed": true
+    },
+    {
+      "text": 17,
+      "audio": 448,
+      "shape": [
+        37,
+        15,
+        27
+      ],
+      "heads": 4,
+      "gate_scale": 0.0,
+      "relative_l2": 0.0,
+      "normalized_max": 0.0,
+      "exact": true,
+      "passed": true
+    },
+    {
+      "text": 17,
+      "audio": 448,
+      "shape": [
+        37,
+        15,
+        27
+      ],
+      "heads": 4,
+      "gate_scale": 0.3,
+      "relative_l2": 0.0,
+      "normalized_max": 0.0,
+      "exact": true,
+      "passed": true
+    },
+    {
+      "text": 3,
+      "audio": 11,
+      "shape": [
+        4,
+        4,
+        8193
+      ],
+      "heads": 1,
+      "gate_scale": 0.0,
+      "relative_l2": 0.0,
+      "normalized_max": 0.0,
+      "exact": true,
+      "passed": true
+    },
+    {
+      "text": 3,
+      "audio": 11,
+      "shape": [
+        4,
+        4,
+        8193
+      ],
+      "heads": 1,
+      "gate_scale": 0.3,
+      "relative_l2": 0.0,
+      "normalized_max": 0.0,
+      "exact": true,
+      "passed": true
+    }
+  ]
+}

@@ -1,4 +1,5 @@
 #include "h3_host.h"
+#include "h3_fasth3.h"
 
 #ifndef H3_CUDA
 #include <Accelerate/Accelerate.h>
@@ -171,6 +172,27 @@ int h3_serving_schedule_build(int evaluations, h3_sigma_schedule *schedule) {
     }
     schedule->video[evaluations] = 0.0f;
     schedule->audio[evaluations] = 0.0f;
+    return 1;
+}
+
+int h3_fasth3_schedule_build(const h3_fasth3_config *config,
+                            h3_sigma_schedule *schedule) {
+    if (!config || !schedule ||
+        (config->kind != H3_FASTH3_DENSE && config->kind != H3_FASTH3_VSA) ||
+        config->steps != 4 || config->video_shift != 12.0f ||
+        config->audio_shift != 3.0f) return 0;
+    const int rungs[] = {999, 749, 500, 250};
+    for (int i = 0; i < 4; ++i) if (config->rungs[i] != rungs[i]) return 0;
+    memset(schedule, 0, sizeof(*schedule));
+    schedule->steps = 4;
+    for (int i = 0; i < 4; ++i) {
+        /* Match FastVideo: Python division, FP32 base, one shift per modality. */
+        float base = (float)((double)config->rungs[i] / 1000.0);
+        schedule->video[i] = config->video_shift * base /
+            (1.0f + (config->video_shift - 1.0f) * base);
+        schedule->audio[i] = config->audio_shift * base /
+            (1.0f + (config->audio_shift - 1.0f) * base);
+    }
     return 1;
 }
 

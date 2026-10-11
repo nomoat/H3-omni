@@ -1,0 +1,15 @@
+{"event":"context","seconds":1.641772}
+h3: resident text encoder loaded
+h3: conditioning cache miss; stored exact BF16
+h3: prepared DiT cache miss; model retained
+h3: resident audio VAE loaded
+h3: video VAE cache miss; decoder retained
+{"event":"request","name":"short","start":5267564.288476,"seconds":192.417294,"text_encoder":1,"audio_decoder":1,"video_decoder":1,"dit":1,"phases":[{"phase":"tokenizer","first":0.000011,"last":0.252365},{"phase":"text encoder load","first":2.921017,"last":71.355657},{"phase":"text encoder","first":71.355798,"last":71.470490},{"phase":"refine text","first":72.628587,"last":75.282252},{"phase":"precompute AdaLN","first":76.075878,"last":101.733246},{"phase":"load transformer core","first":103.321626,"last":166.107367},{"phase":"denoise","first":166.294400,"last":166.514353},{"phase":"audio VAE","first":179.649013,"last":179.826658},{"phase":"video VAE load","first":180.261267,"last":190.962969},{"phase":"FFmpeg","first":191.778629,"last":192.416674}]}
+h3: conditioning cache miss; stored exact BF16
+h3: resident DiT rebound to new request
+h3: video VAE cache hit
+{"event":"request","name":"wide","start":5267756.843948,"seconds":7.095134,"text_encoder":1,"audio_decoder":1,"video_decoder":1,"dit":1,"phases":[{"phase":"tokenizer","first":0.000010,"last":0.000011},{"phase":"text encoder","first":0.000111,"last":0.036310},{"phase":"refine text","first":0.036575,"last":0.045325},{"phase":"precompute AdaLN","first":0.045325,"last":0.045325},{"phase":"load transformer core","first":0.064223,"last":0.064229},{"phase":"denoise","first":0.072411,"last":1.002483},{"phase":"audio VAE","first":1.800126,"last":1.832783},{"phase":"video VAE load","first":2.367884,"last":2.367961},{"phase":"FFmpeg","first":5.247376,"last":7.087502}]}
+h3: conditioning cache miss; stored exact BF16
+h3: resident DiT rebound to new request
+h3: video VAE cache hit
+{"event":"request","name":"again","start":5267764.075293,"seconds":2.607120,"text_encoder":1,"audio_decoder":1,"video_decoder":1,"dit":1,"phases":[{"phase":"tokenizer","first":0.000012,"last":0.000013},{"phase":"text encoder","first":0.000087,"last":0.023689},{"phase":"refine text","first":0.023905,"last":0.024622},{"phase":"precompute AdaLN","first":0.024623,"last":0.024623},{"phase":"load transformer core","first":0.042275,"last":0.042281},{"phase":"denoise","first":0.043325,"last":0.230421},{"phase":"audio VAE","first":0.835259,"last":0.867875},{"phase":"video VAE load","first":1.161039,"last":1.161252},{"phase":"FFmpeg","first":1.974937,"last":2.607114}]}

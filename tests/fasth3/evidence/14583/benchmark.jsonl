@@ -1,0 +1,11 @@
+{"event":"context","seconds":4.586540}
+h3: resident text encoder loaded
+h3: conditioning cache miss; stored exact BF16
+h3: prepared DiT cache miss; model retained
+h3: resident audio VAE loaded
+h3: video VAE cache miss; decoder retained
+{"event":"request","name":"cold","start":4022795.105769,"seconds":258.926846,"text_encoder":1,"audio_decoder":1,"video_decoder":1,"dit":1,"phases":[{"phase":"tokenizer","first":0.000010,"last":0.309707},{"phase":"text encoder load","first":5.202543,"last":94.797750},{"phase":"text encoder","first":94.797877,"last":94.957269},{"phase":"refine text","first":96.037388,"last":96.735632},{"phase":"precompute AdaLN","first":97.022663,"last":118.451062},{"phase":"load transformer core","first":119.674600,"last":193.441044},{"phase":"denoise","first":193.678539,"last":198.951284},{"phase":"audio VAE","first":211.811709,"last":212.119513},{"phase":"video VAE load","first":212.177254,"last":241.936005},{"phase":"FFmpeg","first":253.500546,"last":258.917144}]}
+h3: conditioning cache hit
+h3: prepared DiT cache hit
+h3: video VAE cache hit
+{"event":"request","name":"warm","start":4023054.149230,"seconds":22.533215,"text_encoder":1,"audio_decoder":1,"video_decoder":1,"dit":1,"phases":[{"phase":"denoise","first":0.024849,"last":5.155673},{"phase":"audio VAE","first":5.155676,"last":5.294799},{"phase":"video VAE load","first":5.296553,"last":5.296663},{"phase":"FFmpeg","first":16.795134,"last":22.530957}]}

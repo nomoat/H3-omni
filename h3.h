@@ -19,6 +19,8 @@ extern "C" {
 
 typedef struct h3_ctx h3_ctx;
 typedef struct h3_result h3_result;
+/* Trained evaluation count for a FastH3 export, or H3_DEFAULT_STEPS. */
+int h3_model_default_steps(const h3_ctx *ctx);
 
 typedef struct {
     size_t embedding_entries;

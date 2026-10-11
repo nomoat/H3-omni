@@ -1,0 +1,4 @@
+{
+  "passed": true,
+  "error": "h3: FastH3 VSA requires a CUDA build with VSA=1\n"
+}

@@ -4,6 +4,18 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
+typedef struct h3_gpu_vsa h3_gpu_vsa;
+h3_gpu_vsa *h3_gpu_vsa_new(h3_gpu *gpu, uint32_t text_rows, uint32_t audio_rows,
+                           uint32_t time, uint32_t height, uint32_t width, uint32_t heads);
+void h3_gpu_vsa_free(h3_gpu_vsa *vsa);
+int h3_gpu_vsa_bf16(h3_gpu_vsa *vsa, h3_gpu_tensor *output,
+                     const h3_gpu_tensor *query, const h3_gpu_tensor *key,
+                     const h3_gpu_tensor *value, const h3_gpu_tensor *gate);
+/* FastH3 text refinement needs FA2 rounding, independent of H3_FLASH3. */
+int h3_gpu_sdpa_fa2_bf16(h3_gpu *gpu, h3_gpu_tensor *output,
+                         const h3_gpu_tensor *query, const h3_gpu_tensor *key,
+                         const h3_gpu_tensor *value, uint32_t tokens,
+                         uint32_t heads, uint32_t head_dim, float scale);
 /* Qwen rounds the normalized activation before multiplying by its BF16 weight. */
 int h3_gpu_qwen_rms_norm_bf16(h3_gpu *gpu, h3_gpu_tensor *output,
                               const h3_gpu_tensor *input,

@@ -1,0 +1,307 @@
+{
+  "passed": true,
+  "cases": [
+    {
+      "case": "wrong_steps",
+      "passed": true,
+      "error": "h3: FastH3 Preview v1 requires exactly 4 evaluations and text-only input\n"
+    },
+    {
+      "case": "reuse",
+      "passed": true,
+      "error": "h3: CUDA phase one requires 50 layers, no reuse, no token reduction, no quantization or internal scaling\n"
+    },
+    {
+      "case": "layers",
+      "passed": true,
+      "error": "h3: CUDA phase one requires 50 layers, no reuse, no token reduction, no quantization or internal scaling\n"
+    },
+    {
+      "case": "conditioning",
+      "passed": true,
+      "error": "h3: FastH3 Preview v1 requires exactly 4 evaluations and text-only input\n"
+    },
+    {
+      "case": "CLI automatic four steps and MP4/audio",
+      "passed": true,
+      "seconds": 165.83937195222825,
+      "video": {
+        "index": 0,
+        "codec_name": "h264",
+        "codec_long_name": "H.264 / AVC / MPEG-4 AVC / MPEG-4 part 10",
+        "profile": "High",
+        "codec_type": "video",
+        "codec_tag_string": "avc1",
+        "codec_tag": "0x31637661",
+        "width": 256,
+        "height": 256,
+        "coded_width": 256,
+        "coded_height": 256,
+        "closed_captions": 0,
+        "film_grain": 0,
+        "has_b_frames": 2,
+        "pix_fmt": "yuv420p",
+        "level": 13,
+        "chroma_location": "left",
+        "field_order": "progressive",
+        "refs": 4,
+        "is_avc": "true",
+        "nal_length_size": "4",
+        "id": "0x1",
+        "r_frame_rate": "24/1",
+        "avg_frame_rate": "24/1",
+        "time_base": "1/12288",
+        "start_pts": 0,
+        "start_time": "0.000000",
+        "duration_ts": 11264,
+        "duration": "0.916667",
+        "bit_rate": "2068267",
+        "bits_per_raw_sample": "8",
+        "nb_frames": "22",
+        "nb_read_frames": "22",
+        "extradata_size": 45,
+        "disposition": {
+          "default": 1,
+          "dub": 0,
+          "original": 0,
+          "comment": 0,
+          "lyrics": 0,
+          "karaoke": 0,
+          "forced": 0,
+          "hearing_impaired": 0,
+          "visual_impaired": 0,
+          "clean_effects": 0,
+          "attached_pic": 0,
+          "timed_thumbnails": 0,
+          "non_diegetic": 0,
+          "captions": 0,
+          "descriptions": 0,
+          "metadata": 0,
+          "dependent": 0,
+          "still_image": 0
+        },
+        "tags": {
+          "language": "und",
+          "handler_name": "VideoHandler",
+          "vendor_id": "[0][0][0][0]",
+          "encoder": "Lavc61.3.100 libx264"
+        }
+      },
+      "audio": {
+        "index": 1,
+        "codec_name": "aac",
+        "codec_long_name": "AAC (Advanced Audio Coding)",
+        "profile": "LC",
+        "codec_type": "audio",
+        "codec_tag_string": "mp4a",
+        "codec_tag": "0x6134706d",
+        "sample_fmt": "fltp",
+        "sample_rate": "32000",
+        "channels": 2,
+        "channel_layout": "stereo",
+        "bits_per_sample": 0,
+        "initial_padding": 0,
+        "id": "0x2",
+        "r_frame_rate": "0/0",
+        "avg_frame_rate": "0/0",
+        "time_base": "1/32000",
+        "start_pts": 0,
+        "start_time": "0.000000",
+        "duration_ts": 29600,
+        "duration": "0.925000",
+        "bit_rate": "166721",
+        "nb_frames": "30",
+        "nb_read_frames": "29",
+        "extradata_size": 5,
+        "disposition": {
+          "default": 1,
+          "dub": 0,
+          "original": 0,
+          "comment": 0,
+          "lyrics": 0,
+          "karaoke": 0,
+          "forced": 0,
+          "hearing_impaired": 0,
+          "visual_impaired": 0,
+          "clean_effects": 0,
+          "attached_pic": 0,
+          "timed_thumbnails": 0,
+          "non_diegetic": 0,
+          "captions": 0,
+          "descriptions": 0,
+          "metadata": 0,
+          "dependent": 0,
+          "still_image": 0
+        },
+        "tags": {
+          "language": "und",
+          "handler_name": "SoundHandler",
+          "vendor_id": "[0][0][0][0]"
+        }
+      }
+    },
+    {
+      "case": "resident short equals fresh CLI",
+      "passed": true,
+      "comparison": {
+        "video_latent.f32": {
+          "equal": true,
+          "bytes": 172032,
+          "finite": true
+        },
+        "audio_latent.f32": {
+          "equal": true,
+          "bytes": 9472,
+          "finite": true
+        },
+        "audio_pcm.f32": {
+          "equal": true,
+          "bytes": 236800,
+          "finite": true
+        },
+        "video_rgb.f32": {
+          "equal": true,
+          "bytes": 17301504,
+          "finite": true
+        },
+        "output.mp4": {
+          "equal": true,
+          "bytes": 259071
+        },
+        "all_equal": true
+      }
+    },
+    {
+      "case": "resident again equals fresh CLI",
+      "passed": true,
+      "comparison": {
+        "video_latent.f32": {
+          "equal": true,
+          "bytes": 172032,
+          "finite": true
+        },
+        "audio_latent.f32": {
+          "equal": true,
+          "bytes": 9472,
+          "finite": true
+        },
+        "audio_pcm.f32": {
+          "equal": true,
+          "bytes": 236800,
+          "finite": true
+        },
+        "video_rgb.f32": {
+          "equal": true,
+          "bytes": 17301504,
+          "finite": true
+        },
+        "output.mp4": {
+          "equal": true,
+          "bytes": 259071
+        },
+        "all_equal": true
+      }
+    }
+  ],
+  "benchmark": [
+    {
+      "event": "context",
+      "seconds": 1.797307
+    },
+    {
+      "event": "request",
+      "name": "cold",
+      "start": 5267775.992904,
+      "seconds": 213.973807,
+      "text_encoder": 1,
+      "audio_decoder": 1,
+      "video_decoder": 1,
+      "dit": 1,
+      "phases": [
+        {
+          "phase": "tokenizer",
+          "first": 1.1e-05,
+          "last": 0.290502
+        },
+        {
+          "phase": "text encoder load",
+          "first": 4.842564,
+          "last": 78.061957
+        },
+        {
+          "phase": "text encoder",
+          "first": 78.062112,
+          "last": 78.163877
+        },
+        {
+          "phase": "refine text",
+          "first": 79.289102,
+          "last": 81.438122
+        },
+        {
+          "phase": "precompute AdaLN",
+          "first": 82.289553,
+          "last": 106.822511
+        },
+        {
+          "phase": "load transformer core",
+          "first": 108.150795,
+          "last": 169.349352
+        },
+        {
+          "phase": "denoise",
+          "first": 169.635705,
+          "last": 174.859867
+        },
+        {
+          "phase": "audio VAE",
+          "first": 186.544939,
+          "last": 186.872814
+        },
+        {
+          "phase": "video VAE load",
+          "first": 186.878771,
+          "last": 196.98052
+        },
+        {
+          "phase": "FFmpeg",
+          "first": 208.592225,
+          "last": 213.936766
+        }
+      ]
+    },
+    {
+      "event": "request",
+      "name": "warm",
+      "start": 5267990.10274,
+      "seconds": 21.441373,
+      "text_encoder": 1,
+      "audio_decoder": 1,
+      "video_decoder": 1,
+      "dit": 1,
+      "phases": [
+        {
+          "phase": "denoise",
+          "first": 0.027824,
+          "last": 5.249826
+        },
+        {
+          "phase": "audio VAE",
+          "first": 5.24983,
+          "last": 5.389015
+        },
+        {
+          "phase": "video VAE load",
+          "first": 5.390788,
+          "last": 5.390896
+        },
+        {
+          "phase": "FFmpeg",
+          "first": 16.986222,
+          "last": 21.402683
+        }
+      ]
+    }
+  ],
+  "binary_sha256": "b28560c9192552fd6859cd0849b380511bb943c3629b3b27fd101338a56c5d45"
+}

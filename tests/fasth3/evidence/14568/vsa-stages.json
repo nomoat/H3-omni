@@ -1,0 +1,38 @@
+[
+  {
+    "stage": "vsa-gate",
+    "relative_l2": 0.0,
+    "normalized_max": 0.0,
+    "exact": true
+  },
+  {
+    "stage": "vsa-heads",
+    "relative_l2": 0.0012927326606586576,
+    "normalized_max": 0.0044247787445783615,
+    "exact": false
+  },
+  {
+    "stage": "vsa-input",
+    "relative_l2": 0.0,
+    "normalized_max": 0.0,
+    "exact": true
+  },
+  {
+    "stage": "vsa-k",
+    "relative_l2": 0.0,
+    "normalized_max": 0.0,
+    "exact": true
+  },
+  {
+    "stage": "vsa-q",
+    "relative_l2": 0.0,
+    "normalized_max": 0.0,
+    "exact": true
+  },
+  {
+    "stage": "vsa-v",
+    "relative_l2": 0.0,
+    "normalized_max": 0.0,
+    "exact": true
+  }
+]

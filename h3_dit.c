@@ -1,4 +1,5 @@
 #include "h3_dit.h"
+#include "h3_fasth3.h"
 #ifdef H3_CUDA
 #include "cuda/h3_cuda.h"
 #endif
@@ -34,6 +35,7 @@ enum {
 
 typedef struct {
     h3_gpu_tensor *norm1;
+    h3_gpu_tensor *vsa_gate;
     h3_gpu_tensor *norm2;
     h3_gpu_tensor *qkv;
     h3_gpu_tensor *qkv_int8;
@@ -72,6 +74,11 @@ typedef struct {
 
 struct h3_dit {
     h3_gpu *gpu;
+    h3_fasth3_config fasth3;
+#ifdef H3_VSA
+    h3_gpu_vsa *vsa;
+    h3_gpu_tensor *vsa_gate_values;
+#endif
     h3_weight_store *weights;
     h3_dit_schedule *schedule;
     int fused_mlp;
@@ -571,6 +578,8 @@ static int load_block(h3_dit *dit, h3_dit_block *block, const char *prefix,
     LOAD2(out, "attn.out_proj.weight", HIDDEN, INNER);
     LOAD2(fc1, "mlp.fc1.weight", FFN * 2, HIDDEN);
     LOAD2(fc2, "mlp.fc2.weight", HIDDEN, FFN);
+    if (dit->fasth3.kind == H3_FASTH3_VSA && !strncmp(prefix, "blocks.", 7))
+        LOAD2(vsa_gate, "attn.to_gate_compress.weight", INNER, HIDDEN);
 #undef LOAD1
 #undef LOAD2
     return 1;
@@ -594,6 +603,7 @@ static int load_block_norms(h3_dit *dit, h3_dit_block *block,
 }
 
 static void free_block(h3_dit_block *block) {
+    free_tensor(&block->vsa_gate);
     free_tensor(&block->norm1);
     free_tensor(&block->norm2);
     free_tensor(&block->qkv);
@@ -831,6 +841,14 @@ static int run_refiner_block(h3_dit *dit, const h3_dit_block *weight,
                              weight->k_norm, weight->q_norm, weight->q_norm,
                              rows, HEADS, HEAD_DIM, 0, 1e-5f),
        "refiner QK norm");
+#ifdef H3_CUDA
+    /* This distilled model amplifies the small FA2/FA3 rounding difference. */
+    if (dit->fasth3.kind) {
+        OP(h3_gpu_sdpa_fa2_bf16(dit->gpu, heads, query, key, value, rows, HEADS,
+                               HEAD_DIM, 1.0f / sqrtf((float)HEAD_DIM)),
+           "FastH3 refiner attention");
+    } else
+#endif
     OP(h3_gpu_sdpa_bf16(dit->gpu, heads, query, key, value, rows, HEADS,
                          HEAD_DIM, 1.0f / sqrtf((float)HEAD_DIM)),
        "refiner attention");
@@ -1711,6 +1729,15 @@ static int bind_request(h3_dit *dit, const h3_text_embedding *text,
         (size_t)dit->video_condition_rows * VIDEO_PATCH;
     size_t wanted_audio_condition =
         (size_t)dit->audio_condition_rows * AUDIO_CHANNELS;
+    if (dit->fasth3.kind) {
+        h3_sigma_schedule expected;
+        if (wanted_video_condition || wanted_audio_condition || active_blocks != 50 ||
+            core_reuse_interval != 1 || token_reduction ||
+            !h3_fasth3_schedule_build(&dit->fasth3, &expected) || !same_sigmas(sigmas, &expected)) {
+            fail(error, error_size, "FastH3 requires text-only input, all 50 blocks, and its trained four-step schedule");
+            return 0;
+        }
+    }
     if (condition_video_elements != wanted_video_condition ||
         condition_audio_elements != wanted_audio_condition ||
         (wanted_video_condition && !condition_video_rows) ||
@@ -1780,6 +1807,17 @@ static int bind_request(h3_dit *dit, const h3_text_embedding *text,
         !prepare_token_reduction_maps(dit, error, error_size) ||
         !load_core(dit, progress, progress_opaque, error, error_size) ||
         !allocate_activations(dit, error, error_size)) return 0;
+#ifdef H3_VSA
+    if (dit->fasth3.kind == H3_FASTH3_VSA) {
+        dit->vsa = h3_gpu_vsa_new(dit->gpu, dit->text_rows, dit->audio_rows,
+            dit->latent_t, dit->latent_h / 2, dit->latent_w / 2, HEADS);
+        dit->vsa_gate_values = h3_gpu_tensor_new_bf16(dit->gpu, (size_t)dit->sequence * INNER);
+        if (!dit->vsa || !dit->vsa_gate_values) {
+            fail(error, error_size, "cannot prepare VSA: %s", h3_gpu_error(dit->gpu));
+            return 0;
+        }
+    }
+#endif
     if ((wanted_video_condition && !h3_gpu_tensor_write_f32_range(
              dit->video_input, 0, condition_video_rows,
              wanted_video_condition)) ||
@@ -1855,6 +1893,20 @@ static h3_dit *load_dit(const char *weight_directory,
     dit->resident = resident;
     dit->weights = h3_weight_store_open(weight_directory, error, error_size);
     if (!dit->weights) goto failed;
+#ifdef H3_CUDA
+    if (!h3_fasth3_config_read(weight_directory, &dit->fasth3, error, error_size)) goto failed;
+    int has_vsa_gate = h3_weight_find(dit->weights, "blocks.0.attn.to_gate_compress.weight", NULL) != NULL;
+    if (has_vsa_gate != (dit->fasth3.kind == H3_FASTH3_VSA)) {
+        fail(error, error_size, "VSA gate weights and FastH3 manifest disagree");
+        goto failed;
+    }
+#ifndef H3_VSA
+    if (dit->fasth3.kind == H3_FASTH3_VSA) {
+        fail(error, error_size, "FastH3 VSA requires a CUDA build with VSA=1");
+        goto failed;
+    }
+#endif
+#endif
     dit->gpu = h3_gpu_create(shader_source_path, error, error_size);
     if (!dit->gpu) goto failed;
     dit->nax_mlp = dit->fused_mlp && h3_gpu_has_nax_mlp(dit->gpu);
@@ -2202,6 +2254,22 @@ static int run_block(h3_dit *dit, unsigned index, int step,
         !dit->use_slower_row_major_attention_output &&
         !dit->use_slower_uncached_int8_scales &&
         !getenv("H3_DISABLE_HEAD_MAJOR_ATTENTION_OUTPUT");
+#ifdef H3_VSA
+    if (dit->vsa) {
+        OP(h3_gpu_linear_bf16(dit->gpu, dit->vsa_gate_values, dit->mod_attention,
+            weight->vsa_gate, NULL, rows, HIDDEN, INNER), "VSA compression gate");
+        OP(h3_gpu_vsa_bf16(dit->vsa, dit->attention_heads, dit->query,
+            dit->key, dit->value, dit->vsa_gate_values), "DiT VSA attention");
+        if (index == 0 && step == 0 && getenv("H3_CUDA_TRACE_DIR")) {
+            OP(cuda_trace(dit, "vsa-input", step, dit->mod_attention, (size_t)rows * HIDDEN), "trace VSA input");
+            OP(cuda_trace(dit, "vsa-q", step, dit->query, (size_t)rows * INNER), "trace VSA query");
+            OP(cuda_trace(dit, "vsa-k", step, dit->key, (size_t)rows * INNER), "trace VSA key");
+            OP(cuda_trace(dit, "vsa-v", step, dit->value, (size_t)rows * INNER), "trace VSA value");
+            OP(cuda_trace(dit, "vsa-gate", step, dit->vsa_gate_values, (size_t)rows * INNER), "trace VSA gate");
+            OP(cuda_trace(dit, "vsa-heads", step, dit->attention_heads, (size_t)rows * INNER), "trace VSA heads");
+        }
+    } else
+#endif
     if (head_major_attention_output)
         OP(h3_gpu_sdpa_bf16_head_major_output(
             dit->gpu, dit->attention_heads, dit->query, dit->key, dit->value,
@@ -3321,6 +3389,11 @@ int h3_dit_denoise_euler(h3_dit *dit, float *video_latent,
 /* Release everything prepared for one request and return the transformer to
  * its weight-only state. Weight-level configuration is left untouched. */
 static void free_request_state(h3_dit *dit) {
+#ifdef H3_VSA
+    h3_gpu_vsa_free(dit->vsa);
+    dit->vsa = NULL;
+    free_tensor(&dit->vsa_gate_values);
+#endif
     int steps = h3_dit_schedule_steps(dit->schedule);
     if (dit->row_maps) for (int step = 0; step < steps; step++)
         h3_gpu_tensor_free(dit->row_maps[step]);

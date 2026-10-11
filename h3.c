@@ -471,6 +471,32 @@ h3_ctx *h3_load_dir(const char *model_dir) {
         free(ctx);
         return NULL;
     }
+#ifdef H3_CUDA
+    char *fasth3_path = h3_path(model_dir, "FL2VA/transformer");
+    int fasth3_ok = fasth3_path && h3_fasth3_config_read(
+        fasth3_path, &ctx->fasth3, ctx->error, sizeof(ctx->error));
+    free(fasth3_path);
+#ifndef H3_VSA
+    if (ctx->fasth3.kind == H3_FASTH3_VSA) {
+        h3_set_error(ctx, "FastH3 VSA requires a CUDA build with VSA=1");
+        fasth3_ok = 0;
+    }
+#endif
+    if (!fasth3_ok) {
+        snprintf(h3_global_error, sizeof(h3_global_error), "%s", ctx->error);
+        h3_free(ctx);
+        return NULL;
+    }
+#else
+    char *fasth3_manifest = h3_path(model_dir, "FL2VA/transformer/h3_fasth3.json");
+    int has_fasth3_manifest = fasth3_manifest && h3_is_file(fasth3_manifest);
+    free(fasth3_manifest);
+    if (has_fasth3_manifest) {
+        h3_set_error(NULL, "FastH3 exports require the CUDA backend");
+        h3_free(ctx);
+        return NULL;
+    }
+#endif
     if (!h3_require_file(ctx, "FL2VA/transformer/config.json") ||
         !h3_require_file(ctx, "FL2VA/tokenizer/tokenizer.json") ||
         !h3_inventory(ctx, "FL2VA/text_encoder", &ctx->model.text_encoder) ||
@@ -545,6 +571,10 @@ const h3_model_info *h3_model(const h3_ctx *ctx) {
     return ctx ? &ctx->model : NULL;
 }
 
+int h3_model_default_steps(const h3_ctx *ctx) {
+    return ctx && ctx->fasth3.kind ? ctx->fasth3.steps : H3_DEFAULT_STEPS;
+}
+
 static int h3_valid_params(h3_ctx *ctx, const h3_params *params) {
     if (!params) {
         h3_set_error(ctx, "generation parameters are required");
@@ -584,6 +614,11 @@ static int h3_valid_params(h3_ctx *ctx, const h3_params *params) {
     }
     if (params->steps < 2 || params->steps > H3_MAX_STEPS) {
         h3_set_error(ctx, "denoising steps must be in [2, 1000]");
+        return 0;
+    }
+    if (ctx->fasth3.kind && (params->steps != 4 || params->first_frame ||
+                            params->last_frame || params->reference_count)) {
+        h3_set_error(ctx, "FastH3 Preview v1 requires exactly 4 evaluations and text-only input");
         return 0;
     }
 #ifdef H3_CUDA
@@ -1709,7 +1744,8 @@ h3_result *h3_generate(h3_ctx *ctx, const char *prompt,
         goto cleanup;
     }
     h3_sigma_schedule sigmas;
-    if (!h3_serving_schedule_build(params->steps, &sigmas)) {
+    if (!(ctx->fasth3.kind ? h3_fasth3_schedule_build(&ctx->fasth3, &sigmas) :
+          h3_serving_schedule_build(params->steps, &sigmas))) {
         h3_set_error(ctx, "cannot construct the requested sigma schedule");
         goto cleanup;
     }

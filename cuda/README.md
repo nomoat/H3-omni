@@ -1,5 +1,8 @@
 # H200 correctness backend
 
+[FastH3 Preview v1 support](FASTH3.md) is available as the optional `VSA=1`
+build, with its own converted checkpoint and four-step schedule.
+
 This backend keeps h3.c's C model code and uses CUDA, cuBLAS, cuDNN and the
 FlashAttention forward kernel bundled with the pinned PyTorch reference. The
 executable has no Python, PyTorch or libtorch runtime dependency. Python is used

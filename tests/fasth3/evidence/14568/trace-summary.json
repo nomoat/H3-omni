@@ -1,0 +1,308 @@
+[
+  {
+    "stage": "packed_input",
+    "relative_l2": 0.0,
+    "normalized_max": 0.0,
+    "unequal_fraction": 0.0
+  },
+  {
+    "stage": "block-00",
+    "relative_l2": 0.0014479962410405278,
+    "normalized_max": 0.0002589779032859951,
+    "unequal_fraction": 0.23773373663425446
+  },
+  {
+    "stage": "block-01",
+    "relative_l2": 0.0019362620078027248,
+    "normalized_max": 0.00013586955901701003,
+    "unequal_fraction": 0.41588014364242554
+  },
+  {
+    "stage": "block-02",
+    "relative_l2": 0.002565760398283601,
+    "normalized_max": 0.0010775862028822303,
+    "unequal_fraction": 0.590422511100769
+  },
+  {
+    "stage": "block-03",
+    "relative_l2": 0.008837475441396236,
+    "normalized_max": 0.0010638297535479069,
+    "unequal_fraction": 0.7267842888832092
+  },
+  {
+    "stage": "block-04",
+    "relative_l2": 0.00976776983588934,
+    "normalized_max": 0.004115226212888956,
+    "unequal_fraction": 0.8202580809593201
+  },
+  {
+    "stage": "block-05",
+    "relative_l2": 0.012110233306884766,
+    "normalized_max": 0.00401606410741806,
+    "unequal_fraction": 0.8987600207328796
+  },
+  {
+    "stage": "block-06",
+    "relative_l2": 0.014950019307434559,
+    "normalized_max": 0.007633587811142206,
+    "unequal_fraction": 0.9294800758361816
+  },
+  {
+    "stage": "block-07",
+    "relative_l2": 0.015552557073533535,
+    "normalized_max": 0.0016891892300918698,
+    "unequal_fraction": 0.9405568838119507
+  },
+  {
+    "stage": "block-08",
+    "relative_l2": 0.017614902928471565,
+    "normalized_max": 0.002097315387800336,
+    "unequal_fraction": 0.9477225542068481
+  },
+  {
+    "stage": "block-09",
+    "relative_l2": 0.01972934417426586,
+    "normalized_max": 0.002307046903297305,
+    "unequal_fraction": 0.9524581432342529
+  },
+  {
+    "stage": "block-10",
+    "relative_l2": 0.022219695150852203,
+    "normalized_max": 0.002307046903297305,
+    "unequal_fraction": 0.9552100896835327
+  },
+  {
+    "stage": "block-11",
+    "relative_l2": 0.02404412068426609,
+    "normalized_max": 0.005681818351149559,
+    "unequal_fraction": 0.9569161534309387
+  },
+  {
+    "stage": "block-12",
+    "relative_l2": 0.026211578398942947,
+    "normalized_max": 0.00561797758564353,
+    "unequal_fraction": 0.9572930932044983
+  },
+  {
+    "stage": "block-13",
+    "relative_l2": 0.022133907303214073,
+    "normalized_max": 0.0012019231216982007,
+    "unequal_fraction": 0.9589141607284546
+  },
+  {
+    "stage": "block-14",
+    "relative_l2": 0.02397667057812214,
+    "normalized_max": 0.0013020833721384406,
+    "unequal_fraction": 0.9595617055892944
+  },
+  {
+    "stage": "block-15",
+    "relative_l2": 0.02603817544877529,
+    "normalized_max": 0.0013020833721384406,
+    "unequal_fraction": 0.9606714844703674
+  },
+  {
+    "stage": "block-16",
+    "relative_l2": 0.027705421671271324,
+    "normalized_max": 0.0013020833721384406,
+    "unequal_fraction": 0.9618370532989502
+  },
+  {
+    "stage": "block-17",
+    "relative_l2": 0.030726337805390358,
+    "normalized_max": 0.0015775240026414394,
+    "unequal_fraction": 0.9621824026107788
+  },
+  {
+    "stage": "block-18",
+    "relative_l2": 0.03977050632238388,
+    "normalized_max": 0.01353503204882145,
+    "unequal_fraction": 0.9620879888534546
+  },
+  {
+    "stage": "block-19",
+    "relative_l2": 0.04581731557846069,
+    "normalized_max": 0.014132165350019932,
+    "unequal_fraction": 0.9626003503799438
+  },
+  {
+    "stage": "block-20",
+    "relative_l2": 0.04972289875149727,
+    "normalized_max": 0.012775157578289509,
+    "unequal_fraction": 0.9637680649757385
+  },
+  {
+    "stage": "block-21",
+    "relative_l2": 0.05631830170750618,
+    "normalized_max": 0.01230468787252903,
+    "unequal_fraction": 0.965015709400177
+  },
+  {
+    "stage": "block-22",
+    "relative_l2": 0.06457725167274475,
+    "normalized_max": 0.010675465688109398,
+    "unequal_fraction": 0.9654677510261536
+  },
+  {
+    "stage": "block-23",
+    "relative_l2": 0.07445511966943741,
+    "normalized_max": 0.00920245423913002,
+    "unequal_fraction": 0.9660377502441406
+  },
+  {
+    "stage": "block-24",
+    "relative_l2": 0.08638518303632736,
+    "normalized_max": 0.0070935580879449844,
+    "unequal_fraction": 0.9667410850524902
+  },
+  {
+    "stage": "block-25",
+    "relative_l2": 0.1023382768034935,
+    "normalized_max": 0.0070935580879449844,
+    "unequal_fraction": 0.9670706391334534
+  },
+  {
+    "stage": "block-26",
+    "relative_l2": 0.11882904171943665,
+    "normalized_max": 0.0060240961611270905,
+    "unequal_fraction": 0.9675247669219971
+  },
+  {
+    "stage": "block-27",
+    "relative_l2": 0.14256896078586578,
+    "normalized_max": 0.009191176854074001,
+    "unequal_fraction": 0.9681368470191956
+  },
+  {
+    "stage": "block-28",
+    "relative_l2": 0.17731991410255432,
+    "normalized_max": 0.012008928693830967,
+    "unequal_fraction": 0.969031810760498
+  },
+  {
+    "stage": "block-29",
+    "relative_l2": 0.23090232908725739,
+    "normalized_max": 0.01575741544365883,
+    "unequal_fraction": 0.9707098007202148
+  },
+  {
+    "stage": "block-30",
+    "relative_l2": 0.2742099463939667,
+    "normalized_max": 0.01732819899916649,
+    "unequal_fraction": 0.9729247093200684
+  },
+  {
+    "stage": "block-31",
+    "relative_l2": 0.3313380181789398,
+    "normalized_max": 0.017096413299441338,
+    "unequal_fraction": 0.9742805361747742
+  },
+  {
+    "stage": "block-32",
+    "relative_l2": 0.398746132850647,
+    "normalized_max": 0.024779735133051872,
+    "unequal_fraction": 0.976204514503479
+  },
+  {
+    "stage": "block-33",
+    "relative_l2": 0.4652201533317566,
+    "normalized_max": 0.02955426275730133,
+    "unequal_fraction": 0.9775996208190918
+  },
+  {
+    "stage": "block-34",
+    "relative_l2": 0.5502300262451172,
+    "normalized_max": 0.06190814450383186,
+    "unequal_fraction": 0.9797576665878296
+  },
+  {
+    "stage": "block-35",
+    "relative_l2": 0.6060552000999451,
+    "normalized_max": 0.09616268426179886,
+    "unequal_fraction": 0.9815226793289185
+  },
+  {
+    "stage": "block-36",
+    "relative_l2": 0.6539021730422974,
+    "normalized_max": 0.10092268139123917,
+    "unequal_fraction": 0.9839183688163757
+  },
+  {
+    "stage": "block-37",
+    "relative_l2": 0.6993493437767029,
+    "normalized_max": 0.10750000178813934,
+    "unequal_fraction": 0.9851755499839783
+  },
+  {
+    "stage": "block-38",
+    "relative_l2": 0.7053649425506592,
+    "normalized_max": 0.11297286301851273,
+    "unequal_fraction": 0.9860764741897583
+  },
+  {
+    "stage": "block-39",
+    "relative_l2": 0.6276220679283142,
+    "normalized_max": 0.08950173109769821,
+    "unequal_fraction": 0.9869539141654968
+  },
+  {
+    "stage": "block-40",
+    "relative_l2": 0.6250778436660767,
+    "normalized_max": 0.09605414420366287,
+    "unequal_fraction": 0.9877656698226929
+  },
+  {
+    "stage": "block-41",
+    "relative_l2": 0.6364628076553345,
+    "normalized_max": 0.09677419066429138,
+    "unequal_fraction": 0.9883777499198914
+  },
+  {
+    "stage": "block-42",
+    "relative_l2": 0.6391715407371521,
+    "normalized_max": 0.1137152761220932,
+    "unequal_fraction": 0.9889206886291504
+  },
+  {
+    "stage": "block-43",
+    "relative_l2": 0.6516687870025635,
+    "normalized_max": 0.1353197693824768,
+    "unequal_fraction": 0.9898778200149536
+  },
+  {
+    "stage": "block-44",
+    "relative_l2": 0.6224128603935242,
+    "normalized_max": 0.1287790685892105,
+    "unequal_fraction": 0.9903705716133118
+  },
+  {
+    "stage": "block-45",
+    "relative_l2": 0.6086705923080444,
+    "normalized_max": 0.08833165466785431,
+    "unequal_fraction": 0.9913195371627808
+  },
+  {
+    "stage": "block-46",
+    "relative_l2": 0.5996631979942322,
+    "normalized_max": 0.09437251091003418,
+    "unequal_fraction": 0.9921042919158936
+  },
+  {
+    "stage": "block-47",
+    "relative_l2": 0.6011372208595276,
+    "normalized_max": 0.0870535746216774,
+    "unequal_fraction": 0.9938254356384277
+  },
+  {
+    "stage": "block-48",
+    "relative_l2": 0.6289312243461609,
+    "normalized_max": 0.05973895639181137,
+    "unequal_fraction": 0.9944154024124146
+  },
+  {
+    "stage": "block-49",
+    "relative_l2": 0.45442673563957214,
+    "normalized_max": 0.07652484625577927,
+    "unequal_fraction": 0.995498538017273
+  }
+]

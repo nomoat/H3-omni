@@ -1,0 +1,126 @@
+{
+  "passed": true,
+  "oracle": "math",
+  "cases": [
+    {
+      "text": 3,
+      "audio": 11,
+      "shape": [
+        1,
+        2,
+        3
+      ],
+      "heads": 2,
+      "gate_scale": 0.0,
+      "relative_l2": 0.0019013643031939864,
+      "normalized_max": 0.004629629664123058,
+      "exact": false,
+      "passed": true
+    },
+    {
+      "text": 3,
+      "audio": 11,
+      "shape": [
+        1,
+        2,
+        3
+      ],
+      "heads": 2,
+      "gate_scale": 0.3,
+      "relative_l2": 0.001886079553514719,
+      "normalized_max": 0.003759398590773344,
+      "exact": false,
+      "passed": true
+    },
+    {
+      "text": 65,
+      "audio": 67,
+      "shape": [
+        5,
+        7,
+        9
+      ],
+      "heads": 4,
+      "gate_scale": 0.0,
+      "relative_l2": 0.002321651903912425,
+      "normalized_max": 0.004444444552063942,
+      "exact": false,
+      "passed": true
+    },
+    {
+      "text": 65,
+      "audio": 67,
+      "shape": [
+        5,
+        7,
+        9
+      ],
+      "heads": 4,
+      "gate_scale": 0.3,
+      "relative_l2": 0.0023421733640134335,
+      "normalized_max": 0.0044247787445783615,
+      "exact": false,
+      "passed": true
+    },
+    {
+      "text": 17,
+      "audio": 30,
+      "shape": [
+        7,
+        8,
+        8
+      ],
+      "heads": 56,
+      "gate_scale": 0.0,
+      "relative_l2": 0.0022011883556842804,
+      "normalized_max": 0.0018115942366421223,
+      "exact": false,
+      "passed": true
+    },
+    {
+      "text": 17,
+      "audio": 30,
+      "shape": [
+        7,
+        8,
+        8
+      ],
+      "heads": 56,
+      "gate_scale": 0.3,
+      "relative_l2": 0.0022266097366809845,
+      "normalized_max": 0.0027173913549631834,
+      "exact": false,
+      "passed": true
+    },
+    {
+      "text": 5,
+      "audio": 13,
+      "shape": [
+        4,
+        4,
+        44
+      ],
+      "heads": 4,
+      "gate_scale": 0.0,
+      "relative_l2": 0.0022468334063887596,
+      "normalized_max": 0.0037313431967049837,
+      "exact": false,
+      "passed": true
+    },
+    {
+      "text": 5,
+      "audio": 13,
+      "shape": [
+        4,
+        4,
+        44
+      ],
+      "heads": 4,
+      "gate_scale": 0.3,
+      "relative_l2": 0.0022723337169736624,
+      "normalized_max": 0.0037313431967049837,
+      "exact": false,
+      "passed": true
+    }
+  ]
+}

@@ -1,0 +1,165 @@
+{
+  "scope": "DiT and sampler; text and decoded-output acceptance remain separate",
+  "arguments": {
+    "weights": "/data0/models/h3-fasth3/vsa-native/FL2VA",
+    "diffusers": "/var/tmp/h3-fasth3/diffusers",
+    "library": "build-cuda/libh3_model.so",
+    "output": "/home/cj/h3-fasth3/results/14575/parity",
+    "text": "/home/cj/h3-cuda/results/14274/text/text-1.safetensors",
+    "width": 512,
+    "height": 512,
+    "frames": 22,
+    "steps": 4,
+    "evaluations": null,
+    "seed": 1,
+    "trace": false,
+    "attention_math_diagnostic": false
+  },
+  "complete_trajectory": true,
+  "real_text": true,
+  "layers": 50,
+  "diagnostic_attention": false,
+  "trace_enabled": false,
+  "reference_timestep_plan": "MiniMaxH3SetTimestepsStep.build_row_timesteps",
+  "reference_timestep_rows": [
+    2,
+    2,
+    2,
+    2
+  ],
+  "exact_checks": {
+    "positions": true,
+    "token_tags": true,
+    "packing_indices": true,
+    "latent_packing": true
+  },
+  "input_sha256": "237ffa4511b7f54afdf1de84a79334b956df8b9280ccdc10106d353583c269d4",
+  "passed": false,
+  "results": [
+    {
+      "label": "step_0_video_velocity",
+      "relative_l2": 0.17638270556926727,
+      "normalized_max": 0.2538134753704071,
+      "passed": false
+    },
+    {
+      "label": "step_0_audio_velocity",
+      "relative_l2": 0.09051194041967392,
+      "normalized_max": 0.12005008012056351,
+      "passed": false
+    },
+    {
+      "label": "step_0_video_latent",
+      "relative_l2": 0.0066042072139680386,
+      "normalized_max": 0.010356222279369831,
+      "passed": true
+    },
+    {
+      "label": "step_0_audio_latent",
+      "relative_l2": 0.009959370829164982,
+      "normalized_max": 0.011636698618531227,
+      "passed": true
+    },
+    {
+      "label": "step_1_video_velocity",
+      "relative_l2": 0.3336900472640991,
+      "normalized_max": 0.5579634308815002,
+      "passed": false
+    },
+    {
+      "label": "step_1_audio_velocity",
+      "relative_l2": 0.08461175858974457,
+      "normalized_max": 0.09819526970386505,
+      "passed": false
+    },
+    {
+      "label": "step_1_video_latent",
+      "relative_l2": 0.02732284553349018,
+      "normalized_max": 0.043283652514219284,
+      "passed": true
+    },
+    {
+      "label": "step_1_audio_latent",
+      "relative_l2": 0.023438524454832077,
+      "normalized_max": 0.02847721055150032,
+      "passed": true
+    },
+    {
+      "label": "step_2_video_velocity",
+      "relative_l2": 0.30882617831230164,
+      "normalized_max": 0.5943564772605896,
+      "passed": false
+    },
+    {
+      "label": "step_2_audio_velocity",
+      "relative_l2": 0.07242141664028168,
+      "normalized_max": 0.11496999859809875,
+      "passed": false
+    },
+    {
+      "label": "step_2_video_latent",
+      "relative_l2": 0.0995408147573471,
+      "normalized_max": 0.16357672214508057,
+      "passed": false
+    },
+    {
+      "label": "step_2_audio_latent",
+      "relative_l2": 0.08460913598537445,
+      "normalized_max": 0.10516160726547241,
+      "passed": false
+    },
+    {
+      "label": "step_3_video_velocity",
+      "relative_l2": 0.23926688730716705,
+      "normalized_max": 0.5179933905601501,
+      "passed": false
+    },
+    {
+      "label": "step_3_audio_velocity",
+      "relative_l2": 0.03910079225897789,
+      "normalized_max": 0.06799650937318802,
+      "passed": false
+    },
+    {
+      "label": "step_3_video_latent",
+      "relative_l2": 0.6370514631271362,
+      "normalized_max": 1.158057689666748,
+      "passed": false
+    },
+    {
+      "label": "step_3_audio_latent",
+      "relative_l2": 0.2148139625787735,
+      "normalized_max": 0.2980383336544037,
+      "passed": false
+    }
+  ],
+  "timings": [
+    {
+      "step": 0,
+      "native_seconds": 0.14799105748534203,
+      "reference_seconds": 2.2795350877568126
+    },
+    {
+      "step": 1,
+      "native_seconds": 0.13662694860249758,
+      "reference_seconds": 0.25920291896909475
+    },
+    {
+      "step": 2,
+      "native_seconds": 0.13790164422243834,
+      "reference_seconds": 0.25579045433551073
+    },
+    {
+      "step": 3,
+      "native_seconds": 0.13761920668184757,
+      "reference_seconds": 0.2567440262064338
+    }
+  ],
+  "load_seconds": {
+    "native": 94.4127053162083,
+    "reference": 64.75066360179335
+  },
+  "reference": "Pinned Diffusers model + FastVideo tile/mask helpers + PyTorch pooling/gating",
+  "sparse_kernel_oracle": "hopper",
+  "source_checkpoint": "/data0/models/h3-fasth3/vsa-source"
+}

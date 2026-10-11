@@ -1,0 +1,65 @@
+[
+  {
+    "stage": "poolq",
+    "relative_l2": 2.2065520244307635e-10,
+    "max_abs": 5.960464477539063e-08,
+    "unequal": 157,
+    "elements": 2064384
+  },
+  {
+    "stage": "poolk",
+    "relative_l2": 3.006038196140537e-10,
+    "max_abs": 1.1920928955078125e-07,
+    "unequal": 153,
+    "elements": 2064384
+  },
+  {
+    "stage": "poolv",
+    "relative_l2": 1.4697129069318748e-09,
+    "max_abs": 4.76837158203125e-07,
+    "unequal": 1038,
+    "elements": 2064384
+  },
+  {
+    "stage": "scores",
+    "relative_l2": 5.585349427406072e-08,
+    "max_abs": 1.7881393432617188e-07,
+    "unequal": 922382,
+    "elements": 4644864
+  },
+  {
+    "stage": "compression",
+    "relative_l2": 5.670208835795165e-08,
+    "max_abs": 1.430511474609375e-06,
+    "unequal": 340005,
+    "elements": 2064384
+  },
+  {
+    "stage": "compression-bf16",
+    "relative_l2": 7.398729849228403e-06,
+    "max_abs": 0.00390625,
+    "unequal": 13,
+    "elements": 2064384
+  },
+  {
+    "stage": "selection",
+    "relative_l2": 0.0,
+    "max_abs": 0.0,
+    "unequal": 0,
+    "elements": 4644864
+  },
+  {
+    "stage": "sparse",
+    "relative_l2": 0.0,
+    "max_abs": 0.0,
+    "unequal": 0,
+    "elements": 132120576
+  },
+  {
+    "stage": "heads",
+    "relative_l2": 3.774794379296509e-07,
+    "max_abs": 0.001953125,
+    "unequal": 10,
+    "elements": 110437376
+  }
+]

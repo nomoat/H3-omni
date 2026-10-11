@@ -36,3 +36,6 @@ __pycache__/
 
 # Independent experiment repositories, worktrees and full tensor evidence.
 research/autoresearch/runs/
+
+# Claude Code agent worktrees.
+.claude/

@@ -1,0 +1,65 @@
+[
+  {
+    "stage": "poolq",
+    "relative_l2": 0.0,
+    "max_abs": 0.0,
+    "unequal": 0,
+    "elements": 2064384
+  },
+  {
+    "stage": "poolk",
+    "relative_l2": 0.0,
+    "max_abs": 0.0,
+    "unequal": 0,
+    "elements": 2064384
+  },
+  {
+    "stage": "poolv",
+    "relative_l2": 0.0,
+    "max_abs": 0.0,
+    "unequal": 0,
+    "elements": 2064384
+  },
+  {
+    "stage": "scores",
+    "relative_l2": 0.0,
+    "max_abs": 0.0,
+    "unequal": 0,
+    "elements": 4644864
+  },
+  {
+    "stage": "compression",
+    "relative_l2": 0.0,
+    "max_abs": 0.0,
+    "unequal": 0,
+    "elements": 2064384
+  },
+  {
+    "stage": "compression-bf16",
+    "relative_l2": 0.0,
+    "max_abs": 0.0,
+    "unequal": 0,
+    "elements": 2064384
+  },
+  {
+    "stage": "selection",
+    "relative_l2": 0.0,
+    "max_abs": 0.0,
+    "unequal": 0,
+    "elements": 4644864
+  },
+  {
+    "stage": "sparse",
+    "relative_l2": 0.0,
+    "max_abs": 0.0,
+    "unequal": 0,
+    "elements": 132120576
+  },
+  {
+    "stage": "heads",
+    "relative_l2": 0.0,
+    "max_abs": 0.0,
+    "unequal": 0,
+    "elements": 110437376
+  }
+]

@@ -15,6 +15,7 @@
 #include <cudnn.h>
 #include <sys/sysinfo.h>
 #include <vector>
+#include <new>
 extern "C" {
 #include "h3_cuda.h"
 #include "h3_flash.h"
@@ -1104,7 +1105,7 @@ static bool use_flash3() {
 }
 static int sdpa(h3_gpu *g, h3_gpu_tensor *y, const h3_gpu_tensor *q, const h3_gpu_tensor *k,
                 const h3_gpu_tensor *v, uint batch, uint n, uint h, uint kh, uint d, float scale,
-                bool causal) {
+                bool causal, bool allow_flash3 = true) {
     if (!n || !h || !kh || h % kh || !d || !batch)
         return 0;
     if (q->dtype == H3_GPU_BF16 && d == 128) {
@@ -1113,7 +1114,7 @@ static int sdpa(h3_gpu *g, h3_gpu_tensor *y, const h3_gpu_tensor *q, const h3_gp
             return 0;
         // Non-causal (DiT joint) attention uses the FlashAttention-3 Hopper
         // kernel; H3_FLASH3=0 selects the FlashAttention-2 reference kernel.
-        int ok = cuda_ok(g, !causal && use_flash3()
+        int ok = cuda_ok(g, !causal && allow_flash3 && use_flash3()
             ? h3_flash3_bf16(y->data, q->data, k->data, v->data,
                              static_cast<float *>(lse->data), batch, n, h, kh, scale,
                              g->stream)
@@ -1213,6 +1214,11 @@ extern "C" int h3_gpu_sdpa_bf16(h3_gpu *g, h3_gpu_tensor *y, const h3_gpu_tensor
                                 const h3_gpu_tensor *k, const h3_gpu_tensor *v, uint n, uint h,
                                 uint d, float s) {
     return sdpa(g, y, q, k, v, 1, n, h, h, d, s, false);
+}
+extern "C" int h3_gpu_sdpa_fa2_bf16(h3_gpu *g, h3_gpu_tensor *y, const h3_gpu_tensor *q,
+                                    const h3_gpu_tensor *k, const h3_gpu_tensor *v,
+                                    uint n, uint h, uint d, float s) {
+    return sdpa(g, y, q, k, v, 1, n, h, h, d, s, false, false);
 }
 extern "C" int h3_gpu_sdpa_causal_f32(h3_gpu *g, h3_gpu_tensor *y, const h3_gpu_tensor *q,
                                       const h3_gpu_tensor *k, const h3_gpu_tensor *v, uint b,
@@ -1433,4 +1439,15 @@ extern "C" int h3_gpu_adaln_linear_bf16(h3_gpu *g, h3_gpu_tensor *y, h3_gpu_tens
     return ok;
 }
 #include "vae_fused.cuh"
+#ifdef H3_VSA
+#include "vsa.cuh"
+#else
+extern "C" h3_gpu_vsa *h3_gpu_vsa_new(h3_gpu *g, unsigned, unsigned, unsigned, unsigned, unsigned, unsigned) {
+    h3_gpu_set_error(g, "VSA requires a CUDA build with VSA=1");
+    return nullptr;
+}
+extern "C" void h3_gpu_vsa_free(h3_gpu_vsa *) {}
+extern "C" int h3_gpu_vsa_bf16(h3_gpu_vsa *, h3_gpu_tensor *, const h3_gpu_tensor *,
+                                 const h3_gpu_tensor *, const h3_gpu_tensor *, const h3_gpu_tensor *) { return 0; }
+#endif
 #include "unsupported.inc"
