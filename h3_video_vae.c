@@ -195,9 +195,37 @@ static void cleanup(vae_context *vae) {
 }
 
 #ifdef H3_CUDA
-static int use_3xtf32(void) {
+/* Video VAE precision on CUDA. FP16 (default): FP16 tensor-core products and
+ * attention with FP32 accumulation, FP32 norms and residual stream, the
+ * diffusers mixed-precision decode. 3XTF32: products about as accurate as
+ * FP32. FP32: the reference path that matches PyTorch's FP32 decode.
+ * H3_VAE_PRECISION=fp16|3xtf32|fp32; H3_VAE_3XTF32=0 still selects FP32. */
+enum { VAE_FP32, VAE_3XTF32, VAE_FP16 };
+static int vae_precision(void) {
+    const char *mode = getenv("H3_VAE_PRECISION");
+    if (mode && *mode) {
+        if (!strcmp(mode, "fp32")) return VAE_FP32;
+        if (!strcmp(mode, "3xtf32")) return VAE_3XTF32;
+        return VAE_FP16;
+    }
     const char *x3 = getenv("H3_VAE_3XTF32");
-    return !x3 || strcmp(x3, "0");
+    return x3 && !strcmp(x3, "0") ? VAE_FP32 : VAE_FP16;
+}
+static int use_3xtf32(void) { return vae_precision() == VAE_3XTF32; }
+static int use_fp16(void) { return vae_precision() == VAE_FP16; }
+
+/* Replace an FP32 weight with its FP16 rounding. */
+static int weight_to_f16(vae_context *vae, h3_gpu_tensor **weight, char *error,
+                         size_t error_size) {
+    h3_gpu_tensor *half = h3_gpu_tensor_to_f16(vae->gpu, *weight);
+    if (!half) {
+        fail(error, error_size, "cannot convert video VAE weight to FP16: %s",
+             h3_gpu_error(vae->gpu));
+        return 0;
+    }
+    h3_gpu_tensor_free(*weight);
+    *weight = half;
+    return 1;
 }
 #endif
 
@@ -231,10 +259,16 @@ static int load_block(vae_context *vae, int index, char *error,
 #undef F1
 #undef F2
 #ifdef H3_CUDA
+    if (use_fp16()) {
+        h3_gpu_tensor **half[] = {&block->qkv_w, &block->out_w, &block->w1, &block->w2};
+        for (size_t item = 0; item < sizeof(half) / sizeof(half[0]); item++)
+            if (!weight_to_f16(vae, half[item], error, error_size)) return 0;
+        return 1;
+    }
     /* The four block projections run as 3xTF32 tensor-core products instead
      * of FP32 SIMT GEMMs: 2.5x faster, decoded relative error about 1e-4
      * against the FP32 reference, and twice the memory for these weights.
-     * H3_VAE_3XTF32=0 restores the FP32 path that matches PyTorch. */
+     * H3_VAE_PRECISION=3xtf32 selects it; fp32 is the PyTorch-exact path. */
     /* The same switch selects the fused 3xTF32 attention kernel instead of
      * FP32 SIMT GEMMs + softmax over packed heads. */
     block->tf32_attention = use_3xtf32();
@@ -456,20 +490,33 @@ static int prepare_rope(vae_context *vae, char *error, size_t error_size) {
 static int allocate_activations(vae_context *vae, char *error,
                                 size_t error_size) {
     size_t patches = vae->patches, sequence = vae->sequence;
+    /* In FP16 mode the product inputs (normed rows, Q/K/V, attention output,
+     * SwiGLU output) are FP16; everything else stays FP32. */
+    int half = 0;
+#ifdef H3_CUDA
+    half = use_fp16();
+#define F16(field, elements) (vae->field = half                                 \
+        ? h3_gpu_tensor_new_f16(vae->gpu, (elements))                          \
+        : h3_gpu_tensor_new_f32(vae->gpu, (elements)))
+#else
+#define F16(field, elements) (vae->field = h3_gpu_tensor_new_f32(vae->gpu, (elements)))
+#endif
+    (void)half;
 #define F32(field, elements) (vae->field = h3_gpu_tensor_new_f32(vae->gpu, (elements)))
     h3_gpu_tensor *all[] = {
         F32(post, patches * LATENT_CHANNELS),
         F32(patch_hidden, patches * HIDDEN),
         F32(hidden, sequence * HIDDEN),
-        F32(norm, sequence * HIDDEN),
+        F16(norm, sequence * HIDDEN),
         F32(qkv, sequence * INNER * 3),
-        F32(query, sequence * INNER), F32(key, sequence * INNER),
-        F32(value, sequence * INNER), F32(heads, sequence * INNER),
+        F16(query, sequence * INNER), F16(key, sequence * INNER),
+        F16(value, sequence * INNER), F16(heads, sequence * INNER),
         F32(branch, sequence * HIDDEN), F32(ff1, sequence * FFN * 2),
-        F32(activated, sequence * FFN),
+        F16(activated, sequence * FFN),
         F32(projected, sequence * OUTPUT_PATCH)
     };
 #undef F32
+#undef F16
     for (size_t index = 0; index < sizeof(all) / sizeof(*all); index++)
         if (!all[index]) {
             fail(error, error_size, "cannot allocate video VAE activations: %s",
@@ -498,6 +545,37 @@ static int run_block(vae_context *vae, int index, char *error,
     if (!gpu_op(vae, (call), error, error_size, label)) return 0;               \
 } while (0)
 #ifdef H3_CUDA
+    /* FP16: each product reads FP16 inputs and returns FP32; the bias is
+     * added in FP32 where the product is consumed. */
+    if (h3_gpu_tensor_dtype(weight->qkv_w) == H3_GPU_F16) {
+        OP(h3_gpu_rms_norm_f16_out(vae->gpu, vae->norm, vae->hidden,
+            weight->norm1, rows, HIDDEN, 1e-5f), "video VAE attention norm");
+        OP(h3_gpu_linear_f16_f32_out(vae->gpu, vae->qkv, vae->norm,
+            weight->qkv_w, rows, HIDDEN, INNER * 3), "video VAE QKV");
+        OP(h3_gpu_video_qkv_rope_bias_f16(vae->gpu, vae->query, vae->key,
+            vae->value, vae->qkv, weight->qkv_b, vae->rope_cos, vae->rope_sin,
+            rows, HEADS, HEAD_DIM, ROPE_HALF, 1e-5f), "video VAE QK norm/RoPE");
+        OP(h3_gpu_sdpa_f16_d64(vae->gpu, vae->heads, vae->query, vae->key,
+            vae->value, rows, HEADS, HEAD_DIM, 1.0f / sqrtf((float)HEAD_DIM)),
+           "video VAE attention");
+        OP(h3_gpu_linear_f16_f32_out(vae->gpu, vae->branch, vae->heads,
+            weight->out_w, rows, INNER, HIDDEN), "video VAE attention output");
+        OP(h3_gpu_scale_add_bias_f32(vae->gpu, vae->hidden, vae->hidden,
+            vae->branch, weight->out_b, weight->scale1, rows, HIDDEN),
+           "video VAE attention residual");
+        OP(h3_gpu_rms_norm_f16_out(vae->gpu, vae->norm, vae->hidden,
+            weight->norm2, rows, HIDDEN, 1e-5f), "video VAE MLP norm");
+        OP(h3_gpu_linear_f16_f32_out(vae->gpu, vae->ff1, vae->norm,
+            weight->w1, rows, HIDDEN, FFN * 2), "video VAE MLP input");
+        OP(h3_gpu_swiglu_bias_f16_out(vae->gpu, vae->activated, vae->ff1,
+            weight->w1_b, rows, FFN), "video VAE SwiGLU");
+        OP(h3_gpu_linear_f16_f32_out(vae->gpu, vae->branch, vae->activated,
+            weight->w2, rows, FFN, HIDDEN), "video VAE MLP output");
+        OP(h3_gpu_scale_add_bias_f32(vae->gpu, vae->hidden, vae->hidden,
+            vae->branch, weight->w2_b, weight->scale2, rows, HIDDEN),
+           "video VAE MLP residual");
+        return 1;
+    }
     /* 3xTF32: the norms and SwiGLU write TF32 parts for the next product, and
      * each bias is added where its product is consumed. Same values as the
      * unfused path below with split weights. */
@@ -574,6 +652,12 @@ static int run_block(vae_context *vae, int index, char *error,
     return 1;
 }
 
+/* The output LayerNorm is FP32 in every mode; in FP16 mode `norm` is an FP16
+ * buffer, so the free FP32 `branch` buffer holds it instead. */
+static h3_gpu_tensor *output_norm(vae_context *vae) {
+    return h3_gpu_tensor_dtype(vae->norm) == H3_GPU_F32 ? vae->norm : vae->branch;
+}
+
 static int run_decoder(vae_context *vae, h3_video_vae_progress progress,
                        void *progress_opaque, char *error,
                        size_t error_size) {
@@ -621,10 +705,10 @@ static int run_decoder(vae_context *vae, h3_video_vae_progress progress,
     }
     if (!load_output_weights(vae, error, error_size)) return 0;
     OP(h3_gpu_begin(vae->gpu), "begin video VAE output projection");
-    OP(h3_gpu_layer_norm_f32(vae->gpu, vae->norm, vae->hidden,
+    OP(h3_gpu_layer_norm_f32(vae->gpu, output_norm(vae), vae->hidden,
         vae->norm_out_w, vae->norm_out_b, vae->sequence, HIDDEN, 1e-5f),
        "video VAE output LayerNorm");
-    OP(h3_gpu_linear_f32(vae->gpu, vae->projected, vae->norm, vae->proj_w,
+    OP(h3_gpu_linear_f32(vae->gpu, vae->projected, output_norm(vae), vae->proj_w,
         vae->proj_b, vae->sequence, HIDDEN, OUTPUT_PATCH),
        "video VAE output projection");
     OP(h3_gpu_submit(vae->gpu), "submit video VAE decoder");
@@ -688,10 +772,10 @@ static int run_resident_tile(vae_context *vae, h3_gpu_tensor *projected,
             RELEASE_ZERO();
             return 0;
         }
-    OP(h3_gpu_layer_norm_f32(vae->gpu, vae->norm, vae->hidden,
+    OP(h3_gpu_layer_norm_f32(vae->gpu, output_norm(vae), vae->hidden,
         vae->norm_out_w, vae->norm_out_b, vae->sequence, HIDDEN, 1e-5f),
        "tiled video VAE output LayerNorm");
-    OP(h3_gpu_linear_f32(vae->gpu, projected, vae->norm, vae->proj_w,
+    OP(h3_gpu_linear_f32(vae->gpu, projected, output_norm(vae), vae->proj_w,
         vae->proj_b, vae->sequence, HIDDEN, OUTPUT_PATCH),
        "tiled video VAE output projection");
     if (synchronous)

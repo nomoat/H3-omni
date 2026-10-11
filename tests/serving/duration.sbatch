@@ -15,7 +15,7 @@ set -euo pipefail
 ROOT=/home/cj/h3-serve
 STAGE=/var/tmp/h3-duration-$SLURM_JOB_ID
 RESULT=$ROOT/results/$SLURM_JOB_ID
-SOURCE=${SOURCE:-$ROOT/source.tar}
+SOURCE=${1:-${SOURCE:-$ROOT/source.tar}}
 mkdir -p "$STAGE/icu" "$STAGE/.deps" "$RESULT"
 tar -xf "$SOURCE" -C "$STAGE"
 tar -xzf /home/cj/h3-cuda/flash-deps.tar.gz -C "$STAGE/.deps"

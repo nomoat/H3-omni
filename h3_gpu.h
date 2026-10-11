@@ -11,7 +11,8 @@ typedef enum {
     H3_GPU_F32 = 0,
     H3_GPU_BF16,
     H3_GPU_I8,
-    H3_GPU_U32
+    H3_GPU_U32,
+    H3_GPU_F16 /* CUDA video VAE FP16 mode only */
 } h3_gpu_dtype;
 
 typedef struct {

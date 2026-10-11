@@ -23,17 +23,17 @@ $(BUILD):
 	mkdir -p $@
 $(BUILD)/%.o: $(ROOT)/%.c | $(BUILD)
 	$(CC) $(CFLAGS) -c $< -o $@
-$(BUILD)/h3_gpu_cuda.o: $(ROOT)/cuda/h3_gpu_cuda.cu $(ROOT)/cuda/h3_cuda.h $(ROOT)/cuda/h3_flash.h $(ROOT)/h3_gpu.h $(ROOT)/cuda/primitives.cuh $(ROOT)/cuda/fast_primitives.cuh $(ROOT)/cuda/primitive_wrappers.inc $(ROOT)/cuda/dispatch.inc $(ROOT)/cuda/unsupported.inc $(ROOT)/cuda/vae_fused.cuh $(ROOT)/cuda/vae_attention.cuh | $(BUILD)
+$(BUILD)/h3_gpu_cuda.o: $(ROOT)/cuda/h3_gpu_cuda.cu $(ROOT)/cuda/h3_cuda.h $(ROOT)/cuda/h3_flash.h $(ROOT)/h3_gpu.h $(ROOT)/cuda/primitives.cuh $(ROOT)/cuda/fast_primitives.cuh $(ROOT)/cuda/primitive_wrappers.inc $(ROOT)/cuda/dispatch.inc $(ROOT)/cuda/unsupported.inc $(ROOT)/cuda/vae_fused.cuh $(ROOT)/cuda/vae_attention.cuh $(ROOT)/cuda/vae_fp16.cuh | $(BUILD)
 	$(NVCC) $(NVFLAGS) -c $< -o $@
 $(BUILD)/flash_attention.o: $(ROOT)/cuda/flash_attention.cu $(ROOT)/cuda/h3_flash.h $(FLASH_ROOT)/flash_fwd_kernel.h | $(BUILD)
 	$(NVCC) -O3 -std=c++17 -arch=$(CUDA_ARCH) --expt-relaxed-constexpr --expt-extended-lambda -DUNFUSE_FMA -DFLASHATTENTION_DISABLE_ALIBI -DFLASHATTENTION_DISABLE_SOFTCAP -Xcompiler=-fPIC -I$(ROOT)/cuda -I$(FLASH_ROOT) -I$(CUTLASS_ROOT)/include -c $< -o $@
 # FlashAttention-3 needs sm_90a (WGMMA/TMA) and its own CUTLASS revision. All
 # symbols except the entry point are made local so the two CUTLASS revisions
 # cannot resolve to each other's inline functions.
-FLASH3_DISABLE := BACKWARD SPLIT PAGEDKV APPENDKV LOCAL SOFTCAP PACKGQA FP16 FP8 VARLEN SM8x HDIM64 HDIM96 HDIM192 HDIM256
+FLASH3_DISABLE := BACKWARD SPLIT PAGEDKV APPENDKV LOCAL SOFTCAP PACKGQA FP8 VARLEN SM8x HDIM96 HDIM192 HDIM256
 $(BUILD)/flash3_attention.o: $(ROOT)/cuda/flash3_attention.cu $(ROOT)/cuda/h3_flash.h $(FLASH3_ROOT)/flash_fwd_launch_template.h | $(BUILD)
 	$(NVCC) -O3 -std=c++17 -gencode arch=compute_90a,code=sm_90a --expt-relaxed-constexpr --expt-extended-lambda --use_fast_math -DCUTE_SM90_EXTENDED_MMA_SHAPES_ENABLED -DCUTLASS_ENABLE_GDC_FOR_SM90 -DCUTLASS_DEBUG_TRACE_LEVEL=0 -DNDEBUG $(addprefix -DFLASHATTENTION_DISABLE_,$(FLASH3_DISABLE)) -Xcompiler=-fPIC -I$(ROOT)/cuda -I$(FLASH3_ROOT) -I$(CUTLASS3_ROOT)/include -c $< -o $(BUILD)/flash3_attention.raw.o
-	objcopy --keep-global-symbol=h3_flash3_bf16 $(BUILD)/flash3_attention.raw.o $@
+	objcopy --keep-global-symbol=h3_flash3_bf16 --keep-global-symbol=h3_flash3_f16_d64 $(BUILD)/flash3_attention.raw.o $@
 $(BUILD)/libh3_cuda.so: $(GPU_OBJ)
 	$(NVCC) -shared -o $@ $^ $(LDLIBS)
 MODEL_C := h3_host h3_safetensors h3_weights h3_text_encoder h3_dit_schedule h3_dit h3_video_vae h3_audio_vae
