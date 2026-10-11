@@ -1,0 +1,165 @@
+{
+  "scope": "DiT and sampler; text and decoded-output acceptance remain separate",
+  "arguments": {
+    "weights": "/data0/models/h3-fasth3/vsa-native/FL2VA",
+    "diffusers": "/var/tmp/h3-fasth3-merged-14779/diffusers",
+    "library": "build-cuda/libh3_model.so",
+    "output": "/home/cj/h3-fasth3/results/14779/parity",
+    "text": "/home/cj/h3-cuda/results/14274/text/text-1.safetensors",
+    "width": 512,
+    "height": 512,
+    "frames": 22,
+    "steps": 4,
+    "evaluations": null,
+    "seed": 1,
+    "trace": false,
+    "attention_math_diagnostic": false
+  },
+  "complete_trajectory": true,
+  "real_text": true,
+  "layers": 50,
+  "diagnostic_attention": false,
+  "trace_enabled": false,
+  "reference_timestep_plan": "MiniMaxH3SetTimestepsStep.build_row_timesteps",
+  "reference_timestep_rows": [
+    2,
+    2,
+    2,
+    2
+  ],
+  "exact_checks": {
+    "positions": true,
+    "token_tags": true,
+    "packing_indices": true,
+    "latent_packing": true
+  },
+  "input_sha256": "237ffa4511b7f54afdf1de84a79334b956df8b9280ccdc10106d353583c269d4",
+  "passed": true,
+  "results": [
+    {
+      "label": "step_0_video_velocity",
+      "relative_l2": 0.0,
+      "normalized_max": 0.0,
+      "passed": true
+    },
+    {
+      "label": "step_0_audio_velocity",
+      "relative_l2": 0.0,
+      "normalized_max": 0.0,
+      "passed": true
+    },
+    {
+      "label": "step_0_video_latent",
+      "relative_l2": 0.0,
+      "normalized_max": 0.0,
+      "passed": true
+    },
+    {
+      "label": "step_0_audio_latent",
+      "relative_l2": 0.0,
+      "normalized_max": 0.0,
+      "passed": true
+    },
+    {
+      "label": "step_1_video_velocity",
+      "relative_l2": 0.0,
+      "normalized_max": 0.0,
+      "passed": true
+    },
+    {
+      "label": "step_1_audio_velocity",
+      "relative_l2": 0.0,
+      "normalized_max": 0.0,
+      "passed": true
+    },
+    {
+      "label": "step_1_video_latent",
+      "relative_l2": 0.0,
+      "normalized_max": 0.0,
+      "passed": true
+    },
+    {
+      "label": "step_1_audio_latent",
+      "relative_l2": 0.0,
+      "normalized_max": 0.0,
+      "passed": true
+    },
+    {
+      "label": "step_2_video_velocity",
+      "relative_l2": 0.0,
+      "normalized_max": 0.0,
+      "passed": true
+    },
+    {
+      "label": "step_2_audio_velocity",
+      "relative_l2": 0.0,
+      "normalized_max": 0.0,
+      "passed": true
+    },
+    {
+      "label": "step_2_video_latent",
+      "relative_l2": 0.0,
+      "normalized_max": 0.0,
+      "passed": true
+    },
+    {
+      "label": "step_2_audio_latent",
+      "relative_l2": 0.0,
+      "normalized_max": 0.0,
+      "passed": true
+    },
+    {
+      "label": "step_3_video_velocity",
+      "relative_l2": 0.0,
+      "normalized_max": 0.0,
+      "passed": true
+    },
+    {
+      "label": "step_3_audio_velocity",
+      "relative_l2": 0.0,
+      "normalized_max": 0.0,
+      "passed": true
+    },
+    {
+      "label": "step_3_video_latent",
+      "relative_l2": 0.0,
+      "normalized_max": 0.0,
+      "passed": true
+    },
+    {
+      "label": "step_3_audio_latent",
+      "relative_l2": 0.0,
+      "normalized_max": 0.0,
+      "passed": true
+    }
+  ],
+  "timings": [
+    {
+      "step": 0,
+      "native_seconds": 0.13670607097446918,
+      "reference_seconds": 1.9682781537994742
+    },
+    {
+      "step": 1,
+      "native_seconds": 0.13620762387290597,
+      "reference_seconds": 0.2528667920269072
+    },
+    {
+      "step": 2,
+      "native_seconds": 0.13665848318487406,
+      "reference_seconds": 0.2528321030549705
+    },
+    {
+      "step": 3,
+      "native_seconds": 0.1352199506945908,
+      "reference_seconds": 0.25689476635307074
+    }
+  ],
+  "load_seconds": {
+    "native": 43.805675839073956,
+    "reference": 11.691976822912693
+  },
+  "reference": "Pinned Diffusers model + FastVideo tile/mask helpers + PyTorch pooling/gating",
+  "sparse_kernel_oracle": "hopper",
+  "source_checkpoint": "/data0/models/h3-fasth3/vsa-source"
+}

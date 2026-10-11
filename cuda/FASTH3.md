@@ -156,6 +156,11 @@ then seed 43. The second request reused weights and the prompt cache.
 | Second request, weights and prompt cached, including decoding and MP4 output | 22.53 s |
 | Four-step denoising portion of the second request | 5.13 s |
 
+After the merge with the FP16 video VAE (job 14779, gpu-h200x1-2, resident
+`h3_serve_check`), warm 864x480 requests take 10.5-11.6 s for 5 s video and
+21.0-22.5 s for 10 s video: denoise 5.1 / 10.8 s, video VAE 2.5 / 4.9 s,
+and 2.4-6.3 s of MP4 encoding that does not overlap the decode.
+
 These are individual requests, not a statistical benchmark or a comparison
 with the blog's B200 system. Cold loading depends heavily on shared storage.
 Raw timings are in `14583/benchmark.jsonl`. The actual warm MP4 has
