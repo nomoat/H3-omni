@@ -2010,6 +2010,7 @@ h3_result *h3_generate(h3_ctx *ctx, const char *prompt,
         }
         frame_stream.stream = av_stream;
     }
+    h3_progress_emit(&progress, "video VAE", 0, 1);
     int video_ok = preview_decoder ?
         (av_stream ?
          h3_video_vae_decoder_decode_rgb8(
@@ -2027,6 +2028,7 @@ h3_result *h3_generate(h3_ctx *ctx, const char *prompt,
         h3_set_error(ctx, "%s", detail);
         goto cleanup;
     }
+    h3_progress_emit(&progress, "video VAE", 1, 1);
     if (!h3_dump_f32("video_rgb", frames.rgb, (size_t)frames.frames *
                      (size_t)frames.height * (size_t)frames.width * 3)) {
         h3_set_error(ctx, "cannot write H3_DUMP_DIR video");

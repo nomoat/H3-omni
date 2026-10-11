@@ -15,7 +15,7 @@ set -euo pipefail
 ROOT=/home/cj/h3-serve
 STAGE=/var/tmp/h3-duration-$SLURM_JOB_ID
 RESULT=$ROOT/results/$SLURM_JOB_ID
-SOURCE=${SOURCE:-$ROOT/source.tar}
+SOURCE=${1:-${SOURCE:-$ROOT/source.tar}}
 mkdir -p "$STAGE/icu" "$STAGE/.deps" "$RESULT"
 tar -xf "$SOURCE" -C "$STAGE"
 tar -xzf /home/cj/h3-cuda/flash-deps.tar.gz -C "$STAGE/.deps"
@@ -50,8 +50,8 @@ s10-boat|864|480|240|20|7|$P1
 s10-fox|864|480|240|20|11|$P2
 s10-guitar|864|480|240|20|23|$P3
 EOF
-nvidia-smi --query-gpu=timestamp,memory.used --format=csv,noheader -lms 500 \
-    > results/serve/gpu-memory.csv &
+nvidia-smi --query-gpu=timestamp,memory.used,clocks.sm,power.draw,temperature.gpu,clocks_throttle_reasons.active \
+    --format=csv,noheader -lms 500 > results/serve/gpu-memory.csv &
 SAMPLER=$!
 build-cuda/h3_serve_check "$MODEL" results/serve results/requests.txt \
     > results/serve/events.jsonl 2> results/serve/stderr.log || echo "serve exit $?"

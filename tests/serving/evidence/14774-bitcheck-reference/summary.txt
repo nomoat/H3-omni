@@ -1,0 +1,18 @@
+node gpu-h200x8-3 model /data0/models/h3-cuda/42ed227ee7df40d41602854ae760620d6eb651fe reference /home/cj/h3-serve/results/14416/fresh mode reference
+mkdir -p /var/tmp/h3-bitcheck-14774/build-cuda
+/var/tmp/h3-bitcheck-14774/h3.c: In function ‘h3_load_dir’:
+  513 |                      "incomplete Ref2VA checkpoint: %s", ctx->error);
+                 from /var/tmp/h3-bitcheck-14774/h3.c:21:
+   71 |   return __builtin___snprintf_chk (__s, __n, __USE_FORTIFY_LEVEL - 1,
+   72 |                                    __glibc_objsize (__s), __fmt,
+   73 |                                    __va_arg_pack ());
+objcopy --keep-global-symbol=h3_flash3_bf16 --keep-global-symbol=h3_flash3_f16_d64 /var/tmp/h3-bitcheck-14774/build-cuda/flash3_attention.raw.o /var/tmp/h3-bitcheck-14774/build-cuda/flash3_attention.o
+r1-boat 104.38 denoise 13.6
+r2-fox 26.41 denoise 13.51
+r3-boat 26.51 denoise 13.63
+r4-cat 5.55 denoise 2.74
+r5-fox 26.38 denoise 13.54
+r6-city 8.65 denoise 0.54
+r7-fox 34.03 denoise 13.46
+ 99225 MiB
+{"passed": true, "requests": {"r1-boat": true, "r2-fox": true, "r3-boat": true, "r4-cat": true, "r5-fox": true, "r6-city": true, "r7-fox": true}}

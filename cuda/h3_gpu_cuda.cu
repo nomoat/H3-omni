@@ -11,6 +11,7 @@
 #include <cublas_v2.h>
 #include <cublasLt.h>
 #include <cuda_bf16.h>
+#include <cuda_fp16.h>
 #include <cuda_runtime.h>
 #include <cudnn.h>
 #include <sys/sysinfo.h>
@@ -203,7 +204,9 @@ extern "C" void h3_gpu_free(h3_gpu *g) {
 extern "C" int h3_gpu_is_m5(const h3_gpu *) { return 0; }
 extern "C" int h3_gpu_has_nax_mlp(const h3_gpu *) { return 0; }
 extern "C" int h3_gpu_has_int8_mlp(const h3_gpu *) { return 0; }
-static size_t item_size(h3_gpu_dtype d) { return d == H3_GPU_BF16 ? 2 : d == H3_GPU_I8 ? 1 : 4; }
+static size_t item_size(h3_gpu_dtype d) {
+    return d == H3_GPU_BF16 || d == H3_GPU_F16 ? 2 : d == H3_GPU_I8 ? 1 : 4;
+}
 // Device memory comes from the stream-ordered pool. cudaFree synchronizes the
 // whole device, and per-operation temporaries made the GPU idle between
 // kernels. The pool keeps freed memory for reuse; when it cannot grow, idle
@@ -1439,6 +1442,7 @@ extern "C" int h3_gpu_adaln_linear_bf16(h3_gpu *g, h3_gpu_tensor *y, h3_gpu_tens
     return ok;
 }
 #include "vae_fused.cuh"
+#include "vae_fp16.cuh"
 #ifdef H3_VSA
 #include "vsa.cuh"
 #else

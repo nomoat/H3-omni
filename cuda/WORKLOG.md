@@ -9,24 +9,26 @@ unless stated otherwise. Evidence paths are relative to `tests/serving/evidence/
 
 ## Current result
 
-| Request | Start (job 14419) | Experiments 1-8 (job 14436) | Experiments 9-11 merged (job 14480) | Change |
-| --- | --- | --- | --- | --- |
-| 2.3 s video (56 frames) | 33.0 s (job 14416) | 20.8 s (job 14438) | about 19 s ¹ | -42% |
-| 5 s video (124 frames) | 81.7 s | 51.0 s | 41.0 s | -50% |
-| 10 s video (243 frames) | 201.3 s | 118.7 s | 98.5 s | -51% |
-| 15 s video (362 frames) | - | - | 174.3 s (job 14488) | - |
+| Request | Start (job 14419) | Experiments 1-8 (job 14436) | Experiments 9-11 merged (job 14480) | FP16 video VAE, #13 (job 14734) | VAE kernels and pipeline, #14 (job 14771) | vLLM-Omni, 1 GPU | Change |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| 2.3 s video (56 frames) | 33.0 s (job 14416) | 20.8 s (job 14438) | about 19 s ¹ | not measured | not measured | - | - |
+| 5 s video (124 frames) | 81.7 s | 51.0 s | 41.0 s | 32.4 s | 32.0 s | 33.0 s | -61% |
+| 10 s video (243 frames) | 201.3 s | 118.7 s | 98.5 s | 81.2 s | 80.4 s | 82.9 s | -60% |
+| 15 s video (362 frames) | - | - | 174.3 s (job 14488) | not measured | not measured | - | - |
 
 ¹ Agent profiles of #9-#11 separately (jobs 14458, 14477); not remeasured
 after the merge.
 
-Peak GPU memory in resident serving: 114 GB at 10 s, 118 GB for 1344x768,
+Peak GPU memory in resident serving: 100889 MiB at 10 s after #14 (job
+14771, nvidia-smi every 0.5 s); before #13: 114 GB at 10 s, 118 GB for 1344x768,
 768x1344 and 15 s in one process (job 14488); the H200 has 141 GB.
 
 Two modes:
 
 | Mode | Settings | Matches PyTorch | Use |
 | --- | --- | --- | --- |
-| Default | FlashAttention-3, 3xTF32 video VAE | Calibrated acceptance | Serving |
+| Default | FlashAttention-3, FP16 video VAE (#13) | Calibrated acceptance; video VAE no worse than the diffusers FP16 decode | Serving |
+| Accurate VAE | default + `H3_VAE_PRECISION=3xtf32` (the default before #13) | Calibrated acceptance | Serving when the decode must stay within 1e-4 of FP32 |
 | Reference | `H3_FLASH3=0 H3_VAE_3XTF32=0` | Bit for bit, original acceptance | Correctness oracle |
 
 ## Method
@@ -119,6 +121,8 @@ CUDA context; overlapping the two was not tried.
 | 12d | Download Ref2VA (MiniMaxAI/MiniMax-H3 42ed227e). First only the transformer (66 GB): h3 also reads Ref2VA/tokenizer, text_encoder and VAEs and failed with an empty-JSON tokenizer error. Then the full 144 GB; all 29 large files match the Hugging Face sha256. Only the transformer differs from FL2VA | Complete checkpoint in the shared model dir | Done | 14489-14490 (failed runs) |
 | 12e | Ref2VA needs FFprobe for reference inputs ("cannot start FFprobe"); none on the cluster. Fetched the johnvansickle 7.0.2 static release, whose ffmpeg is byte-identical to the one in use, and set `H3_FFPROBE` | Ref2VA runs | Done | 14491-14492 (failed runs) |
 | 12g | Clear error for an incomplete Ref2VA/: h3 checks Ref2VA tokenizer, text encoder and VAEs at load; prompt-only requests still run, ordered references name the missing file | Partial directory test passes; reference mode bit-identical to 14416 | Done | 14496-ref2va-partial, 14497-bitcheck-reference |
+| 13 | FP16 video VAE (`cuda/vae_fp16.cuh`, default; `H3_VAE_PRECISION=fp16\|3xtf32\|fp32`): block weights rounded to FP16 at load; RMSNorm (FP32 statistics) writes FP16 rows; QKV, output, w1, w2 as FP16 cuBLAS products with FP32 accumulation and FP32 output; bias, QK norm, RoPE, SwiGLU and residual in FP32, Q/K/V and SwiGLU output rounded to FP16; FlashAttention-3 FP16, head dim 64 (second instantiation in `flash3_attention.cu`). Input projection, output LayerNorm and projection stay FP32. Same recipe as the diffusers mixed-precision decode (`_keep_in_fp32_modules`), except that products return FP32 instead of FP16 | Error against the PyTorch FP32 decode on 9 cases (6 acceptance trajectories, 3 served requests up to 864x480x56): relative L2 3.9e-5 to 2.6e-4, 98.5% to 99.7% of 8-bit pixels identical, never off by more than 1. diffusers FP16: 3.2e-4 to 1.6e-3, up to 8 levels off; BF16: 2.5e-3 to 1.3e-2, up to 43 levels; FP16 autocast (vLLM-Omni) equals diffusers FP16. 3xTF32: 2.1e-5 to 1.5e-4. Video VAE + MP4 at 10 s: about 23 s -> 6.2 s. 5 s 41.0 -> 32.4 s, 10 s 98.5 -> 81.2 s. Reference mode bit-identical to 14416; 3xTF32 mode gives the same latents and audio as 14438 and the same RGB as the merged build (14478) | Worked: faster than vLLM-Omni on one GPU, 6x to 10x less error than the diffusers FP16 decode | 14732-vae-precision, 14734-duration, 14735-bitcheck-reference, 14736-bitcheck-3xtf32 |
+| 14 | Video VAE after #13, from a kernel profile (`tests/pytorch/vae_profile.py`, torch.profiler around the resident decoder, 10 s latent 67x30x54). Profile before: 4.92 s decode, GEMMs 2.49 s, FA3 0.56 s, SwiGLU 0.43 s, QKV/RoPE 0.41 s, residual + RMSNorm 0.40 s, FP32 SIMT output projection 0.13 s, and 12 GPU stalls of 21-34 ms (0.31 s) at the temporal-chunk boundaries: the host thread blends and finalizes each chunk, and with 2 pipeline slots the GPU had nothing queued. A concurrent libx264 encode cost only 0.06 s (14767). Changes: 4 pipeline slots; FP16 mode only: residual add fused with the following RMSNorm (norm2, and the next block's norm1 when resident; same arithmetic and reduction order), QKV/RoPE with one warp per (row, head) and shuffle reductions, SwiGLU with float4 loads, output projection as 3xTF32 | Decode 4.92 -> 4.26 s (QKV/RoPE 411 -> 141 ms, SwiGLU 428 -> 277 ms, residual + norm 396 -> 273 ms, projection 132 -> about 55 ms). Serving: 10 s video VAE + MP4 6.04 -> 5.22 s, 5 s 32.4 -> 32.0 s, 10 s 81.2 -> 80.4 s. Precision, 9 cases: all pass, h3-fp16 relative L2 4.8e-5 to 2.6e-4, 98.4% to 99.5% of 8-bit pixels identical, never more than 1 level off. GPU at the 700 W cap during the VAE (SM 1.6-1.9 GHz, reason 0x4). Reference mode bit-identical to 14416 | Worked | 14766-vae-profile-before, 14769-vae-profile, 14770-vae-precision, 14771-duration, 14774-bitcheck-reference |
 | 12f | Ref2VA image and reference video, old vs merged build, both modes | Reference mode bit-identical; default latents and audio bit-identical, RGB 99.998% identical, rest +-1; peak 40-41 GB one-shot | Passed | 14493-14494-scenario |
 | 12c | Resident serving at the largest shapes | 1344x768 44.1 s, 768x1344 44.4 s, 15 s 174.3 s; peak 118 GB of 141 GB | Passed | 14488-resident-large |
 
@@ -169,5 +173,9 @@ passes them. Visual check: `/home/homo/model/h3-samples/compare/`, user review
   still uses GEMM + softmax + pack.
 - Video VAE idle time and MP4 overlap: done (#11, 97% busy). The audio VAE
   (0.27 s at 10 s) could overlap the video VAE.
+- Video VAE after #14: 5.2 s with MP4 at 10 s (decode 4.26 s in isolation).
+  GEMMs are now 60% of the decode at about 680 TFLOPS. FP16 product outputs
+  would cut the SwiGLU and QKV traffic, but at diffusers-FP16 error; not
+  tried. The audio VAE (0.25 s) could still overlap the video VAE.
 - Lossy options (not started): step reuse, fewer layers, token reduction,
   FP8 GEMMs, sparse attention; multi-GPU sequence parallelism.

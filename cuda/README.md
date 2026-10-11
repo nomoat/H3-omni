@@ -15,8 +15,12 @@ also produced a valid 22-frame MP4 with audio. Its runtime dependencies contain
 neither libtorch nor libpython.
 
 **Two modes.** The default mode is for serving: FlashAttention-3 for the DiT
-attention, and 3xTF32 tensor-core GEMMs and a fused 3xTF32 attention kernel
-(`vae_attention.cuh`) in the video VAE. The reference mode,
+attention, and FP16 tensor-core products and FP16 FlashAttention-3 in the
+video VAE, with FP32 norms, residual stream and accumulation
+(`vae_fp16.cuh`; decoded error 4e-5 to 3e-4 against the PyTorch FP32 decode,
+6x to 10x less than the diffusers FP16 decode). `H3_VAE_PRECISION=3xtf32`
+selects the previous 3xTF32 video VAE (`vae_attention.cuh`, error about
+1e-4). The reference mode,
 `H3_FLASH3=0 H3_VAE_3XTF32=0`, is the phase-one backend that matches PyTorch
 bit for bit; it must keep passing the contract below. The default mode passes
 the calibrated acceptance described in [WORKLOG.md](WORKLOG.md), which also
@@ -191,14 +195,14 @@ from before the change.
 
 ## Serving latency
 
-| Request (warm, 864x480, 20 steps) | Reference mode, job 14419 | Default mode, job 14436 |
-| --- | --- | --- |
-| 5 s video | 81.7 s | 51.0 s |
-| 10 s video | 201.3 s | 118.7 s |
+| Request (warm, 864x480, 20 steps) | Reference mode, job 14419 | Default mode, job 14771 | vLLM-Omni, 1 GPU |
+| --- | --- | --- | --- |
+| 5 s video | 81.7 s | 32.0 s | 33.0 s |
+| 10 s video | 201.3 s | 80.4 s | 82.9 s |
 
 Job 14419 predates the stream-ordered memory pool, which is bit-exact and on
-in both modes. Default-mode peak memory is 114 GB: the video VAE keeps a
-TF32 high and low part of its four block projections. Details, profiles and
+in both modes. The FP16 video VAE keeps 4.8 GB of block weights; the 3xTF32
+one keeps 19 GB (a TF32 high and low part of its four block projections). Details, profiles and
 rejected experiments: [WORKLOG.md](WORKLOG.md).
 
 The resident video VAE decodes its tiles as a pipeline: the GPU works on the

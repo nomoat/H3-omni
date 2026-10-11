@@ -104,6 +104,42 @@ int h3_gpu_sdpa_3xtf32_f32(h3_gpu *gpu, h3_gpu_tensor *output,
                            const h3_gpu_tensor *query, const h3_gpu_tensor *key,
                            const h3_gpu_tensor *value, uint32_t tokens,
                            uint32_t heads, uint32_t head_dim, float scale);
+
+/* Video VAE FP16 mode (cuda/vae_fp16.cuh): FP16 tensor-core products with
+ * FP32 accumulation and FP32 outputs; norms, QK norm, RoPE, SwiGLU, biases
+ * and the residual stream stay FP32, only product inputs are FP16. */
+h3_gpu_tensor *h3_gpu_tensor_new_f16(h3_gpu *gpu, size_t elements);
+h3_gpu_tensor *h3_gpu_tensor_to_f16(h3_gpu *gpu, const h3_gpu_tensor *f32);
+int h3_gpu_rms_norm_f16_out(h3_gpu *gpu, h3_gpu_tensor *output,
+                            const h3_gpu_tensor *input,
+                            const h3_gpu_tensor *weight, uint32_t rows,
+                            uint32_t width, float epsilon);
+int h3_gpu_video_qkv_rope_bias_f16(h3_gpu *gpu, h3_gpu_tensor *query,
+                                   h3_gpu_tensor *key, h3_gpu_tensor *value,
+                                   const h3_gpu_tensor *qkv,
+                                   const h3_gpu_tensor *bias,
+                                   const h3_gpu_tensor *rope_cos,
+                                   const h3_gpu_tensor *rope_sin,
+                                   uint32_t sequence, uint32_t heads,
+                                   uint32_t head_dim, uint32_t rope_half,
+                                   float epsilon);
+int h3_gpu_scale_add_bias_rms_f16(h3_gpu *gpu, h3_gpu_tensor *output,
+                                  h3_gpu_tensor *normed, const h3_gpu_tensor *residual,
+                                  const h3_gpu_tensor *branch, const h3_gpu_tensor *bias,
+                                  const h3_gpu_tensor *scale, const h3_gpu_tensor *weight,
+                                  uint32_t rows, uint32_t width, float eps);
+int h3_gpu_swiglu_bias_f16_out(h3_gpu *gpu, h3_gpu_tensor *output,
+                               const h3_gpu_tensor *fused,
+                               const h3_gpu_tensor *bias, uint32_t rows,
+                               uint32_t width);
+int h3_gpu_linear_f16_f32_out(h3_gpu *gpu, h3_gpu_tensor *output,
+                              const h3_gpu_tensor *input,
+                              const h3_gpu_tensor *weight, uint32_t rows,
+                              uint32_t in_features, uint32_t out_features);
+int h3_gpu_sdpa_f16_d64(h3_gpu *gpu, h3_gpu_tensor *output,
+                        const h3_gpu_tensor *query, const h3_gpu_tensor *key,
+                        const h3_gpu_tensor *value, uint32_t tokens,
+                        uint32_t heads, uint32_t head_dim, float scale);
 #ifdef __cplusplus
 }
 #endif

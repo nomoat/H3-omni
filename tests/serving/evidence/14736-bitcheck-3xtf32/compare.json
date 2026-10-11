@@ -1,0 +1,213 @@
+{
+  "r1-boat": {
+    "reference": "r1-boat",
+    "video_latent.f32": {
+      "equal": true,
+      "bytes": 2643840,
+      "finite": true
+    },
+    "audio_latent.f32": {
+      "equal": true,
+      "bytes": 23808,
+      "finite": true
+    },
+    "audio_pcm.f32": {
+      "equal": true,
+      "bytes": 595200,
+      "finite": true
+    },
+    "video_rgb.f32": {
+      "equal": false,
+      "bytes": 278691840,
+      "finite": true,
+      "max_abs": 7.18235969543457e-06,
+      "differing": 55870387
+    },
+    "output.mp4": {
+      "equal": false,
+      "bytes": 690003
+    },
+    "all_equal": false
+  },
+  "r2-fox": {
+    "reference": "r2-fox",
+    "video_latent.f32": {
+      "equal": true,
+      "bytes": 2643840,
+      "finite": true
+    },
+    "audio_latent.f32": {
+      "equal": true,
+      "bytes": 23808,
+      "finite": true
+    },
+    "audio_pcm.f32": {
+      "equal": true,
+      "bytes": 595200,
+      "finite": true
+    },
+    "video_rgb.f32": {
+      "equal": false,
+      "bytes": 278691840,
+      "finite": true,
+      "max_abs": 5.334615707397461e-06,
+      "differing": 57487259
+    },
+    "output.mp4": {
+      "equal": false,
+      "bytes": 825226
+    },
+    "all_equal": false
+  },
+  "r3-boat": {
+    "reference": "r1-boat",
+    "video_latent.f32": {
+      "equal": true,
+      "bytes": 2643840,
+      "finite": true
+    },
+    "audio_latent.f32": {
+      "equal": true,
+      "bytes": 23808,
+      "finite": true
+    },
+    "audio_pcm.f32": {
+      "equal": true,
+      "bytes": 595200,
+      "finite": true
+    },
+    "video_rgb.f32": {
+      "equal": false,
+      "bytes": 278691840,
+      "finite": true,
+      "max_abs": 7.18235969543457e-06,
+      "differing": 55870387
+    },
+    "output.mp4": {
+      "equal": false,
+      "bytes": 690003
+    },
+    "all_equal": false
+  },
+  "r4-cat": {
+    "reference": "r4-cat",
+    "video_latent.f32": {
+      "equal": true,
+      "bytes": 688128,
+      "finite": true
+    },
+    "audio_latent.f32": {
+      "equal": true,
+      "bytes": 9472,
+      "finite": true
+    },
+    "audio_pcm.f32": {
+      "equal": true,
+      "bytes": 236800,
+      "finite": true
+    },
+    "video_rgb.f32": {
+      "equal": false,
+      "bytes": 69206016,
+      "finite": true,
+      "max_abs": 2.086162567138672e-06,
+      "differing": 15361331
+    },
+    "output.mp4": {
+      "equal": false,
+      "bytes": 388114
+    },
+    "all_equal": false
+  },
+  "r5-fox": {
+    "reference": "r2-fox",
+    "video_latent.f32": {
+      "equal": true,
+      "bytes": 2643840,
+      "finite": true
+    },
+    "audio_latent.f32": {
+      "equal": true,
+      "bytes": 23808,
+      "finite": true
+    },
+    "audio_pcm.f32": {
+      "equal": true,
+      "bytes": 595200,
+      "finite": true
+    },
+    "video_rgb.f32": {
+      "equal": false,
+      "bytes": 278691840,
+      "finite": true,
+      "max_abs": 5.334615707397461e-06,
+      "differing": 57487259
+    },
+    "output.mp4": {
+      "equal": false,
+      "bytes": 825226
+    },
+    "all_equal": false
+  },
+  "r6-city": {
+    "reference": "r6-city",
+    "video_latent.f32": {
+      "equal": true,
+      "bytes": 172032,
+      "finite": true
+    },
+    "audio_latent.f32": {
+      "equal": true,
+      "bytes": 9472,
+      "finite": true
+    },
+    "audio_pcm.f32": {
+      "equal": true,
+      "bytes": 236800,
+      "finite": true
+    },
+    "video_rgb.f32": {
+      "equal": false,
+      "bytes": 17301504,
+      "finite": true,
+      "max_abs": 4.32133674621582e-06,
+      "differing": 3942692
+    },
+    "output.mp4": {
+      "equal": false,
+      "bytes": 108446
+    },
+    "all_equal": false
+  },
+  "r7-fox": {
+    "reference": "r2-fox",
+    "video_latent.f32": {
+      "equal": true,
+      "bytes": 2643840,
+      "finite": true
+    },
+    "audio_latent.f32": {
+      "equal": true,
+      "bytes": 23808,
+      "finite": true
+    },
+    "audio_pcm.f32": {
+      "equal": true,
+      "bytes": 595200,
+      "finite": true
+    },
+    "video_rgb.f32": {
+      "equal": false,
+      "bytes": 278691840,
+      "finite": true,
+      "max_abs": 5.334615707397461e-06,
+      "differing": 57487259
+    },
+    "output.mp4": {
+      "equal": false,
+      "bytes": 825226
+    },
+    "all_equal": false
+  },
+  "passed": false
+}

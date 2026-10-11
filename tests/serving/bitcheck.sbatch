@@ -14,6 +14,8 @@
 # reference mode (FlashAttention-2, FP32 video VAE); with that reference the
 # run sets H3_FLASH3=0 H3_VAE_3XTF32=0. Pass MODE=default together with a
 # fresh directory produced by the default mode to check the fast path.
+# MODE=3xtf32 runs the default mode with the 3xTF32 video VAE (the default
+# before the FP16 video VAE; reference 14438).
 # Usage: sbatch bitcheck.sbatch SOURCE_TAR [REFERENCE_FRESH_DIR [MODE]]
 set -euo pipefail
 ROOT=/home/cj/h3-serve
@@ -21,6 +23,7 @@ SOURCE=$1
 REFERENCE=${2:-$ROOT/results/14416/fresh}
 MODE=${3:-reference}
 if [ "$MODE" = reference ]; then export H3_FLASH3=0 H3_VAE_3XTF32=0; fi
+if [ "$MODE" = 3xtf32 ]; then export H3_VAE_PRECISION=3xtf32; fi
 STAGE=/var/tmp/h3-bitcheck-$SLURM_JOB_ID
 RESULT=$ROOT/results/$SLURM_JOB_ID
 mkdir -p "$STAGE/icu" "$STAGE/.deps" "$RESULT"
