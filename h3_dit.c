@@ -224,6 +224,23 @@ struct h3_dit {
     h3_gpu_tensor *video_output_bf16;
     h3_gpu_tensor *previous_audio_velocity;
     h3_gpu_tensor *previous_video_velocity;
+#ifdef H3_CUDA
+    /* Multi-GPU (H3_GPUS=N > 1), Ulysses sequence parallelism. Rank 0 is the
+     * object callers hold and owns the others; every rank is a complete
+     * h3_dit on its own device, driven by its own thread. Input packing,
+     * final heads and the sampler are replicated; the transformer blocks see
+     * only this rank's shard_rows rows, and attention exchanges heads. */
+    int rank;
+    int world;
+    struct h3_dit_group *group;   /* rank 0 only */
+    h3_gpu_comm *comm;
+    uint32_t shard_rows;          /* ceil(sequence / world); last rank padded */
+    h3_gpu_tensor *shard_hidden;
+    h3_gpu_tensor *full_hidden;   /* hidden while shard_hidden stands in */
+    h3_gpu_tensor *shard_rope_cos;
+    h3_gpu_tensor *shard_rope_sin;
+    h3_gpu_tensor **shard_row_maps;
+#endif
 };
 
 static void fail(char *error, size_t error_size, const char *format, ...) {
@@ -314,6 +331,19 @@ static h3_gpu_tensor *f2(h3_dit *dit, const char *name, uint64_t rows,
     return h3_weight_load_f32(dit->weights, dit->gpu, name, 2, shape,
                               error, error_size);
 }
+
+#ifdef H3_CUDA
+/* This rank's first sequence row and its number of real (unpadded) rows. */
+static uint32_t shard_start(const h3_dit *dit) {
+    return (uint32_t)dit->rank * dit->shard_rows;
+}
+static uint32_t shard_real_rows(const h3_dit *dit) {
+    uint32_t start = shard_start(dit);
+    return dit->sequence > start ?
+        (dit->sequence - start < dit->shard_rows ?
+         dit->sequence - start : dit->shard_rows) : 0;
+}
+#endif
 
 static int copy_layout(h3_dit *dit, const h3_layout *layout,
                        char *error, size_t error_size) {
@@ -1066,6 +1096,31 @@ static int prepare_rope(h3_dit *dit, char *error, size_t error_size) {
                      (uint32_t)reduced_count), error, error_size,
                      "reduced RoPE sine cast");
         }
+#ifdef H3_CUDA
+        if (ok && dit->world > 1) {
+            /* Padding rows get zero tables; their outputs are never used. */
+            size_t shard = (size_t)dit->shard_rows * ROPE_HALF;
+            size_t start = (size_t)shard_start(dit) * ROPE_HALF;
+            size_t real = (size_t)shard_real_rows(dit) * ROPE_HALF;
+            dit->shard_rope_cos = h3_gpu_tensor_new_bf16(dit->gpu, shard);
+            dit->shard_rope_sin = h3_gpu_tensor_new_bf16(dit->gpu, shard);
+            ok = dit->shard_rope_cos && dit->shard_rope_sin &&
+                 gpu_op(dit, h3_gpu_zero(dit->gpu, dit->shard_rope_cos),
+                        error, error_size, "clear RoPE shard") &&
+                 gpu_op(dit, h3_gpu_zero(dit->gpu, dit->shard_rope_sin),
+                        error, error_size, "clear RoPE shard") &&
+                 (!real ||
+                  (gpu_op(dit, h3_gpu_copy_bf16(dit->gpu, dit->shard_rope_cos, 0,
+                       dit->rope_cos, start, real), error, error_size,
+                       "RoPE cosine shard") &&
+                   gpu_op(dit, h3_gpu_copy_bf16(dit->gpu, dit->shard_rope_sin, 0,
+                       dit->rope_sin, start, real), error, error_size,
+                       "RoPE sine shard")));
+            if (!ok && (!error || !*error))
+                fail(error, error_size, "cannot allocate DiT RoPE shard: %s",
+                     h3_gpu_error(dit->gpu));
+        }
+#endif
         if (ok) ok =
              gpu_op(dit, h3_gpu_submit(dit->gpu), error, error_size,
                     "submit RoPE setup");
@@ -1091,6 +1146,13 @@ static int prepare_maps(h3_dit *dit, const h3_text_embedding *text,
                                    sizeof(*dit->final_audio_maps));
     dit->final_video_maps = calloc((size_t)steps,
                                    sizeof(*dit->final_video_maps));
+#ifdef H3_CUDA
+    if (dit->world > 1 &&
+        !(dit->shard_row_maps = calloc((size_t)steps, sizeof(*dit->shard_row_maps)))) {
+        fail(error, error_size, "out of memory allocating row map shards");
+        return 0;
+    }
+#endif
     uint32_t *rows = malloc((size_t)dit->sequence * sizeof(*rows));
     uint32_t *reduced = dit->token_reduction ?
         malloc((size_t)dit->reduced_sequence * sizeof(*reduced)) : NULL;
@@ -1129,6 +1191,24 @@ static int prepare_maps(h3_dit *dit, const h3_text_embedding *text,
             video[index] = video_row;
         dit->row_maps[step] = h3_gpu_tensor_from_u32(
             dit->gpu, rows, dit->sequence);
+#ifdef H3_CUDA
+        if (dit->world > 1) {
+            /* Padding rows read modulation row 0; their values are unused. */
+            uint32_t *shard = calloc(dit->shard_rows, sizeof(*shard));
+            if (shard) {
+                memcpy(shard, rows + shard_start(dit),
+                       (size_t)shard_real_rows(dit) * sizeof(*shard));
+                dit->shard_row_maps[step] = h3_gpu_tensor_from_u32(
+                    dit->gpu, shard, dit->shard_rows);
+                free(shard);
+            }
+            if (!dit->shard_row_maps[step]) {
+                fail(error, error_size, "cannot allocate modulation row map shard");
+                free(rows); free(reduced); free(audio); free(video);
+                return 0;
+            }
+        }
+#endif
         dit->final_audio_maps[step] = h3_gpu_tensor_from_u32(
             dit->gpu, audio, dit->audio_rows);
         dit->final_video_maps[step] = h3_gpu_tensor_from_u32(
@@ -1451,6 +1531,25 @@ static int allocate_activations(h3_dit *dit, char *error, size_t error_size) {
     size_t video = dit->video_rows;
     size_t audio_total = dit->audio_total_rows;
     size_t video_total = dit->video_total_rows;
+    /* Multi-GPU: hidden also receives the all-gather of every rank's padded
+     * shard. Other buffers need only shard_rows rows; sizing them for the
+     * whole sequence keeps the single-GPU allocation code. */
+    size_t hidden_rows = sequence;
+#ifdef H3_CUDA
+    if (dit->world > 1) {
+        hidden_rows = (size_t)dit->shard_rows * (size_t)dit->world;
+        dit->shard_hidden = h3_gpu_tensor_new_bf16(
+            dit->gpu, (size_t)dit->shard_rows * HIDDEN);
+        if (!dit->shard_hidden ||
+            !gpu_op(dit, h3_gpu_zero(dit->gpu, dit->shard_hidden), error,
+                    error_size, "clear DiT hidden shard")) {
+            if (!error || !*error)
+                fail(error, error_size, "cannot allocate DiT hidden shard: %s",
+                     h3_gpu_error(dit->gpu));
+            return 0;
+        }
+    }
+#endif
     dit->activation_aliases = !getenv("H3_DISABLE_DIT_ACTIVATION_ALIAS");
     dit->fused_patch_projection =
         !getenv("H3_DISABLE_FUSED_PATCH_CAST") && !getenv("H3_SCALAR_PATCH");
@@ -1461,7 +1560,7 @@ static int allocate_activations(h3_dit *dit, char *error, size_t error_size) {
     h3_gpu_tensor *all[] = {
         F32(video_input, video_total * VIDEO_PATCH),
         F32(audio_input, audio_total * AUDIO_CHANNELS),
-        BF(hidden, sequence * HIDDEN),
+        BF(hidden, hidden_rows * HIDDEN),
         BF(mod_attention, sequence * HIDDEN),
         BF(qkv, sequence * INNER * 3),
         BF(query, sequence * INNER),
@@ -1729,6 +1828,19 @@ static int bind_request(h3_dit *dit, const h3_text_embedding *text,
         (size_t)dit->video_condition_rows * VIDEO_PATCH;
     size_t wanted_audio_condition =
         (size_t)dit->audio_condition_rows * AUDIO_CHANNELS;
+#ifdef H3_CUDA
+    if (dit->world > 1) {
+        if (core_reuse_interval != 1 || token_reduction || dit->ssd_streaming ||
+            dit->fasth3.kind) {
+            fail(error, error_size, "multi-GPU (H3_GPUS) supports the original "
+                 "H3 model with every block evaluated, no token reduction and "
+                 "no SSD streaming");
+            return 0;
+        }
+        dit->shard_rows = (dit->sequence + (uint32_t)dit->world - 1) /
+                          (uint32_t)dit->world;
+    }
+#endif
     if (dit->fasth3.kind) {
         h3_sigma_schedule expected;
         if (wanted_video_condition || wanted_audio_condition || active_blocks != 50 ||
@@ -1831,34 +1943,74 @@ static int bind_request(h3_dit *dit, const h3_text_embedding *text,
     return 1;
 }
 
-static h3_dit *load_dit(const char *weight_directory,
-                        const char *shader_source_path,
-                        const h3_text_embedding *text,
-                        const h3_layout *layout,
-                        const h3_sigma_schedule *sigmas,
-                        unsigned active_blocks,
-                        unsigned core_reuse_interval,
-                        int token_reduction,
-                        int ssd_streaming,
-                        float spatial_rope_scale,
-                        int use_slower_bf16_mlp,
-                        int use_slower_bf16_qkv,
-                        int use_slower_bf16_attention_output,
-                        int use_slower_row_major_attention_output,
-                        int use_slower_unfused_int8_inputs,
-                        int use_slower_unfused_qkv_rope,
-                        int use_slower_scalar_qkv_rms,
-                        int use_slower_uncached_int8_scales,
-                        int use_slower_dynamic_fc1_k,
-                        int use_slower_grouped_quantizer,
-                        int use_int8_row_fc2,
-                        const float *condition_video_rows,
-                        size_t condition_video_elements,
-                        const float *condition_audio_rows,
-                        size_t condition_audio_elements,
-                        int resident,
-                        h3_dit_progress progress, void *progress_opaque,
-                        char *error, size_t error_size) {
+/* Arguments of every DiT load, shared by the public loaders and, for
+ * multi-GPU, by each rank's loading thread. */
+typedef struct {
+    const char *weight_directory;
+    const char *shader_source_path;
+    const h3_text_embedding *text;
+    const h3_layout *layout;
+    const h3_sigma_schedule *sigmas;
+    unsigned active_blocks;
+    unsigned core_reuse_interval;
+    int token_reduction;
+    int ssd_streaming;
+    float spatial_rope_scale;
+    int use_slower_bf16_mlp;
+    int use_slower_bf16_qkv;
+    int use_slower_bf16_attention_output;
+    int use_slower_row_major_attention_output;
+    int use_slower_unfused_int8_inputs;
+    int use_slower_unfused_qkv_rope;
+    int use_slower_scalar_qkv_rms;
+    int use_slower_uncached_int8_scales;
+    int use_slower_dynamic_fc1_k;
+    int use_slower_grouped_quantizer;
+    int use_int8_row_fc2;
+    const float *condition_video_rows;
+    size_t condition_video_elements;
+    const float *condition_audio_rows;
+    size_t condition_audio_elements;
+    int resident;
+} dit_load_args;
+
+static void dit_free(h3_dit *dit);
+static h3_dit *load_dit(const dit_load_args *args, h3_dit_progress progress,
+                        void *progress_opaque, char *error, size_t error_size);
+
+static h3_dit *load_dit_rank(const dit_load_args *args, int rank, int world,
+                             h3_dit_progress progress, void *progress_opaque,
+                             char *error, size_t error_size) {
+    const char *weight_directory = args->weight_directory;
+    const char *shader_source_path = args->shader_source_path;
+    const h3_text_embedding *text = args->text;
+    const h3_layout *layout = args->layout;
+    const h3_sigma_schedule *sigmas = args->sigmas;
+    unsigned active_blocks = args->active_blocks;
+    unsigned core_reuse_interval = args->core_reuse_interval;
+    int token_reduction = args->token_reduction;
+    int ssd_streaming = args->ssd_streaming;
+    float spatial_rope_scale = args->spatial_rope_scale;
+    int use_slower_bf16_mlp = args->use_slower_bf16_mlp;
+    int use_slower_bf16_qkv = args->use_slower_bf16_qkv;
+    int use_slower_bf16_attention_output = args->use_slower_bf16_attention_output;
+    int use_slower_row_major_attention_output =
+        args->use_slower_row_major_attention_output;
+    int use_slower_unfused_int8_inputs = args->use_slower_unfused_int8_inputs;
+    int use_slower_unfused_qkv_rope = args->use_slower_unfused_qkv_rope;
+    int use_slower_scalar_qkv_rms = args->use_slower_scalar_qkv_rms;
+    int use_slower_uncached_int8_scales = args->use_slower_uncached_int8_scales;
+    int use_slower_dynamic_fc1_k = args->use_slower_dynamic_fc1_k;
+    int use_slower_grouped_quantizer = args->use_slower_grouped_quantizer;
+    int use_int8_row_fc2 = args->use_int8_row_fc2;
+    const float *condition_video_rows = args->condition_video_rows;
+    size_t condition_video_elements = args->condition_video_elements;
+    const float *condition_audio_rows = args->condition_audio_rows;
+    size_t condition_audio_elements = args->condition_audio_elements;
+    int resident = args->resident;
+#ifndef H3_CUDA
+    (void)rank; (void)world;
+#endif
     if (error && error_size) error[0] = '\0';
     if (!weight_directory || !shader_source_path || !layout || !sigmas ||
         (ssd_streaming != 0 && ssd_streaming != 1) ||
@@ -1891,6 +2043,10 @@ static h3_dit *load_dit(const char *weight_directory,
 #endif
     dit->ssd_streaming = ssd_streaming;
     dit->resident = resident;
+#ifdef H3_CUDA
+    dit->rank = rank;
+    dit->world = world;
+#endif
     dit->weights = h3_weight_store_open(weight_directory, error, error_size);
     if (!dit->weights) goto failed;
 #ifdef H3_CUDA
@@ -1940,7 +2096,7 @@ static h3_dit *load_dit(const char *weight_directory,
                      error, error_size) == 1)
         return dit;
 failed:
-    h3_dit_free(dit);
+    dit_free(dit);
     return NULL;
 }
 
@@ -1967,22 +2123,19 @@ h3_dit *h3_dit_load_t2va(const char *weight_directory,
                          int use_int8_row_fc2,
                          h3_dit_progress progress, void *progress_opaque,
                          char *error, size_t error_size) {
-    return load_dit(weight_directory, shader_source_path, text, layout, sigmas,
-                    active_blocks, core_reuse_interval, token_reduction,
-                    ssd_streaming,
-                    spatial_rope_scale,
-                    use_slower_bf16_mlp, use_slower_bf16_qkv,
-                    use_slower_bf16_attention_output,
-                    use_slower_row_major_attention_output,
-                    use_slower_unfused_int8_inputs,
-                    use_slower_unfused_qkv_rope,
-                    use_slower_scalar_qkv_rms,
-                    use_slower_uncached_int8_scales,
-                    use_slower_dynamic_fc1_k,
-                    use_slower_grouped_quantizer,
-                    use_int8_row_fc2,
-                    NULL, 0, NULL, 0, 0, progress, progress_opaque,
-                    error, error_size);
+    dit_load_args args = {
+        weight_directory, shader_source_path, text, layout, sigmas,
+        active_blocks, core_reuse_interval, token_reduction, ssd_streaming,
+        spatial_rope_scale, use_slower_bf16_mlp, use_slower_bf16_qkv,
+        use_slower_bf16_attention_output,
+        use_slower_row_major_attention_output,
+        use_slower_unfused_int8_inputs, use_slower_unfused_qkv_rope,
+        use_slower_scalar_qkv_rms, use_slower_uncached_int8_scales,
+        use_slower_dynamic_fc1_k, use_slower_grouped_quantizer,
+        use_int8_row_fc2,
+        NULL, 0, NULL, 0, 0
+    };
+    return load_dit(&args, progress, progress_opaque, error, error_size);
 }
 
 h3_dit *h3_dit_load_conditioned(
@@ -2013,23 +2166,20 @@ h3_dit *h3_dit_load_conditioned(
                          size_t condition_audio_elements,
                          h3_dit_progress progress, void *progress_opaque,
                          char *error, size_t error_size) {
-    return load_dit(weight_directory, shader_source_path, text, layout, sigmas,
-                    active_blocks, core_reuse_interval, token_reduction,
-                    ssd_streaming,
-                    spatial_rope_scale,
-                    use_slower_bf16_mlp, use_slower_bf16_qkv,
-                    use_slower_bf16_attention_output,
-                    use_slower_row_major_attention_output,
-                    use_slower_unfused_int8_inputs,
-                    use_slower_unfused_qkv_rope,
-                    use_slower_scalar_qkv_rms,
-                    use_slower_uncached_int8_scales,
-                    use_slower_dynamic_fc1_k,
-                    use_slower_grouped_quantizer,
-                    use_int8_row_fc2,
-                    condition_video_rows, condition_video_elements,
-                    condition_audio_rows, condition_audio_elements,
-                    0, progress, progress_opaque, error, error_size);
+    dit_load_args args = {
+        weight_directory, shader_source_path, text, layout, sigmas,
+        active_blocks, core_reuse_interval, token_reduction, ssd_streaming,
+        spatial_rope_scale, use_slower_bf16_mlp, use_slower_bf16_qkv,
+        use_slower_bf16_attention_output,
+        use_slower_row_major_attention_output,
+        use_slower_unfused_int8_inputs, use_slower_unfused_qkv_rope,
+        use_slower_scalar_qkv_rms, use_slower_uncached_int8_scales,
+        use_slower_dynamic_fc1_k, use_slower_grouped_quantizer,
+        use_int8_row_fc2,
+        condition_video_rows, condition_video_elements,
+        condition_audio_rows, condition_audio_elements, 0
+    };
+    return load_dit(&args, progress, progress_opaque, error, error_size);
 }
 
 h3_dit *h3_dit_load_resident(
@@ -2060,28 +2210,25 @@ h3_dit *h3_dit_load_resident(
                          size_t condition_audio_elements,
                          h3_dit_progress progress, void *progress_opaque,
                          char *error, size_t error_size) {
-    return load_dit(weight_directory, shader_source_path, text, layout, sigmas,
-                    active_blocks, core_reuse_interval, token_reduction,
-                    ssd_streaming,
-                    spatial_rope_scale,
-                    use_slower_bf16_mlp, use_slower_bf16_qkv,
-                    use_slower_bf16_attention_output,
-                    use_slower_row_major_attention_output,
-                    use_slower_unfused_int8_inputs,
-                    use_slower_unfused_qkv_rope,
-                    use_slower_scalar_qkv_rms,
-                    use_slower_uncached_int8_scales,
-                    use_slower_dynamic_fc1_k,
-                    use_slower_grouped_quantizer,
-                    use_int8_row_fc2,
-                    condition_video_rows, condition_video_elements,
-                    condition_audio_rows, condition_audio_elements,
-                    1, progress, progress_opaque, error, error_size);
+    dit_load_args args = {
+        weight_directory, shader_source_path, text, layout, sigmas,
+        active_blocks, core_reuse_interval, token_reduction, ssd_streaming,
+        spatial_rope_scale, use_slower_bf16_mlp, use_slower_bf16_qkv,
+        use_slower_bf16_attention_output,
+        use_slower_row_major_attention_output,
+        use_slower_unfused_int8_inputs, use_slower_unfused_qkv_rope,
+        use_slower_scalar_qkv_rms, use_slower_uncached_int8_scales,
+        use_slower_dynamic_fc1_k, use_slower_grouped_quantizer,
+        use_int8_row_fc2,
+        condition_video_rows, condition_video_elements,
+        condition_audio_rows, condition_audio_elements, 1
+    };
+    return load_dit(&args, progress, progress_opaque, error, error_size);
 }
 
 static void free_request_state(h3_dit *dit);
 
-int h3_dit_rebind(h3_dit *dit, const h3_text_embedding *text,
+static int dit_rebind(h3_dit *dit, const h3_text_embedding *text,
                   const h3_layout *layout,
                   const h3_sigma_schedule *sigmas,
                   unsigned active_blocks,
@@ -2222,6 +2369,15 @@ static int run_block(h3_dit *dit, unsigned index, int step,
         dit->reduced_rope_sin : dit->rope_sin;
     uint32_t rows = dit->token_reduction_active ?
         dit->reduced_sequence : dit->sequence;
+#ifdef H3_CUDA
+    /* Multi-GPU: this rank's rows only; dit->hidden is its shard here. */
+    if (dit->world > 1) {
+        row_map = dit->shard_row_maps[step];
+        rope_cos = dit->shard_rope_cos;
+        rope_sin = dit->shard_rope_sin;
+        rows = dit->shard_rows;
+    }
+#endif
 #define OP(call, label) do {                                                    \
     if (!gpu_op(dit, (call), error, error_size, label)) return 0;               \
 } while (0)
@@ -2268,6 +2424,26 @@ static int run_block(h3_dit *dit, unsigned index, int step,
             OP(cuda_trace(dit, "vsa-gate", step, dit->vsa_gate_values, (size_t)rows * INNER), "trace VSA gate");
             OP(cuda_trace(dit, "vsa-heads", step, dit->attention_heads, (size_t)rows * INNER), "trace VSA heads");
         }
+    } else
+#endif
+#ifdef H3_CUDA
+    if (dit->world > 1) {
+        /* Ulysses: exchange rows for heads, attend over the whole sequence
+         * with HEADS / world heads, exchange back. The qkv buffer is free
+         * scratch until attention writes attention_heads (its alias). */
+        uint32_t heads = HEADS / (uint32_t)dit->world;
+        OP(h3_gpu_ulysses_scatter_heads_bf16(dit->gpu, dit->comm, dit->query,
+            dit->qkv, rows, HEADS, HEAD_DIM), "Ulysses query exchange");
+        OP(h3_gpu_ulysses_scatter_heads_bf16(dit->gpu, dit->comm, dit->key,
+            dit->qkv, rows, HEADS, HEAD_DIM), "Ulysses key exchange");
+        OP(h3_gpu_ulysses_scatter_heads_bf16(dit->gpu, dit->comm, dit->value,
+            dit->qkv, rows, HEADS, HEAD_DIM), "Ulysses value exchange");
+        OP(h3_gpu_sdpa_bf16(dit->gpu, dit->attention_heads, dit->query,
+            dit->key, dit->value, dit->sequence, heads, HEAD_DIM,
+            1.0f / sqrtf((float)HEAD_DIM)), "DiT sequence-parallel attention");
+        OP(h3_gpu_ulysses_gather_heads_bf16(dit->gpu, dit->comm,
+            dit->attention_heads, dit->query, rows, HEADS, HEAD_DIM),
+           "Ulysses output exchange");
     } else
 #endif
     if (head_major_attention_output)
@@ -2531,6 +2707,20 @@ static int encode_forward(h3_dit *dit, int step, int begin, int submit,
     if (evaluate_core && dit->core_reuse_interval > 1)
         OP(h3_gpu_copy_bf16(dit->gpu, dit->core_input, 0, dit->hidden, 0,
                             hidden_elements), "save DiT core input");
+#ifdef H3_CUDA
+    /* Multi-GPU: the blocks run on this rank's rows, held in shard_hidden
+     * (its padding rows stay zero). hidden is swapped for the shard here and
+     * restored, then filled again by an all-gather of every rank's shard. */
+    if (evaluate_core && dit->world > 1) {
+        uint32_t real = shard_real_rows(dit);
+        if (real)
+            OP(h3_gpu_copy_bf16(dit->gpu, dit->shard_hidden, 0, dit->hidden,
+                (size_t)shard_start(dit) * HIDDEN, (size_t)real * HIDDEN),
+               "take DiT hidden shard");
+        dit->full_hidden = dit->hidden;
+        dit->hidden = dit->shard_hidden;
+    }
+#endif
     if (evaluate_core) {
         unsigned command_blocks = disable_command_split
             ? 0 : command_block_interval(dit);
@@ -2627,7 +2817,7 @@ static int encode_forward(h3_dit *dit, int step, int begin, int submit,
                 return 0;
             }
 #ifdef H3_CUDA
-            if (getenv("H3_CUDA_TRACE_DIR") && step == 0) {
+            if (getenv("H3_CUDA_TRACE_DIR") && step == 0 && dit->world <= 1) {
                 char label[32];
                 snprintf(label, sizeof(label), "block-%02u", block);
                 OP(cuda_trace(dit, label, step, dit->hidden, hidden_elements),
@@ -2681,6 +2871,15 @@ static int encode_forward(h3_dit *dit, int step, int begin, int submit,
                            dit->core_residual, hidden_elements),
            "reuse DiT core residual");
     }
+#ifdef H3_CUDA
+    if (dit->full_hidden) {
+        dit->hidden = dit->full_hidden;
+        dit->full_hidden = NULL;
+        OP(h3_gpu_all_gather_bf16(dit->gpu, dit->comm, dit->hidden,
+            dit->shard_hidden, (size_t)dit->shard_rows * HIDDEN),
+           "all-gather DiT hidden shards");
+    }
+#endif
     dit->core_forward_count++;
     const h3_gpu_tensor *final = h3_dit_schedule_final(dit->schedule);
 #ifdef H3_CUDA
@@ -2780,7 +2979,7 @@ size_t h3_dit_audio_elements(const h3_dit *dit) {
         (size_t)dit->audio_t : 0;
 }
 
-int h3_dit_reset_run(h3_dit *dit,
+static int dit_reset_run(h3_dit *dit,
                      const float *condition_video_rows,
                      size_t condition_video_elements,
                      const float *condition_audio_rows,
@@ -2814,7 +3013,7 @@ int h3_dit_reset_run(h3_dit *dit,
     return 1;
 }
 
-int h3_dit_forward(h3_dit *dit, int step,
+static int dit_forward(h3_dit *dit, int step,
                    const float *video_latent, const float *audio_latent,
                    float *video_velocity, float *audio_velocity,
                    char *error, size_t error_size) {
@@ -3172,7 +3371,7 @@ static int denoise_euler_gpu(h3_dit *dit, float *video_latent,
     return ok;
 }
 
-int h3_dit_denoise(h3_dit *dit, float *video_latent, float *audio_latent,
+static int dit_denoise(h3_dit *dit, float *video_latent, float *audio_latent,
                    h3_dit_progress progress, void *progress_opaque,
                    char *error, size_t error_size) {
     if (error && error_size) error[0] = '\0';
@@ -3203,7 +3402,7 @@ int h3_dit_denoise(h3_dit *dit, float *video_latent, float *audio_latent,
     int ok = 1;
     for (int step = 0; step < dit->sigmas.steps && ok; step++) {
         report(progress, progress_opaque, "denoise", step, dit->sigmas.steps);
-        ok = h3_dit_forward(dit, step, video_latent, audio_latent,
+        ok = dit_forward(dit, step, video_latent, audio_latent,
                             video_velocity, audio_velocity,
                             error, error_size);
         float sigma = dit->sigmas.video[step];
@@ -3246,7 +3445,7 @@ int h3_dit_denoise(h3_dit *dit, float *video_latent, float *audio_latent,
     return ok;
 }
 
-int h3_dit_denoise_euler_preview(
+static int dit_denoise_euler_preview(
                          h3_dit *dit, float *video_latent,
                          float *audio_latent, int reuse_interval,
                          h3_dit_progress progress, void *progress_opaque,
@@ -3316,7 +3515,7 @@ int h3_dit_denoise_euler_preview(
         report(progress, progress_opaque, "denoise", step, dit->sigmas.steps);
         int evaluate = selected[step];
         if (evaluate) {
-            ok = h3_dit_forward(dit, step, video_latent, audio_latent,
+            ok = dit_forward(dit, step, video_latent, audio_latent,
                                 video_velocity, audio_velocity,
                                 error, error_size);
             if (ok && reuse_interval > 1) {
@@ -3411,6 +3610,20 @@ static void free_request_state(h3_dit *dit) {
     dit->reduced_row_maps = NULL;
     dit->final_audio_maps = NULL;
     dit->final_video_maps = NULL;
+#ifdef H3_CUDA
+    if (dit->full_hidden) {   /* a failed forward left the shard in place */
+        dit->hidden = dit->full_hidden;
+        dit->full_hidden = NULL;
+    }
+    if (dit->shard_row_maps) for (int step = 0; step < steps; step++)
+        h3_gpu_tensor_free(dit->shard_row_maps[step]);
+    free(dit->shard_row_maps);
+    dit->shard_row_maps = NULL;
+    free_tensor(&dit->shard_rope_cos);
+    free_tensor(&dit->shard_rope_sin);
+    free_tensor(&dit->shard_hidden);
+    dit->shard_rows = 0;
+#endif
     free_tensor(&dit->refined_text);
     free_tensor(&dit->rope_cos);
     free_tensor(&dit->rope_sin);
@@ -3470,7 +3683,7 @@ static void free_request_state(h3_dit *dit) {
     dit->reduced_video_rows = dit->token_baseline_rows = 0;
 }
 
-void h3_dit_free(h3_dit *dit) {
+static void dit_free(h3_dit *dit) {
     if (!dit) return;
     free_request_state(dit);
     free_refiner(dit);
@@ -3587,3 +3800,419 @@ int h3_dit_unpack_audio(const float *rows, int channels, int time,
             }
     return input == latent_elements;
 }
+
+/* ------------------------------------------------------------------------
+ * Multi-GPU groups (CUDA, H3_GPUS=N). Every operation runs once per rank,
+ * each on its own thread with its device selected; rank 0 gets the caller's
+ * progress, preview and output buffers, the others private copies. NCCL
+ * collectives inside the forward keep the ranks in step. When one rank fails
+ * the communicators are aborted so the others return instead of waiting; the
+ * group must then be freed.
+ * ------------------------------------------------------------------------ */
+#ifdef H3_CUDA
+enum { MAX_GPUS = 8 };
+
+typedef struct h3_dit_group {
+    int world;
+    h3_dit *ranks[MAX_GPUS];
+    h3_gpu_comm *comms[MAX_GPUS];
+    pthread_mutex_t lock;
+    int aborted;
+} h3_dit_group;
+
+typedef int (*rank_call)(h3_dit_group *group, int rank, void *opaque,
+                         char *error, size_t error_size);
+
+typedef struct {
+    h3_dit_group *group;
+    int rank;
+    rank_call call;
+    void *opaque;
+    int result;
+    char error[512];
+} rank_job;
+
+static void group_abort(h3_dit_group *group) {
+    pthread_mutex_lock(&group->lock);
+    if (!group->aborted) {
+        group->aborted = 1;
+        for (int rank = 0; rank < group->world; rank++)
+            h3_gpu_comm_abort(group->comms[rank]);
+    }
+    pthread_mutex_unlock(&group->lock);
+}
+
+static void *rank_thread(void *opaque) {
+    rank_job *job = opaque;
+    job->result = h3_gpu_select_device(job->rank, job->error, sizeof(job->error)) ?
+        job->call(job->group, job->rank, job->opaque, job->error,
+                  sizeof(job->error)) : 0;
+    if (job->result != 1) group_abort(job->group);
+    return NULL;
+}
+
+/* Returns 1 when every rank returned 1, otherwise the first rank's result
+ * that is not 1 (0 for errors) with its message. */
+static int run_ranks(h3_dit_group *group, rank_call call, void *opaque,
+                     char *error, size_t error_size) {
+    if (group->aborted) {
+        fail(error, error_size, "multi-GPU DiT group failed earlier; reload it");
+        return 0;
+    }
+    rank_job jobs[MAX_GPUS];
+    pthread_t threads[MAX_GPUS];
+    int started[MAX_GPUS] = {0};
+    for (int rank = 0; rank < group->world; rank++) {
+        jobs[rank] = (rank_job){group, rank, call, opaque, 0, ""};
+        started[rank] = !pthread_create(&threads[rank], NULL, rank_thread,
+                                        &jobs[rank]);
+        if (!started[rank]) {
+            snprintf(jobs[rank].error, sizeof(jobs[rank].error),
+                     "cannot start thread for GPU %d", rank);
+            group_abort(group);
+        }
+    }
+    int result = 1;
+    for (int rank = 0; rank < group->world; rank++) {
+        if (started[rank]) pthread_join(threads[rank], NULL);
+        if (result == 1 && jobs[rank].result != 1) {
+            result = jobs[rank].result;
+            fail(error, error_size, "GPU %d: %s", rank, jobs[rank].error);
+        }
+    }
+    return result;
+}
+
+static int parallel_world(char *error, size_t error_size) {
+    const char *value = getenv("H3_GPUS");
+    if (!value || !*value) return 1;
+    char *end = NULL;
+    long world = strtol(value, &end, 10);
+    if (end == value || *end || world < 1 || world > MAX_GPUS || HEADS % world) {
+        fail(error, error_size, "H3_GPUS must be 1, 2, 4, 7 or 8 "
+             "(it divides the %d attention heads)", HEADS);
+        return 0;
+    }
+    int devices = h3_gpu_device_count();
+    if (world > devices) {
+        fail(error, error_size, "H3_GPUS=%ld but %d CUDA devices are visible",
+             world, devices);
+        return 0;
+    }
+    return (int)world;
+}
+
+static int free_rank(h3_dit_group *group, int rank, void *opaque,
+                     char *error, size_t error_size) {
+    (void)opaque; (void)error; (void)error_size;
+    dit_free(group->ranks[rank]);
+    group->ranks[rank] = NULL;
+    return 1;
+}
+
+static void group_free(h3_dit_group *group) {
+    if (!group) return;
+    for (int rank = 0; rank < group->world; rank++) {
+        h3_gpu_comm_free(group->comms[rank]);
+        group->comms[rank] = NULL;
+    }
+    group->aborted = 0;
+    char error[256];
+    (void)run_ranks(group, free_rank, NULL, error, sizeof(error));
+    pthread_mutex_destroy(&group->lock);
+    free(group);
+}
+
+typedef struct {
+    const dit_load_args *args;
+    h3_dit_progress progress;
+    void *progress_opaque;
+} load_job;
+
+static int load_rank(h3_dit_group *group, int rank, void *opaque,
+                     char *error, size_t error_size) {
+    load_job *job = opaque;
+    group->ranks[rank] = load_dit_rank(
+        job->args, rank, group->world, rank ? NULL : job->progress,
+        rank ? NULL : job->progress_opaque, error, error_size);
+    return group->ranks[rank] != NULL;
+}
+
+static h3_dit *load_dit(const dit_load_args *args, h3_dit_progress progress,
+                        void *progress_opaque, char *error, size_t error_size) {
+    if (error && error_size) error[0] = '\0';
+    int world = parallel_world(error, error_size);
+    if (!world) return NULL;
+    if (world == 1)
+        return load_dit_rank(args, 0, 1, progress, progress_opaque,
+                             error, error_size);
+    h3_dit_group *group = calloc(1, sizeof(*group));
+    if (!group) {
+        fail(error, error_size, "out of memory creating multi-GPU DiT group");
+        return NULL;
+    }
+    group->world = world;
+    pthread_mutex_init(&group->lock, NULL);
+    load_job job = {args, progress, progress_opaque};
+    if (run_ranks(group, load_rank, &job, error, error_size) != 1 ||
+        !h3_gpu_comm_init_all(world, group->comms, error, error_size)) {
+        group_free(group);
+        return NULL;
+    }
+    for (int rank = 0; rank < world; rank++)
+        group->ranks[rank]->comm = group->comms[rank];
+    group->ranks[0]->group = group;
+    return group->ranks[0];
+}
+
+typedef struct {
+    const h3_text_embedding *text;
+    const h3_layout *layout;
+    const h3_sigma_schedule *sigmas;
+    unsigned active_blocks;
+    unsigned core_reuse_interval;
+    int token_reduction;
+    float spatial_rope_scale;
+    const float *condition_video_rows;
+    size_t condition_video_elements;
+    const float *condition_audio_rows;
+    size_t condition_audio_elements;
+    h3_dit_progress progress;
+    void *progress_opaque;
+} rebind_job;
+
+static int rebind_rank(h3_dit_group *group, int rank, void *opaque,
+                       char *error, size_t error_size) {
+    rebind_job *job = opaque;
+    return dit_rebind(group->ranks[rank], job->text, job->layout, job->sigmas,
+                      job->active_blocks, job->core_reuse_interval,
+                      job->token_reduction, job->spatial_rope_scale,
+                      job->condition_video_rows, job->condition_video_elements,
+                      job->condition_audio_rows, job->condition_audio_elements,
+                      rank ? NULL : job->progress,
+                      rank ? NULL : job->progress_opaque, error, error_size);
+}
+
+typedef struct {
+    const float *condition_video_rows;
+    size_t condition_video_elements;
+    const float *condition_audio_rows;
+    size_t condition_audio_elements;
+} reset_job;
+
+static int reset_rank(h3_dit_group *group, int rank, void *opaque,
+                      char *error, size_t error_size) {
+    reset_job *job = opaque;
+    return dit_reset_run(group->ranks[rank], job->condition_video_rows,
+                         job->condition_video_elements,
+                         job->condition_audio_rows,
+                         job->condition_audio_elements, error, error_size);
+}
+
+/* Sampler calls: rank 0 works on the caller's latents (and outputs); the
+ * other ranks on copies, so all end with the same values. */
+typedef struct {
+    int kind; /* 0 forward, 1 RES denoise, 2 Euler denoise */
+    int step;
+    int reuse_interval;
+    float *video[MAX_GPUS];
+    float *audio[MAX_GPUS];
+    float *video_out[MAX_GPUS];
+    float *audio_out[MAX_GPUS];
+    h3_dit_progress progress;
+    void *progress_opaque;
+    h3_dit_preview preview;
+    void *preview_opaque;
+} sampler_job;
+
+static int sampler_rank(h3_dit_group *group, int rank, void *opaque,
+                        char *error, size_t error_size) {
+    sampler_job *job = opaque;
+    h3_dit *dit = group->ranks[rank];
+    h3_dit_progress progress = rank ? NULL : job->progress;
+    void *progress_opaque = rank ? NULL : job->progress_opaque;
+    if (job->kind == 0)
+        return dit_forward(dit, job->step, job->video[rank], job->audio[rank],
+                           job->video_out[rank], job->audio_out[rank],
+                           error, error_size);
+    if (job->kind == 1)
+        return dit_denoise(dit, job->video[rank], job->audio[rank], progress,
+                           progress_opaque, error, error_size);
+    return dit_denoise_euler_preview(
+        dit, job->video[rank], job->audio[rank], job->reuse_interval,
+        progress, progress_opaque, rank ? NULL : job->preview,
+        rank ? NULL : job->preview_opaque, error, error_size);
+}
+
+static void sampler_job_free(sampler_job *job, int world) {
+    for (int rank = 1; rank < world; rank++) {
+        free(job->video[rank]); free(job->audio[rank]);
+        free(job->video_out[rank]); free(job->audio_out[rank]);
+    }
+}
+
+/* Copies the inputs for ranks 1..world-1; outputs get scratch buffers. */
+static int sampler_job_init(sampler_job *job, h3_dit *dit, float *video,
+                            float *audio, float *video_out, float *audio_out,
+                            char *error, size_t error_size) {
+    size_t video_bytes = h3_dit_video_elements(dit) * sizeof(float);
+    size_t audio_bytes = h3_dit_audio_elements(dit) * sizeof(float);
+    int world = dit->group->world;
+    job->video[0] = video; job->audio[0] = audio;
+    job->video_out[0] = video_out; job->audio_out[0] = audio_out;
+    for (int rank = 1; rank < world; rank++) {
+        job->video[rank] = malloc(video_bytes);
+        job->audio[rank] = malloc(audio_bytes);
+        if (video_out) job->video_out[rank] = malloc(video_bytes);
+        if (audio_out) job->audio_out[rank] = malloc(audio_bytes);
+        if (!job->video[rank] || !job->audio[rank] ||
+            (video_out && !job->video_out[rank]) ||
+            (audio_out && !job->audio_out[rank])) {
+            sampler_job_free(job, world);
+            fail(error, error_size, "out of memory copying latents for GPU %d", rank);
+            return 0;
+        }
+        memcpy(job->video[rank], video, video_bytes);
+        memcpy(job->audio[rank], audio, audio_bytes);
+    }
+    return 1;
+}
+
+static int run_sampler(h3_dit *dit, sampler_job *job, float *video,
+                       float *audio, float *video_out, float *audio_out,
+                       char *error, size_t error_size) {
+    if (!video || !audio) {
+        fail(error, error_size, "invalid DiT sampler arguments");
+        return 0;
+    }
+    if (!sampler_job_init(job, dit, video, audio, video_out, audio_out,
+                          error, error_size)) return 0;
+    int ok = run_ranks(dit->group, sampler_rank, job, error, error_size) == 1;
+    sampler_job_free(job, dit->group->world);
+    return ok;
+}
+#endif
+
+int h3_dit_rebind(h3_dit *dit, const h3_text_embedding *text,
+                  const h3_layout *layout,
+                  const h3_sigma_schedule *sigmas,
+                  unsigned active_blocks,
+                  unsigned core_reuse_interval,
+                  int token_reduction,
+                  float spatial_rope_scale,
+                  const float *condition_video_rows,
+                  size_t condition_video_elements,
+                  const float *condition_audio_rows,
+                  size_t condition_audio_elements,
+                  h3_dit_progress progress, void *progress_opaque,
+                  char *error, size_t error_size) {
+#ifdef H3_CUDA
+    if (dit && dit->group) {
+        rebind_job job = {text, layout, sigmas, active_blocks,
+                          core_reuse_interval, token_reduction,
+                          spatial_rope_scale, condition_video_rows,
+                          condition_video_elements, condition_audio_rows,
+                          condition_audio_elements, progress, progress_opaque};
+        return run_ranks(dit->group, rebind_rank, &job, error, error_size);
+    }
+#endif
+    return dit_rebind(dit, text, layout, sigmas, active_blocks,
+                      core_reuse_interval, token_reduction, spatial_rope_scale,
+                      condition_video_rows, condition_video_elements,
+                      condition_audio_rows, condition_audio_elements,
+                      progress, progress_opaque, error, error_size);
+}
+
+int h3_dit_reset_run(h3_dit *dit,
+                     const float *condition_video_rows,
+                     size_t condition_video_elements,
+                     const float *condition_audio_rows,
+                     size_t condition_audio_elements,
+                     char *error, size_t error_size) {
+#ifdef H3_CUDA
+    if (dit && dit->group) {
+        reset_job job = {condition_video_rows, condition_video_elements,
+                         condition_audio_rows, condition_audio_elements};
+        return run_ranks(dit->group, reset_rank, &job, error, error_size) == 1;
+    }
+#endif
+    return dit_reset_run(dit, condition_video_rows, condition_video_elements,
+                         condition_audio_rows, condition_audio_elements,
+                         error, error_size);
+}
+
+int h3_dit_forward(h3_dit *dit, int step,
+                   const float *video_latent, const float *audio_latent,
+                   float *video_velocity, float *audio_velocity,
+                   char *error, size_t error_size) {
+#ifdef H3_CUDA
+    if (dit && dit->group) {
+        sampler_job job = {.kind = 0, .step = step};
+        if (!video_velocity || !audio_velocity) {
+            fail(error, error_size, "invalid DiT forward arguments");
+            return 0;
+        }
+        return run_sampler(dit, &job, (float *)video_latent,
+                           (float *)audio_latent, video_velocity,
+                           audio_velocity, error, error_size);
+    }
+#endif
+    return dit_forward(dit, step, video_latent, audio_latent, video_velocity,
+                       audio_velocity, error, error_size);
+}
+
+int h3_dit_denoise(h3_dit *dit, float *video_latent, float *audio_latent,
+                   h3_dit_progress progress, void *progress_opaque,
+                   char *error, size_t error_size) {
+#ifdef H3_CUDA
+    if (dit && dit->group) {
+        sampler_job job = {.kind = 1, .progress = progress,
+                           .progress_opaque = progress_opaque};
+        return run_sampler(dit, &job, video_latent, audio_latent, NULL, NULL,
+                           error, error_size);
+    }
+#endif
+    return dit_denoise(dit, video_latent, audio_latent, progress,
+                       progress_opaque, error, error_size);
+}
+
+int h3_dit_denoise_euler_preview(
+                         h3_dit *dit, float *video_latent,
+                         float *audio_latent, int reuse_interval,
+                         h3_dit_progress progress, void *progress_opaque,
+                         h3_dit_preview preview, void *preview_opaque,
+                         char *error, size_t error_size) {
+#ifdef H3_CUDA
+    if (dit && dit->group) {
+        sampler_job job = {.kind = 2, .reuse_interval = reuse_interval,
+                           .progress = progress,
+                           .progress_opaque = progress_opaque,
+                           .preview = preview,
+                           .preview_opaque = preview_opaque};
+        return run_sampler(dit, &job, video_latent, audio_latent, NULL, NULL,
+                           error, error_size);
+    }
+#endif
+    return dit_denoise_euler_preview(dit, video_latent, audio_latent,
+                                     reuse_interval, progress, progress_opaque,
+                                     preview, preview_opaque, error,
+                                     error_size);
+}
+
+void h3_dit_free(h3_dit *dit) {
+#ifdef H3_CUDA
+    if (dit && dit->group) {
+        group_free(dit->group);
+        return;
+    }
+#endif
+    dit_free(dit);
+}
+
+#ifndef H3_CUDA
+static h3_dit *load_dit(const dit_load_args *args, h3_dit_progress progress,
+                        void *progress_opaque, char *error, size_t error_size) {
+    return load_dit_rank(args, 0, 1, progress, progress_opaque, error,
+                         error_size);
+}
+#endif

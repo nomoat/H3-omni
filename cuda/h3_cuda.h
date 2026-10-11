@@ -4,6 +4,26 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
+/* Multi-GPU (cuda/parallel.cuh). A thread selects its device before it
+ * creates or uses an h3_gpu. One NCCL communicator per device 0..count-1.
+ * Ulysses: scatter_heads turns this rank's [rows][heads][dim] rows into all
+ * ranks' rows for heads/ranks heads, [ranks*rows][heads/ranks][dim];
+ * gather_heads is the inverse. Values are moved, never changed. */
+typedef struct h3_gpu_comm h3_gpu_comm;
+int h3_gpu_device_count(void);
+int h3_gpu_select_device(int device, char *error, size_t error_size);
+int h3_gpu_comm_init_all(int count, h3_gpu_comm **comms, char *error, size_t error_size);
+void h3_gpu_comm_free(h3_gpu_comm *comm);
+void h3_gpu_comm_abort(h3_gpu_comm *comm);
+int h3_gpu_ulysses_scatter_heads_bf16(h3_gpu *gpu, h3_gpu_comm *comm, h3_gpu_tensor *tensor,
+                                      h3_gpu_tensor *scratch, uint32_t rows, uint32_t heads,
+                                      uint32_t dim);
+int h3_gpu_ulysses_gather_heads_bf16(h3_gpu *gpu, h3_gpu_comm *comm, h3_gpu_tensor *tensor,
+                                     h3_gpu_tensor *scratch, uint32_t rows, uint32_t heads,
+                                     uint32_t dim);
+int h3_gpu_zero(h3_gpu *gpu, h3_gpu_tensor *tensor);
+int h3_gpu_all_gather_bf16(h3_gpu *gpu, h3_gpu_comm *comm, h3_gpu_tensor *output,
+                           const h3_gpu_tensor *input, size_t count);
 typedef struct h3_gpu_vsa h3_gpu_vsa;
 h3_gpu_vsa *h3_gpu_vsa_new(h3_gpu *gpu, uint32_t text_rows, uint32_t audio_rows,
                            uint32_t time, uint32_t height, uint32_t width, uint32_t heads);
