@@ -161,6 +161,14 @@ After the merge with the FP16 video VAE (job 14779, gpu-h200x1-2, resident
 21.0-22.5 s for 10 s video: denoise 5.1 / 10.8 s, video VAE 2.5 / 4.9 s,
 and 2.4-6.3 s of MP4 encoding that does not overlap the decode.
 
+Multi-GPU (`--gpus N`, job 14963, 2 GPUs, gpu-h200x8-1): VSA attention runs
+with 28 heads per GPU after the Ulysses exchange, and the gate is exchanged
+like Q/K/V. Latents, audio and RGB are bit-identical to one GPU on two
+requests. Warm 864x480 requests: 5 s video 4.55-4.69 s (denoise 2.95 s,
+video VAE 1.18 s, MP4 tail 0.18 s), 10 s video 8.91-9.02 s. On this 8-GPU
+node the MP4 tail is 0.2 s; the 2.4-6.3 s tail of job 14779 came from the
+single-GPU node.
+
 These are individual requests, not a statistical benchmark or a comparison
 with the blog's B200 system. Cold loading depends heavily on shared storage.
 Raw timings are in `14583/benchmark.jsonl`. The actual warm MP4 has

@@ -228,8 +228,8 @@ process: one thread and one complete model copy per GPU, NCCL between them.
 
 Output is bit-identical to one GPU (latents, audio and RGB) for N = 2, 4, 7
 and 8, in two requests each (jobs 14780, 14781, 14783, 14785, 14789, 14792;
-`tests/serving/multigpu.sbatch`, `compare_gpus.py`). FastH3, token
-reduction, core reuse and SSD streaming are refused with N > 1.
+`tests/serving/multigpu.sbatch`, `compare_gpus.py`). FastH3 runs on N GPUs
+too (see FASTH3.md); token reduction, core reuse and SSD streaming are refused with N > 1.
 
 | Request (warm, 864x480, 20 steps) | 1 GPU | 2 GPUs | 4 GPUs | 8 GPUs | vLLM-Omni 2 / 4 / 8 GPUs |
 | --- | --- | --- | --- | --- | --- |

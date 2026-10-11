@@ -1830,11 +1830,9 @@ static int bind_request(h3_dit *dit, const h3_text_embedding *text,
         (size_t)dit->audio_condition_rows * AUDIO_CHANNELS;
 #ifdef H3_CUDA
     if (dit->world > 1) {
-        if (core_reuse_interval != 1 || token_reduction || dit->ssd_streaming ||
-            dit->fasth3.kind) {
-            fail(error, error_size, "multi-GPU (H3_GPUS) supports the original "
-                 "H3 model with every block evaluated, no token reduction and "
-                 "no SSD streaming");
+        if (core_reuse_interval != 1 || token_reduction || dit->ssd_streaming) {
+            fail(error, error_size, "multi-GPU (H3_GPUS) needs every block "
+                 "evaluated, no token reduction and no SSD streaming");
             return 0;
         }
         dit->shard_rows = (dit->sequence + (uint32_t)dit->world - 1) /
@@ -1921,8 +1919,10 @@ static int bind_request(h3_dit *dit, const h3_text_embedding *text,
         !allocate_activations(dit, error, error_size)) return 0;
 #ifdef H3_VSA
     if (dit->fasth3.kind == H3_FASTH3_VSA) {
+        /* Multi-GPU: each rank attends with HEADS / world heads. */
         dit->vsa = h3_gpu_vsa_new(dit->gpu, dit->text_rows, dit->audio_rows,
-            dit->latent_t, dit->latent_h / 2, dit->latent_w / 2, HEADS);
+            dit->latent_t, dit->latent_h / 2, dit->latent_w / 2,
+            HEADS / (unsigned)(dit->world > 1 ? dit->world : 1));
         dit->vsa_gate_values = h3_gpu_tensor_new_bf16(dit->gpu, (size_t)dit->sequence * INNER);
         if (!dit->vsa || !dit->vsa_gate_values) {
             fail(error, error_size, "cannot prepare VSA: %s", h3_gpu_error(dit->gpu));
@@ -2414,9 +2414,27 @@ static int run_block(h3_dit *dit, unsigned index, int step,
     if (dit->vsa) {
         OP(h3_gpu_linear_bf16(dit->gpu, dit->vsa_gate_values, dit->mod_attention,
             weight->vsa_gate, NULL, rows, HIDDEN, INNER), "VSA compression gate");
+#ifdef H3_CUDA
+        /* Multi-GPU: exchange rows for heads as for full attention; the gate
+         * has the same [rows][heads][dim] layout as Q/K/V. */
+        if (dit->world > 1) {
+            h3_gpu_tensor *exchanged[] = {dit->query, dit->key, dit->value,
+                                          dit->vsa_gate_values};
+            for (size_t item = 0; item < 4; item++)
+                OP(h3_gpu_ulysses_scatter_heads_bf16(dit->gpu, dit->comm,
+                    exchanged[item], dit->qkv, rows, HEADS, HEAD_DIM),
+                   "Ulysses VSA input exchange");
+        }
+#endif
         OP(h3_gpu_vsa_bf16(dit->vsa, dit->attention_heads, dit->query,
             dit->key, dit->value, dit->vsa_gate_values), "DiT VSA attention");
-        if (index == 0 && step == 0 && getenv("H3_CUDA_TRACE_DIR")) {
+#ifdef H3_CUDA
+        if (dit->world > 1)
+            OP(h3_gpu_ulysses_gather_heads_bf16(dit->gpu, dit->comm,
+                dit->attention_heads, dit->query, rows, HEADS, HEAD_DIM),
+               "Ulysses VSA output exchange");
+#endif
+        if (index == 0 && step == 0 && dit->world <= 1 && getenv("H3_CUDA_TRACE_DIR")) {
             OP(cuda_trace(dit, "vsa-input", step, dit->mod_attention, (size_t)rows * HIDDEN), "trace VSA input");
             OP(cuda_trace(dit, "vsa-q", step, dit->query, (size_t)rows * INNER), "trace VSA query");
             OP(cuda_trace(dit, "vsa-k", step, dit->key, (size_t)rows * INNER), "trace VSA key");

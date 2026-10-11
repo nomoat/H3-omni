@@ -1,0 +1,66 @@
+{
+  "c1-boat": {
+    "video_latent.f32": {
+      "equal": true,
+      "finite": true,
+      "relative_l2": 0.0,
+      "max_abs": 0.0,
+      "differing": 0.0
+    },
+    "audio_latent.f32": {
+      "equal": true,
+      "finite": true,
+      "relative_l2": 0.0,
+      "max_abs": 0.0,
+      "differing": 0.0
+    },
+    "audio_pcm.f32": {
+      "equal": true,
+      "finite": true,
+      "relative_l2": 0.0,
+      "max_abs": 0.0,
+      "differing": 0.0
+    },
+    "video_rgb.f32": {
+      "equal": true,
+      "finite": true,
+      "relative_l2": 0.0,
+      "max_abs": 0.0,
+      "differing": 0.0,
+      "pixels_equal": 1.0,
+      "max_8bit": 0
+    }
+  },
+  "c2-cat": {
+    "video_latent.f32": {
+      "equal": true,
+      "finite": true,
+      "relative_l2": 0.0,
+      "max_abs": 0.0,
+      "differing": 0.0
+    },
+    "audio_latent.f32": {
+      "equal": true,
+      "finite": true,
+      "relative_l2": 0.0,
+      "max_abs": 0.0,
+      "differing": 0.0
+    },
+    "audio_pcm.f32": {
+      "equal": true,
+      "finite": true,
+      "relative_l2": 0.0,
+      "max_abs": 0.0,
+      "differing": 0.0
+    },
+    "video_rgb.f32": {
+      "equal": true,
+      "finite": true,
+      "relative_l2": 0.0,
+      "max_abs": 0.0,
+      "differing": 0.0,
+      "pixels_equal": 1.0,
+      "max_8bit": 0
+    }
+  }
+}
