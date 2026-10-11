@@ -15,6 +15,8 @@ struct h3_audio_vae_decoder;
 struct h3_ctx {
     char *model_dir;
     char error[512];
+    /* Why ordered references cannot run, when Ref2VA/ exists but is incomplete. */
+    char ref2va_unavailable[512];
     h3_device_info device;
     h3_model_info model;
     int cache_enabled;

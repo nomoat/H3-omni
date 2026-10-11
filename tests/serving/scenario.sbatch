@@ -41,6 +41,8 @@ SCENARIO="$3"
 export OMP_NUM_THREADS="${SLURM_CPUS_PER_TASK:-8}"
 export LD_LIBRARY_PATH="$1/icu/usr/lib/x86_64-linux-gnu${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
 export H3_FFMPEG=/home/cj/h3-cuda/releases/14274/bin/ffmpeg
+# Same johnvansickle 7.0.2 static build as H3_FFMPEG (identical ffmpeg sha256).
+export H3_FFPROBE=/home/cj/h3-serve/tools/ffmpeg-7.0.2-static/ffmpeg-7.0.2-amd64-static/ffprobe
 for tree in new old; do
     make -C "$1/$tree" -f cuda/Makefile -j"$OMP_NUM_THREADS" ICU_ROOT="$1/icu/usr" "$1/$tree/build-cuda/h3" \
         > "$1/build-$tree.log" 2>&1 || { tail -30 "$1/build-$tree.log"; exit 1; }

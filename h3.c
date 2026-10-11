@@ -482,7 +482,9 @@ h3_ctx *h3_load_dir(const char *model_dir) {
         return NULL;
     }
     /* Ref2VA is selected only by ordered-reference requests. Keep prompt-only
-     * FL2VA usable while that optional 62 GiB checkpoint is not installed. */
+     * FL2VA usable while that optional checkpoint is not installed. Ordered
+     * references read the tokenizer, text encoder, transformer and both VAEs
+     * from Ref2VA/ (144 GB). */
     char *ref_index = h3_path(
         ctx->model_dir, "Ref2VA/transformer/model.safetensors.index.json");
     if (!ref_index) {
@@ -498,6 +500,21 @@ h3_ctx *h3_load_dir(const char *model_dir) {
         snprintf(h3_global_error, sizeof(h3_global_error), "%s", ctx->error);
         h3_free(ctx);
         return NULL;
+    }
+    if (has_ref2va) {
+        /* A partial Ref2VA/ (for example only the transformer) must not fail
+         * prompt-only requests; ordered references report what is missing. */
+        h3_component_info scratch;
+        if (!h3_require_file(ctx, "Ref2VA/tokenizer/tokenizer.json") ||
+            !h3_inventory(ctx, "Ref2VA/text_encoder", &scratch) ||
+            !h3_inventory(ctx, "Ref2VA/video_vae/source", &scratch) ||
+            !h3_inventory(ctx, "Ref2VA/audio_vae", &scratch)) {
+            snprintf(ctx->ref2va_unavailable, sizeof(ctx->ref2va_unavailable),
+                     "incomplete Ref2VA checkpoint: %s", ctx->error);
+            memset(&ctx->model.ref2va_transformer, 0,
+                   sizeof(ctx->model.ref2va_transformer));
+            ctx->error[0] = '\0';
+        }
     }
     char metal_error[256];
     if (!h3_metal_probe(&ctx->device, metal_error, sizeof(metal_error))) {
@@ -1070,7 +1087,9 @@ h3_result *h3_generate(h3_ctx *ctx, const char *prompt,
     }
     int ref2va = params->reference_count != 0;
     if (ref2va && !ctx->model.ref2va_transformer.files) {
-        h3_set_error(ctx, "ordered references require the Ref2VA checkpoint");
+        h3_set_error(ctx, "ordered references require the Ref2VA checkpoint%s%s",
+                     ctx->ref2va_unavailable[0] ? ": " : "",
+                     ctx->ref2va_unavailable);
         return NULL;
     }
     h3_generation_progress progress = {ctx, params, 0};

@@ -204,6 +204,22 @@ one, and FFmpeg encodes each finished chunk during the decode. Both modes
 give the same bytes as the serial path (job 14473/14474 bit checks); a warm
 10 s request spends 32.1 of its 33.0 s video VAE on the GPU (job 14476).
 
+## Deployment requirements
+
+- Weights: `FL2VA/` (prompt-only and first/last-frame requests). Ordered
+  references (`--ref-image`, `--ref-video`, `--ref-audio`, ...) also need the
+  complete `Ref2VA/` directory, 144 GB: h3 reads its tokenizer, text encoder,
+  transformer and both VAEs from there, not only the transformer.
+  `python3 tests/pytorch/download.py --ref2va DIR` fetches both from the
+  pinned revision. At revision 42ed227e only `Ref2VA/transformer` differs
+  from FL2VA; the other files are byte-identical.
+- FFmpeg and FFprobe: `H3_FFMPEG` encodes the MP4; `H3_FFPROBE` reads the size
+  and streams of reference images and videos (default: `ffmpeg`/`ffprobe`
+  on `PATH`). The cluster uses the johnvansickle.com 7.0.2 static build for
+  both.
+- Peak GPU memory in resident serving: 118 GB at 1344x768, 768x1344 and
+  15 s (job 14488).
+
 ## Reference environment and tests
 
 `tests/pytorch/prepare.sh` installs the pinned Diffusers source and Transformers

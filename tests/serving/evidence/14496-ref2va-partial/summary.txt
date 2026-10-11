@@ -1,0 +1,2 @@
+ordered reference exit 1 : h3: ordered references require the Ref2VA checkpoint: incomplete Ref2VA checkpoint: missing required model file: /var/tmp/h3-ref2va-partial-14496/model/Ref2VA/tokenizer/tokenizer.json
+prompt-only exit 0 : 175986 /var/tmp/h3-ref2va-partial-14496/prompt.mp4
