@@ -169,6 +169,15 @@ video VAE 1.18 s, MP4 tail 0.18 s), 10 s video 8.91-9.02 s. On this 8-GPU
 node the MP4 tail is 0.2 s; the 2.4-6.3 s tail of job 14779 came from the
 single-GPU node.
 
+| Warm request, 864x480 | 1 GPU (14779) | 2 GPUs (14963) | 4 GPUs (14961) | 8 GPUs (14962) |
+| --- | --- | --- | --- | --- |
+| 5 s video | 10.5-11.6 s | 4.55-4.69 s | 2.62-2.81 s | 1.85-2.21 s |
+| 10 s video | 21.0-22.5 s | 8.91-9.02 s | 5.07-5.18 s | 3.47-3.84 s |
+
+All multi-GPU runs are bit-identical to one GPU on the two check requests.
+At 8 GPUs a 5 s request spends 0.85-0.9 s in denoise and 0.6 s in the video
+VAE, whose host passes no longer shrink with more GPUs.
+
 These are individual requests, not a statistical benchmark or a comparison
 with the blog's B200 system. Cold loading depends heavily on shared storage.
 Raw timings are in `14583/benchmark.jsonl`. The actual warm MP4 has
