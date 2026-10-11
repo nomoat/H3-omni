@@ -1,0 +1,506 @@
+{"event":"context_load","seconds":0.964002229}
+{"event":"progress","request":0,"phase":"tokenizer","completed":0,"total":1,"seconds":0.000006739}
+{"event":"progress","request":0,"phase":"tokenizer","completed":1,"total":1,"seconds":0.219428742}
+{"event":"progress","request":0,"phase":"text encoder","completed":0,"total":50,"seconds":0.221035851}
+{"event":"progress","request":0,"phase":"text encoder","completed":1,"total":50,"seconds":1.373962207}
+{"event":"progress","request":0,"phase":"text encoder","completed":2,"total":50,"seconds":1.386733073}
+{"event":"progress","request":0,"phase":"text encoder","completed":3,"total":50,"seconds":1.422245968}
+{"event":"progress","request":0,"phase":"text encoder","completed":4,"total":50,"seconds":1.564829416}
+{"event":"progress","request":0,"phase":"text encoder","completed":5,"total":50,"seconds":1.581195704}
+{"event":"progress","request":0,"phase":"text encoder","completed":6,"total":50,"seconds":1.757059323}
+{"event":"progress","request":0,"phase":"text encoder","completed":7,"total":50,"seconds":1.792276128}
+{"event":"progress","request":0,"phase":"text encoder","completed":8,"total":50,"seconds":1.960585598}
+{"event":"progress","request":0,"phase":"text encoder","completed":9,"total":50,"seconds":2.014597009}
+{"event":"progress","request":0,"phase":"text encoder","completed":10,"total":50,"seconds":2.159164323}
+{"event":"progress","request":0,"phase":"text encoder","completed":11,"total":50,"seconds":2.197322227}
+{"event":"progress","request":0,"phase":"text encoder","completed":12,"total":50,"seconds":2.304522556}
+{"event":"progress","request":0,"phase":"text encoder","completed":13,"total":50,"seconds":2.352979322}
+{"event":"progress","request":0,"phase":"text encoder","completed":14,"total":50,"seconds":2.508907579}
+{"event":"progress","request":0,"phase":"text encoder","completed":15,"total":50,"seconds":2.539775796}
+{"event":"progress","request":0,"phase":"text encoder","completed":16,"total":50,"seconds":2.681496908}
+{"event":"progress","request":0,"phase":"text encoder","completed":17,"total":50,"seconds":2.755561426}
+{"event":"progress","request":0,"phase":"text encoder","completed":18,"total":50,"seconds":2.849056993}
+{"event":"progress","request":0,"phase":"text encoder","completed":19,"total":50,"seconds":2.958884900}
+{"event":"progress","request":0,"phase":"text encoder","completed":20,"total":50,"seconds":2.990247082}
+{"event":"progress","request":0,"phase":"text encoder","completed":21,"total":50,"seconds":3.123685878}
+{"event":"progress","request":0,"phase":"text encoder","completed":22,"total":50,"seconds":3.172397544}
+{"event":"progress","request":0,"phase":"text encoder","completed":23,"total":50,"seconds":3.280853994}
+{"event":"progress","request":0,"phase":"text encoder","completed":24,"total":50,"seconds":3.333138958}
+{"event":"progress","request":0,"phase":"text encoder","completed":25,"total":50,"seconds":3.458459082}
+{"event":"progress","request":0,"phase":"text encoder","completed":26,"total":50,"seconds":3.494371071}
+{"event":"progress","request":0,"phase":"text encoder","completed":27,"total":50,"seconds":3.633719748}
+{"event":"progress","request":0,"phase":"text encoder","completed":28,"total":50,"seconds":3.664114537}
+{"event":"progress","request":0,"phase":"text encoder","completed":29,"total":50,"seconds":3.792039179}
+{"event":"progress","request":0,"phase":"text encoder","completed":30,"total":50,"seconds":3.832698904}
+{"event":"progress","request":0,"phase":"text encoder","completed":31,"total":50,"seconds":3.967839482}
+{"event":"progress","request":0,"phase":"text encoder","completed":32,"total":50,"seconds":4.024512506}
+{"event":"progress","request":0,"phase":"text encoder","completed":33,"total":50,"seconds":4.131200312}
+{"event":"progress","request":0,"phase":"text encoder","completed":34,"total":50,"seconds":4.209706997}
+{"event":"progress","request":0,"phase":"text encoder","completed":35,"total":50,"seconds":4.311278388}
+{"event":"progress","request":0,"phase":"text encoder","completed":36,"total":50,"seconds":4.365477360}
+{"event":"progress","request":0,"phase":"text encoder","completed":37,"total":50,"seconds":4.466540872}
+{"event":"progress","request":0,"phase":"text encoder","completed":38,"total":50,"seconds":4.542163447}
+{"event":"progress","request":0,"phase":"text encoder","completed":39,"total":50,"seconds":4.615494180}
+{"event":"progress","request":0,"phase":"text encoder","completed":40,"total":50,"seconds":4.737471331}
+{"event":"progress","request":0,"phase":"text encoder","completed":41,"total":50,"seconds":4.813236500}
+{"event":"progress","request":0,"phase":"text encoder","completed":42,"total":50,"seconds":4.920960505}
+{"event":"progress","request":0,"phase":"text encoder","completed":43,"total":50,"seconds":5.013936724}
+{"event":"progress","request":0,"phase":"text encoder","completed":44,"total":50,"seconds":5.125368505}
+{"event":"progress","request":0,"phase":"text encoder","completed":45,"total":50,"seconds":5.212735720}
+{"event":"progress","request":0,"phase":"text encoder","completed":46,"total":50,"seconds":5.244087511}
+{"event":"progress","request":0,"phase":"text encoder","completed":47,"total":50,"seconds":5.384196574}
+{"event":"progress","request":0,"phase":"text encoder","completed":48,"total":50,"seconds":5.437797563}
+{"event":"progress","request":0,"phase":"text encoder","completed":49,"total":50,"seconds":5.543199376}
+{"event":"progress","request":0,"phase":"text encoder","completed":50,"total":50,"seconds":5.563246910}
+{"event":"progress","request":0,"phase":"refine text","completed":0,"total":1,"seconds":6.043485732}
+{"event":"progress","request":0,"phase":"refine text","completed":1,"total":1,"seconds":6.862997196}
+{"event":"progress","request":0,"phase":"precompute AdaLN","completed":1,"total":50,"seconds":7.196811439}
+{"event":"progress","request":0,"phase":"precompute AdaLN","completed":2,"total":50,"seconds":7.339958145}
+{"event":"progress","request":0,"phase":"precompute AdaLN","completed":3,"total":50,"seconds":7.483196309}
+{"event":"progress","request":0,"phase":"precompute AdaLN","completed":4,"total":50,"seconds":7.625456757}
+{"event":"progress","request":0,"phase":"precompute AdaLN","completed":5,"total":50,"seconds":7.835710057}
+{"event":"progress","request":0,"phase":"precompute AdaLN","completed":6,"total":50,"seconds":7.984492527}
+{"event":"progress","request":0,"phase":"precompute AdaLN","completed":7,"total":50,"seconds":8.125985929}
+{"event":"progress","request":0,"phase":"precompute AdaLN","completed":8,"total":50,"seconds":8.267617775}
+{"event":"progress","request":0,"phase":"precompute AdaLN","completed":9,"total":50,"seconds":8.407504170}
+{"event":"progress","request":0,"phase":"precompute AdaLN","completed":10,"total":50,"seconds":8.549811566}
+{"event":"progress","request":0,"phase":"precompute AdaLN","completed":11,"total":50,"seconds":8.691509875}
+{"event":"progress","request":0,"phase":"precompute AdaLN","completed":12,"total":50,"seconds":8.904417799}
+{"event":"progress","request":0,"phase":"precompute AdaLN","completed":13,"total":50,"seconds":9.049480019}
+{"event":"progress","request":0,"phase":"precompute AdaLN","completed":14,"total":50,"seconds":9.194701765}
+{"event":"progress","request":0,"phase":"precompute AdaLN","completed":15,"total":50,"seconds":9.341652516}
+{"event":"progress","request":0,"phase":"precompute AdaLN","completed":16,"total":50,"seconds":9.489389010}
+{"event":"progress","request":0,"phase":"precompute AdaLN","completed":17,"total":50,"seconds":9.635502671}
+{"event":"progress","request":0,"phase":"precompute AdaLN","completed":18,"total":50,"seconds":9.780514531}
+{"event":"progress","request":0,"phase":"precompute AdaLN","completed":19,"total":50,"seconds":9.995498673}
+{"event":"progress","request":0,"phase":"precompute AdaLN","completed":20,"total":50,"seconds":10.141880194}
+{"event":"progress","request":0,"phase":"precompute AdaLN","completed":21,"total":50,"seconds":10.288675459}
+{"event":"progress","request":0,"phase":"precompute AdaLN","completed":22,"total":50,"seconds":10.436191620}
+{"event":"progress","request":0,"phase":"precompute AdaLN","completed":23,"total":50,"seconds":10.580738674}
+{"event":"progress","request":0,"phase":"precompute AdaLN","completed":24,"total":50,"seconds":10.726650580}
+{"event":"progress","request":0,"phase":"precompute AdaLN","completed":25,"total":50,"seconds":10.873361628}
+{"event":"progress","request":0,"phase":"precompute AdaLN","completed":26,"total":50,"seconds":11.090613984}
+{"event":"progress","request":0,"phase":"precompute AdaLN","completed":27,"total":50,"seconds":11.235316601}
+{"event":"progress","request":0,"phase":"precompute AdaLN","completed":28,"total":50,"seconds":11.381892042}
+{"event":"progress","request":0,"phase":"precompute AdaLN","completed":29,"total":50,"seconds":11.528589392}
+{"event":"progress","request":0,"phase":"precompute AdaLN","completed":30,"total":50,"seconds":11.676832422}
+{"event":"progress","request":0,"phase":"precompute AdaLN","completed":31,"total":50,"seconds":11.828678275}
+{"event":"progress","request":0,"phase":"precompute AdaLN","completed":32,"total":50,"seconds":11.979099422}
+{"event":"progress","request":0,"phase":"precompute AdaLN","completed":33,"total":50,"seconds":12.194941108}
+{"event":"progress","request":0,"phase":"precompute AdaLN","completed":34,"total":50,"seconds":12.343308795}
+{"event":"progress","request":0,"phase":"precompute AdaLN","completed":35,"total":50,"seconds":12.488621981}
+{"event":"progress","request":0,"phase":"precompute AdaLN","completed":36,"total":50,"seconds":12.634884085}
+{"event":"progress","request":0,"phase":"precompute AdaLN","completed":37,"total":50,"seconds":12.781098256}
+{"event":"progress","request":0,"phase":"precompute AdaLN","completed":38,"total":50,"seconds":12.929634264}
+{"event":"progress","request":0,"phase":"precompute AdaLN","completed":39,"total":50,"seconds":13.075610291}
+{"event":"progress","request":0,"phase":"precompute AdaLN","completed":40,"total":50,"seconds":13.289849907}
+{"event":"progress","request":0,"phase":"precompute AdaLN","completed":41,"total":50,"seconds":13.437969759}
+{"event":"progress","request":0,"phase":"precompute AdaLN","completed":42,"total":50,"seconds":13.586245803}
+{"event":"progress","request":0,"phase":"precompute AdaLN","completed":43,"total":50,"seconds":13.730638172}
+{"event":"progress","request":0,"phase":"precompute AdaLN","completed":44,"total":50,"seconds":13.876930260}
+{"event":"progress","request":0,"phase":"precompute AdaLN","completed":45,"total":50,"seconds":14.025032349}
+{"event":"progress","request":0,"phase":"precompute AdaLN","completed":46,"total":50,"seconds":14.178555666}
+{"event":"progress","request":0,"phase":"precompute AdaLN","completed":47,"total":50,"seconds":14.391796016}
+{"event":"progress","request":0,"phase":"precompute AdaLN","completed":48,"total":50,"seconds":14.534688169}
+{"event":"progress","request":0,"phase":"precompute AdaLN","completed":49,"total":50,"seconds":14.679127270}
+{"event":"progress","request":0,"phase":"precompute AdaLN","completed":50,"total":50,"seconds":14.822732448}
+{"event":"progress","request":0,"phase":"load transformer core","completed":1,"total":50,"seconds":15.218511444}
+{"event":"progress","request":0,"phase":"load transformer core","completed":2,"total":50,"seconds":15.581936905}
+{"event":"progress","request":0,"phase":"load transformer core","completed":3,"total":50,"seconds":15.883524816}
+{"event":"progress","request":0,"phase":"load transformer core","completed":4,"total":50,"seconds":16.178031360}
+{"event":"progress","request":0,"phase":"load transformer core","completed":5,"total":50,"seconds":16.541089862}
+{"event":"progress","request":0,"phase":"load transformer core","completed":6,"total":50,"seconds":16.837480467}
+{"event":"progress","request":0,"phase":"load transformer core","completed":7,"total":50,"seconds":17.133673242}
+{"event":"progress","request":0,"phase":"load transformer core","completed":8,"total":50,"seconds":17.429048216}
+{"event":"progress","request":0,"phase":"load transformer core","completed":9,"total":50,"seconds":17.790752428}
+{"event":"progress","request":0,"phase":"load transformer core","completed":10,"total":50,"seconds":18.087866308}
+{"event":"progress","request":0,"phase":"load transformer core","completed":11,"total":50,"seconds":18.385665221}
+{"event":"progress","request":0,"phase":"load transformer core","completed":12,"total":50,"seconds":18.748587115}
+{"event":"progress","request":0,"phase":"load transformer core","completed":13,"total":50,"seconds":19.046410340}
+{"event":"progress","request":0,"phase":"load transformer core","completed":14,"total":50,"seconds":19.344091655}
+{"event":"progress","request":0,"phase":"load transformer core","completed":15,"total":50,"seconds":19.710379698}
+{"event":"progress","request":0,"phase":"load transformer core","completed":16,"total":50,"seconds":20.007171390}
+{"event":"progress","request":0,"phase":"load transformer core","completed":17,"total":50,"seconds":20.306176563}
+{"event":"progress","request":0,"phase":"load transformer core","completed":18,"total":50,"seconds":20.674357153}
+{"event":"progress","request":0,"phase":"load transformer core","completed":19,"total":50,"seconds":20.977131498}
+{"event":"progress","request":0,"phase":"load transformer core","completed":20,"total":50,"seconds":21.275417051}
+{"event":"progress","request":0,"phase":"load transformer core","completed":21,"total":50,"seconds":21.581822629}
+{"event":"progress","request":0,"phase":"load transformer core","completed":22,"total":50,"seconds":21.947977860}
+{"event":"progress","request":0,"phase":"load transformer core","completed":23,"total":50,"seconds":22.246840636}
+{"event":"progress","request":0,"phase":"load transformer core","completed":24,"total":50,"seconds":22.543783698}
+{"event":"progress","request":0,"phase":"load transformer core","completed":25,"total":50,"seconds":22.914254812}
+{"event":"progress","request":0,"phase":"load transformer core","completed":26,"total":50,"seconds":23.212824413}
+{"event":"progress","request":0,"phase":"load transformer core","completed":27,"total":50,"seconds":23.510976920}
+{"event":"progress","request":0,"phase":"load transformer core","completed":28,"total":50,"seconds":23.873899829}
+{"event":"progress","request":0,"phase":"load transformer core","completed":29,"total":50,"seconds":24.171623954}
+{"event":"progress","request":0,"phase":"load transformer core","completed":30,"total":50,"seconds":24.464626497}
+{"event":"progress","request":0,"phase":"load transformer core","completed":31,"total":50,"seconds":24.827075611}
+{"event":"progress","request":0,"phase":"load transformer core","completed":32,"total":50,"seconds":25.131620450}
+{"event":"progress","request":0,"phase":"load transformer core","completed":33,"total":50,"seconds":25.442041039}
+{"event":"progress","request":0,"phase":"load transformer core","completed":34,"total":50,"seconds":25.738336317}
+{"event":"progress","request":0,"phase":"load transformer core","completed":35,"total":50,"seconds":26.101417154}
+{"event":"progress","request":0,"phase":"load transformer core","completed":36,"total":50,"seconds":26.399357422}
+{"event":"progress","request":0,"phase":"load transformer core","completed":37,"total":50,"seconds":26.697271225}
+{"event":"progress","request":0,"phase":"load transformer core","completed":38,"total":50,"seconds":27.063790264}
+{"event":"progress","request":0,"phase":"load transformer core","completed":39,"total":50,"seconds":27.361551736}
+{"event":"progress","request":0,"phase":"load transformer core","completed":40,"total":50,"seconds":27.661511256}
+{"event":"progress","request":0,"phase":"load transformer core","completed":41,"total":50,"seconds":28.031136756}
+{"event":"progress","request":0,"phase":"load transformer core","completed":42,"total":50,"seconds":28.326420513}
+{"event":"progress","request":0,"phase":"load transformer core","completed":43,"total":50,"seconds":28.624395096}
+{"event":"progress","request":0,"phase":"load transformer core","completed":44,"total":50,"seconds":28.989835115}
+{"event":"progress","request":0,"phase":"load transformer core","completed":45,"total":50,"seconds":29.286499415}
+{"event":"progress","request":0,"phase":"load transformer core","completed":46,"total":50,"seconds":29.587824134}
+{"event":"progress","request":0,"phase":"load transformer core","completed":47,"total":50,"seconds":29.889361389}
+{"event":"progress","request":0,"phase":"load transformer core","completed":48,"total":50,"seconds":30.256363187}
+{"event":"progress","request":0,"phase":"load transformer core","completed":49,"total":50,"seconds":30.550171698}
+{"event":"progress","request":0,"phase":"load transformer core","completed":50,"total":50,"seconds":30.844426895}
+{"event":"progress","request":0,"phase":"denoise","completed":0,"total":20,"seconds":31.114709533}
+{"event":"progress","request":0,"phase":"denoise","completed":1,"total":20,"seconds":32.050084976}
+{"event":"progress","request":0,"phase":"denoise","completed":1,"total":20,"seconds":32.050101100}
+{"event":"progress","request":0,"phase":"denoise","completed":2,"total":20,"seconds":32.916344259}
+{"event":"progress","request":0,"phase":"denoise","completed":2,"total":20,"seconds":32.916360608}
+{"event":"progress","request":0,"phase":"denoise","completed":3,"total":20,"seconds":33.775797565}
+{"event":"progress","request":0,"phase":"denoise","completed":3,"total":20,"seconds":33.775814524}
+{"event":"progress","request":0,"phase":"denoise","completed":4,"total":20,"seconds":34.621949518}
+{"event":"progress","request":0,"phase":"denoise","completed":4,"total":20,"seconds":34.621966095}
+{"event":"progress","request":0,"phase":"denoise","completed":5,"total":20,"seconds":35.480003321}
+{"event":"progress","request":0,"phase":"denoise","completed":5,"total":20,"seconds":35.480019619}
+{"event":"progress","request":0,"phase":"denoise","completed":6,"total":20,"seconds":36.334836999}
+{"event":"progress","request":0,"phase":"denoise","completed":6,"total":20,"seconds":36.334853488}
+{"event":"progress","request":0,"phase":"denoise","completed":7,"total":20,"seconds":37.202437022}
+{"event":"progress","request":0,"phase":"denoise","completed":7,"total":20,"seconds":37.202453556}
+{"event":"progress","request":0,"phase":"denoise","completed":8,"total":20,"seconds":38.053478218}
+{"event":"progress","request":0,"phase":"denoise","completed":8,"total":20,"seconds":38.053493227}
+{"event":"progress","request":0,"phase":"denoise","completed":9,"total":20,"seconds":38.924521758}
+{"event":"progress","request":0,"phase":"denoise","completed":9,"total":20,"seconds":38.924539457}
+{"event":"progress","request":0,"phase":"denoise","completed":10,"total":20,"seconds":39.784161767}
+{"event":"progress","request":0,"phase":"denoise","completed":10,"total":20,"seconds":39.784176992}
+{"event":"progress","request":0,"phase":"denoise","completed":11,"total":20,"seconds":40.634422175}
+{"event":"progress","request":0,"phase":"denoise","completed":11,"total":20,"seconds":40.634439418}
+{"event":"progress","request":0,"phase":"denoise","completed":12,"total":20,"seconds":41.492250106}
+{"event":"progress","request":0,"phase":"denoise","completed":12,"total":20,"seconds":41.492266086}
+{"event":"progress","request":0,"phase":"denoise","completed":13,"total":20,"seconds":42.346778371}
+{"event":"progress","request":0,"phase":"denoise","completed":13,"total":20,"seconds":42.346796648}
+{"event":"progress","request":0,"phase":"denoise","completed":14,"total":20,"seconds":43.203605512}
+{"event":"progress","request":0,"phase":"denoise","completed":14,"total":20,"seconds":43.203624173}
+{"event":"progress","request":0,"phase":"denoise","completed":15,"total":20,"seconds":44.071480600}
+{"event":"progress","request":0,"phase":"denoise","completed":15,"total":20,"seconds":44.071498810}
+{"event":"progress","request":0,"phase":"denoise","completed":16,"total":20,"seconds":44.929182085}
+{"event":"progress","request":0,"phase":"denoise","completed":16,"total":20,"seconds":44.929197531}
+{"event":"progress","request":0,"phase":"denoise","completed":17,"total":20,"seconds":45.784366942}
+{"event":"progress","request":0,"phase":"denoise","completed":17,"total":20,"seconds":45.784382743}
+{"event":"progress","request":0,"phase":"denoise","completed":18,"total":20,"seconds":46.633257798}
+{"event":"progress","request":0,"phase":"denoise","completed":18,"total":20,"seconds":46.633273812}
+{"event":"progress","request":0,"phase":"denoise","completed":19,"total":20,"seconds":47.493384217}
+{"event":"progress","request":0,"phase":"denoise","completed":19,"total":20,"seconds":47.493400451}
+{"event":"progress","request":0,"phase":"denoise","completed":20,"total":20,"seconds":48.342591686}
+{"event":"progress","request":0,"phase":"audio VAE","completed":0,"total":7,"seconds":48.342607745}
+{"event":"progress","request":0,"phase":"audio VAE","completed":1,"total":7,"seconds":50.879662211}
+{"event":"progress","request":0,"phase":"audio VAE","completed":2,"total":7,"seconds":52.729461672}
+{"event":"progress","request":0,"phase":"audio VAE","completed":3,"total":7,"seconds":54.648212676}
+{"event":"progress","request":0,"phase":"audio VAE","completed":4,"total":7,"seconds":56.390675568}
+{"event":"progress","request":0,"phase":"audio VAE","completed":5,"total":7,"seconds":58.137036191}
+{"event":"progress","request":0,"phase":"audio VAE","completed":6,"total":7,"seconds":59.925481115}
+{"event":"progress","request":0,"phase":"audio VAE","completed":7,"total":7,"seconds":61.604856750}
+{"event":"progress","request":0,"phase":"video VAE load","completed":0,"total":36,"seconds":61.721608766}
+{"event":"progress","request":0,"phase":"video VAE load","completed":1,"total":36,"seconds":62.367698911}
+{"event":"progress","request":0,"phase":"video VAE load","completed":2,"total":36,"seconds":62.626178270}
+{"event":"progress","request":0,"phase":"video VAE load","completed":3,"total":36,"seconds":62.917284627}
+{"event":"progress","request":0,"phase":"video VAE load","completed":4,"total":36,"seconds":63.223150262}
+{"event":"progress","request":0,"phase":"video VAE load","completed":5,"total":36,"seconds":63.478275475}
+{"event":"progress","request":0,"phase":"video VAE load","completed":6,"total":36,"seconds":63.743492924}
+{"event":"progress","request":0,"phase":"video VAE load","completed":7,"total":36,"seconds":64.053619913}
+{"event":"progress","request":0,"phase":"video VAE load","completed":8,"total":36,"seconds":64.341529616}
+{"event":"progress","request":0,"phase":"video VAE load","completed":9,"total":36,"seconds":64.596102576}
+{"event":"progress","request":0,"phase":"video VAE load","completed":10,"total":36,"seconds":64.885007150}
+{"event":"progress","request":0,"phase":"video VAE load","completed":11,"total":36,"seconds":65.193965959}
+{"event":"progress","request":0,"phase":"video VAE load","completed":12,"total":36,"seconds":65.449646827}
+{"event":"progress","request":0,"phase":"video VAE load","completed":13,"total":36,"seconds":65.706671913}
+{"event":"progress","request":0,"phase":"video VAE load","completed":14,"total":36,"seconds":66.001165709}
+{"event":"progress","request":0,"phase":"video VAE load","completed":15,"total":36,"seconds":66.307940360}
+{"event":"progress","request":0,"phase":"video VAE load","completed":16,"total":36,"seconds":66.564167508}
+{"event":"progress","request":0,"phase":"video VAE load","completed":17,"total":36,"seconds":66.820005134}
+{"event":"progress","request":0,"phase":"video VAE load","completed":18,"total":36,"seconds":67.090735813}
+{"event":"progress","request":0,"phase":"video VAE load","completed":19,"total":36,"seconds":67.396072409}
+{"event":"progress","request":0,"phase":"video VAE load","completed":20,"total":36,"seconds":67.651498014}
+{"event":"progress","request":0,"phase":"video VAE load","completed":21,"total":36,"seconds":67.924249604}
+{"event":"progress","request":0,"phase":"video VAE load","completed":22,"total":36,"seconds":68.228297460}
+{"event":"progress","request":0,"phase":"video VAE load","completed":23,"total":36,"seconds":68.494412525}
+{"event":"progress","request":0,"phase":"video VAE load","completed":24,"total":36,"seconds":68.748895993}
+{"event":"progress","request":0,"phase":"video VAE load","completed":25,"total":36,"seconds":69.026104020}
+{"event":"progress","request":0,"phase":"video VAE load","completed":26,"total":36,"seconds":69.329961114}
+{"event":"progress","request":0,"phase":"video VAE load","completed":27,"total":36,"seconds":69.584807717}
+{"event":"progress","request":0,"phase":"video VAE load","completed":28,"total":36,"seconds":69.839929622}
+{"event":"progress","request":0,"phase":"video VAE load","completed":29,"total":36,"seconds":70.110492742}
+{"event":"progress","request":0,"phase":"video VAE load","completed":30,"total":36,"seconds":70.415090060}
+{"event":"progress","request":0,"phase":"video VAE load","completed":31,"total":36,"seconds":70.669794123}
+{"event":"progress","request":0,"phase":"video VAE load","completed":32,"total":36,"seconds":70.925316238}
+{"event":"progress","request":0,"phase":"video VAE load","completed":33,"total":36,"seconds":71.197101505}
+{"event":"progress","request":0,"phase":"video VAE load","completed":34,"total":36,"seconds":71.508874218}
+{"event":"progress","request":0,"phase":"video VAE load","completed":35,"total":36,"seconds":71.763463316}
+{"event":"progress","request":0,"phase":"video VAE load","completed":36,"total":36,"seconds":72.021132106}
+{"event":"progress","request":0,"phase":"video VAE load","completed":36,"total":36,"seconds":72.124771309}
+{"event":"progress","request":0,"phase":"FFmpeg","completed":0,"total":56,"seconds":86.910347227}
+{"event":"progress","request":0,"phase":"FFmpeg","completed":56,"total":56,"seconds":87.511445233}
+{"event":"result","request":0,"mode":"first_request","seconds":87.548998535,"width":864,"height":480,"frames":56,"fps":24,"seed":7,"cached_dit":1,"cached_video_decoder":1}
+{"event":"progress","request":1,"phase":"denoise","completed":0,"total":20,"seconds":0.013462849}
+{"event":"progress","request":1,"phase":"denoise","completed":1,"total":20,"seconds":0.864415257}
+{"event":"progress","request":1,"phase":"denoise","completed":1,"total":20,"seconds":0.864429529}
+{"event":"progress","request":1,"phase":"denoise","completed":2,"total":20,"seconds":1.716018129}
+{"event":"progress","request":1,"phase":"denoise","completed":2,"total":20,"seconds":1.716033994}
+{"event":"progress","request":1,"phase":"denoise","completed":3,"total":20,"seconds":2.576434636}
+{"event":"progress","request":1,"phase":"denoise","completed":3,"total":20,"seconds":2.576451976}
+{"event":"progress","request":1,"phase":"denoise","completed":4,"total":20,"seconds":3.444403787}
+{"event":"progress","request":1,"phase":"denoise","completed":4,"total":20,"seconds":3.444419277}
+{"event":"progress","request":1,"phase":"denoise","completed":5,"total":20,"seconds":4.298952206}
+{"event":"progress","request":1,"phase":"denoise","completed":5,"total":20,"seconds":4.298967641}
+{"event":"progress","request":1,"phase":"denoise","completed":6,"total":20,"seconds":5.160054401}
+{"event":"progress","request":1,"phase":"denoise","completed":6,"total":20,"seconds":5.160073728}
+{"event":"progress","request":1,"phase":"denoise","completed":7,"total":20,"seconds":6.015590187}
+{"event":"progress","request":1,"phase":"denoise","completed":7,"total":20,"seconds":6.015606777}
+{"event":"progress","request":1,"phase":"denoise","completed":8,"total":20,"seconds":6.890457660}
+{"event":"progress","request":1,"phase":"denoise","completed":8,"total":20,"seconds":6.890483570}
+{"event":"progress","request":1,"phase":"denoise","completed":9,"total":20,"seconds":7.756649339}
+{"event":"progress","request":1,"phase":"denoise","completed":9,"total":20,"seconds":7.756667249}
+{"event":"progress","request":1,"phase":"denoise","completed":10,"total":20,"seconds":8.609425276}
+{"event":"progress","request":1,"phase":"denoise","completed":10,"total":20,"seconds":8.609443570}
+{"event":"progress","request":1,"phase":"denoise","completed":11,"total":20,"seconds":9.482634074}
+{"event":"progress","request":1,"phase":"denoise","completed":11,"total":20,"seconds":9.482650173}
+{"event":"progress","request":1,"phase":"denoise","completed":12,"total":20,"seconds":10.351897564}
+{"event":"progress","request":1,"phase":"denoise","completed":12,"total":20,"seconds":10.351919082}
+{"event":"progress","request":1,"phase":"denoise","completed":13,"total":20,"seconds":11.218552195}
+{"event":"progress","request":1,"phase":"denoise","completed":13,"total":20,"seconds":11.218573518}
+{"event":"progress","request":1,"phase":"denoise","completed":14,"total":20,"seconds":12.079028931}
+{"event":"progress","request":1,"phase":"denoise","completed":14,"total":20,"seconds":12.079044850}
+{"event":"progress","request":1,"phase":"denoise","completed":15,"total":20,"seconds":12.933745040}
+{"event":"progress","request":1,"phase":"denoise","completed":15,"total":20,"seconds":12.933760618}
+{"event":"progress","request":1,"phase":"denoise","completed":16,"total":20,"seconds":13.792327862}
+{"event":"progress","request":1,"phase":"denoise","completed":16,"total":20,"seconds":13.792343140}
+{"event":"progress","request":1,"phase":"denoise","completed":17,"total":20,"seconds":14.664622805}
+{"event":"progress","request":1,"phase":"denoise","completed":17,"total":20,"seconds":14.664638433}
+{"event":"progress","request":1,"phase":"denoise","completed":18,"total":20,"seconds":15.535212823}
+{"event":"progress","request":1,"phase":"denoise","completed":18,"total":20,"seconds":15.535232489}
+{"event":"progress","request":1,"phase":"denoise","completed":19,"total":20,"seconds":16.396509809}
+{"event":"progress","request":1,"phase":"denoise","completed":19,"total":20,"seconds":16.396531316}
+{"event":"progress","request":1,"phase":"denoise","completed":20,"total":20,"seconds":17.256755793}
+{"event":"progress","request":1,"phase":"audio VAE","completed":0,"total":7,"seconds":17.256774137}
+{"event":"progress","request":1,"phase":"audio VAE","completed":1,"total":7,"seconds":19.361085388}
+{"event":"progress","request":1,"phase":"audio VAE","completed":2,"total":7,"seconds":21.059704120}
+{"event":"progress","request":1,"phase":"audio VAE","completed":3,"total":7,"seconds":22.677826757}
+{"event":"progress","request":1,"phase":"audio VAE","completed":4,"total":7,"seconds":24.285408035}
+{"event":"progress","request":1,"phase":"audio VAE","completed":5,"total":7,"seconds":25.898099245}
+{"event":"progress","request":1,"phase":"audio VAE","completed":6,"total":7,"seconds":27.498300408}
+{"event":"progress","request":1,"phase":"audio VAE","completed":7,"total":7,"seconds":29.109661884}
+{"event":"progress","request":1,"phase":"video VAE load","completed":0,"total":36,"seconds":29.184183892}
+{"event":"progress","request":1,"phase":"video VAE load","completed":36,"total":36,"seconds":29.184201865}
+{"event":"progress","request":1,"phase":"FFmpeg","completed":0,"total":56,"seconds":43.909730875}
+{"event":"progress","request":1,"phase":"FFmpeg","completed":56,"total":56,"seconds":44.463671544}
+{"event":"result","request":1,"mode":"cached_same_prompt_new_seed","seconds":44.464585628,"width":864,"height":480,"frames":56,"fps":24,"seed":8,"cached_dit":1,"cached_video_decoder":1}
+{"event":"progress","request":2,"phase":"tokenizer","completed":0,"total":1,"seconds":0.252267967}
+{"event":"progress","request":2,"phase":"tokenizer","completed":1,"total":1,"seconds":0.454503105}
+{"event":"progress","request":2,"phase":"text encoder","completed":0,"total":50,"seconds":0.454780730}
+{"event":"progress","request":2,"phase":"text encoder","completed":1,"total":50,"seconds":1.197391141}
+{"event":"progress","request":2,"phase":"text encoder","completed":2,"total":50,"seconds":1.390055923}
+{"event":"progress","request":2,"phase":"text encoder","completed":3,"total":50,"seconds":1.418352092}
+{"event":"progress","request":2,"phase":"text encoder","completed":4,"total":50,"seconds":1.552838067}
+{"event":"progress","request":2,"phase":"text encoder","completed":5,"total":50,"seconds":1.634891663}
+{"event":"progress","request":2,"phase":"text encoder","completed":6,"total":50,"seconds":1.752481640}
+{"event":"progress","request":2,"phase":"text encoder","completed":7,"total":50,"seconds":1.790699217}
+{"event":"progress","request":2,"phase":"text encoder","completed":8,"total":50,"seconds":1.916446888}
+{"event":"progress","request":2,"phase":"text encoder","completed":9,"total":50,"seconds":1.950215550}
+{"event":"progress","request":2,"phase":"text encoder","completed":10,"total":50,"seconds":2.093494875}
+{"event":"progress","request":2,"phase":"text encoder","completed":11,"total":50,"seconds":2.127086572}
+{"event":"progress","request":2,"phase":"text encoder","completed":12,"total":50,"seconds":2.276376192}
+{"event":"progress","request":2,"phase":"text encoder","completed":13,"total":50,"seconds":2.328287832}
+{"event":"progress","request":2,"phase":"text encoder","completed":14,"total":50,"seconds":2.468450708}
+{"event":"progress","request":2,"phase":"text encoder","completed":15,"total":50,"seconds":2.512284475}
+{"event":"progress","request":2,"phase":"text encoder","completed":16,"total":50,"seconds":2.624274759}
+{"event":"progress","request":2,"phase":"text encoder","completed":17,"total":50,"seconds":2.668926579}
+{"event":"progress","request":2,"phase":"text encoder","completed":18,"total":50,"seconds":2.772306188}
+{"event":"progress","request":2,"phase":"text encoder","completed":19,"total":50,"seconds":2.870712440}
+{"event":"progress","request":2,"phase":"text encoder","completed":20,"total":50,"seconds":2.947697178}
+{"event":"progress","request":2,"phase":"text encoder","completed":21,"total":50,"seconds":3.033551548}
+{"event":"progress","request":2,"phase":"text encoder","completed":22,"total":50,"seconds":3.123110122}
+{"event":"progress","request":2,"phase":"text encoder","completed":23,"total":50,"seconds":3.207459003}
+{"event":"progress","request":2,"phase":"text encoder","completed":24,"total":50,"seconds":3.303523619}
+{"event":"progress","request":2,"phase":"text encoder","completed":25,"total":50,"seconds":3.378765874}
+{"event":"progress","request":2,"phase":"text encoder","completed":26,"total":50,"seconds":3.448277486}
+{"event":"progress","request":2,"phase":"text encoder","completed":27,"total":50,"seconds":3.576122767}
+{"event":"progress","request":2,"phase":"text encoder","completed":28,"total":50,"seconds":3.609822518}
+{"event":"progress","request":2,"phase":"text encoder","completed":29,"total":50,"seconds":3.766876008}
+{"event":"progress","request":2,"phase":"text encoder","completed":30,"total":50,"seconds":3.793610736}
+{"event":"progress","request":2,"phase":"text encoder","completed":31,"total":50,"seconds":3.928822493}
+{"event":"progress","request":2,"phase":"text encoder","completed":32,"total":50,"seconds":3.961068849}
+{"event":"progress","request":2,"phase":"text encoder","completed":33,"total":50,"seconds":4.084527502}
+{"event":"progress","request":2,"phase":"text encoder","completed":34,"total":50,"seconds":4.154115449}
+{"event":"progress","request":2,"phase":"text encoder","completed":35,"total":50,"seconds":4.217531390}
+{"event":"progress","request":2,"phase":"text encoder","completed":36,"total":50,"seconds":4.308077062}
+{"event":"progress","request":2,"phase":"text encoder","completed":37,"total":50,"seconds":4.397939143}
+{"event":"progress","request":2,"phase":"text encoder","completed":38,"total":50,"seconds":4.486268057}
+{"event":"progress","request":2,"phase":"text encoder","completed":39,"total":50,"seconds":4.555229802}
+{"event":"progress","request":2,"phase":"text encoder","completed":40,"total":50,"seconds":4.640959563}
+{"event":"progress","request":2,"phase":"text encoder","completed":41,"total":50,"seconds":4.743016945}
+{"event":"progress","request":2,"phase":"text encoder","completed":42,"total":50,"seconds":4.819878795}
+{"event":"progress","request":2,"phase":"text encoder","completed":43,"total":50,"seconds":4.914627036}
+{"event":"progress","request":2,"phase":"text encoder","completed":44,"total":50,"seconds":4.974104695}
+{"event":"progress","request":2,"phase":"text encoder","completed":45,"total":50,"seconds":5.096605537}
+{"event":"progress","request":2,"phase":"text encoder","completed":46,"total":50,"seconds":5.147467442}
+{"event":"progress","request":2,"phase":"text encoder","completed":47,"total":50,"seconds":5.254477836}
+{"event":"progress","request":2,"phase":"text encoder","completed":48,"total":50,"seconds":5.307410452}
+{"event":"progress","request":2,"phase":"text encoder","completed":49,"total":50,"seconds":5.449053528}
+{"event":"progress","request":2,"phase":"text encoder","completed":50,"total":50,"seconds":5.459018625}
+{"event":"progress","request":2,"phase":"refine text","completed":0,"total":1,"seconds":5.862900067}
+{"event":"progress","request":2,"phase":"refine text","completed":1,"total":1,"seconds":6.541853200}
+{"event":"progress","request":2,"phase":"precompute AdaLN","completed":1,"total":50,"seconds":6.773180923}
+{"event":"progress","request":2,"phase":"precompute AdaLN","completed":2,"total":50,"seconds":6.915536730}
+{"event":"progress","request":2,"phase":"precompute AdaLN","completed":3,"total":50,"seconds":7.059291518}
+{"event":"progress","request":2,"phase":"precompute AdaLN","completed":4,"total":50,"seconds":7.202609223}
+{"event":"progress","request":2,"phase":"precompute AdaLN","completed":5,"total":50,"seconds":7.349066485}
+{"event":"progress","request":2,"phase":"precompute AdaLN","completed":6,"total":50,"seconds":7.491473801}
+{"event":"progress","request":2,"phase":"precompute AdaLN","completed":7,"total":50,"seconds":7.634733221}
+{"event":"progress","request":2,"phase":"precompute AdaLN","completed":8,"total":50,"seconds":7.781733797}
+{"event":"progress","request":2,"phase":"precompute AdaLN","completed":9,"total":50,"seconds":7.924299061}
+{"event":"progress","request":2,"phase":"precompute AdaLN","completed":10,"total":50,"seconds":8.074568439}
+{"event":"progress","request":2,"phase":"precompute AdaLN","completed":11,"total":50,"seconds":8.223969104}
+{"event":"progress","request":2,"phase":"precompute AdaLN","completed":12,"total":50,"seconds":8.366985098}
+{"event":"progress","request":2,"phase":"precompute AdaLN","completed":13,"total":50,"seconds":8.511938892}
+{"event":"progress","request":2,"phase":"precompute AdaLN","completed":14,"total":50,"seconds":8.655252550}
+{"event":"progress","request":2,"phase":"precompute AdaLN","completed":15,"total":50,"seconds":8.799167553}
+{"event":"progress","request":2,"phase":"precompute AdaLN","completed":16,"total":50,"seconds":8.946334319}
+{"event":"progress","request":2,"phase":"precompute AdaLN","completed":17,"total":50,"seconds":9.089986728}
+{"event":"progress","request":2,"phase":"precompute AdaLN","completed":18,"total":50,"seconds":9.233383705}
+{"event":"progress","request":2,"phase":"precompute AdaLN","completed":19,"total":50,"seconds":9.376923376}
+{"event":"progress","request":2,"phase":"precompute AdaLN","completed":20,"total":50,"seconds":9.519885170}
+{"event":"progress","request":2,"phase":"precompute AdaLN","completed":21,"total":50,"seconds":9.670479872}
+{"event":"progress","request":2,"phase":"precompute AdaLN","completed":22,"total":50,"seconds":9.818683680}
+{"event":"progress","request":2,"phase":"precompute AdaLN","completed":23,"total":50,"seconds":9.960396392}
+{"event":"progress","request":2,"phase":"precompute AdaLN","completed":24,"total":50,"seconds":10.102087809}
+{"event":"progress","request":2,"phase":"precompute AdaLN","completed":25,"total":50,"seconds":10.244443534}
+{"event":"progress","request":2,"phase":"precompute AdaLN","completed":26,"total":50,"seconds":10.385525576}
+{"event":"progress","request":2,"phase":"precompute AdaLN","completed":27,"total":50,"seconds":10.527919940}
+{"event":"progress","request":2,"phase":"precompute AdaLN","completed":28,"total":50,"seconds":10.670390433}
+{"event":"progress","request":2,"phase":"precompute AdaLN","completed":29,"total":50,"seconds":10.814689206}
+{"event":"progress","request":2,"phase":"precompute AdaLN","completed":30,"total":50,"seconds":10.957185471}
+{"event":"progress","request":2,"phase":"precompute AdaLN","completed":31,"total":50,"seconds":11.099797234}
+{"event":"progress","request":2,"phase":"precompute AdaLN","completed":32,"total":50,"seconds":11.250725993}
+{"event":"progress","request":2,"phase":"precompute AdaLN","completed":33,"total":50,"seconds":11.400385703}
+{"event":"progress","request":2,"phase":"precompute AdaLN","completed":34,"total":50,"seconds":11.543109165}
+{"event":"progress","request":2,"phase":"precompute AdaLN","completed":35,"total":50,"seconds":11.685385515}
+{"event":"progress","request":2,"phase":"precompute AdaLN","completed":36,"total":50,"seconds":11.826635884}
+{"event":"progress","request":2,"phase":"precompute AdaLN","completed":37,"total":50,"seconds":11.970859046}
+{"event":"progress","request":2,"phase":"precompute AdaLN","completed":38,"total":50,"seconds":12.112584670}
+{"event":"progress","request":2,"phase":"precompute AdaLN","completed":39,"total":50,"seconds":12.255016469}
+{"event":"progress","request":2,"phase":"precompute AdaLN","completed":40,"total":50,"seconds":12.397213065}
+{"event":"progress","request":2,"phase":"precompute AdaLN","completed":41,"total":50,"seconds":12.540717738}
+{"event":"progress","request":2,"phase":"precompute AdaLN","completed":42,"total":50,"seconds":12.682733374}
+{"event":"progress","request":2,"phase":"precompute AdaLN","completed":43,"total":50,"seconds":12.832166224}
+{"event":"progress","request":2,"phase":"precompute AdaLN","completed":44,"total":50,"seconds":12.976837274}
+{"event":"progress","request":2,"phase":"precompute AdaLN","completed":45,"total":50,"seconds":13.127525613}
+{"event":"progress","request":2,"phase":"precompute AdaLN","completed":46,"total":50,"seconds":13.275585954}
+{"event":"progress","request":2,"phase":"precompute AdaLN","completed":47,"total":50,"seconds":13.421248681}
+{"event":"progress","request":2,"phase":"precompute AdaLN","completed":48,"total":50,"seconds":13.562885973}
+{"event":"progress","request":2,"phase":"precompute AdaLN","completed":49,"total":50,"seconds":13.706943899}
+{"event":"progress","request":2,"phase":"precompute AdaLN","completed":50,"total":50,"seconds":13.853430259}
+{"event":"progress","request":2,"phase":"load transformer core","completed":1,"total":50,"seconds":14.223639903}
+{"event":"progress","request":2,"phase":"load transformer core","completed":2,"total":50,"seconds":14.518300200}
+{"event":"progress","request":2,"phase":"load transformer core","completed":3,"total":50,"seconds":14.815520795}
+{"event":"progress","request":2,"phase":"load transformer core","completed":4,"total":50,"seconds":15.112790068}
+{"event":"progress","request":2,"phase":"load transformer core","completed":5,"total":50,"seconds":15.409783742}
+{"event":"progress","request":2,"phase":"load transformer core","completed":6,"total":50,"seconds":15.703278708}
+{"event":"progress","request":2,"phase":"load transformer core","completed":7,"total":50,"seconds":15.998267157}
+{"event":"progress","request":2,"phase":"load transformer core","completed":8,"total":50,"seconds":16.297620662}
+{"event":"progress","request":2,"phase":"load transformer core","completed":9,"total":50,"seconds":16.596277214}
+{"event":"progress","request":2,"phase":"load transformer core","completed":10,"total":50,"seconds":16.890564848}
+{"event":"progress","request":2,"phase":"load transformer core","completed":11,"total":50,"seconds":17.187058532}
+{"event":"progress","request":2,"phase":"load transformer core","completed":12,"total":50,"seconds":17.480597494}
+{"event":"progress","request":2,"phase":"load transformer core","completed":13,"total":50,"seconds":17.775054371}
+{"event":"progress","request":2,"phase":"load transformer core","completed":14,"total":50,"seconds":18.069860745}
+{"event":"progress","request":2,"phase":"load transformer core","completed":15,"total":50,"seconds":18.365248692}
+{"event":"progress","request":2,"phase":"load transformer core","completed":16,"total":50,"seconds":18.660297882}
+{"event":"progress","request":2,"phase":"load transformer core","completed":17,"total":50,"seconds":18.971960332}
+{"event":"progress","request":2,"phase":"load transformer core","completed":18,"total":50,"seconds":19.268380971}
+{"event":"progress","request":2,"phase":"load transformer core","completed":19,"total":50,"seconds":19.564047484}
+{"event":"progress","request":2,"phase":"load transformer core","completed":20,"total":50,"seconds":19.864488729}
+{"event":"progress","request":2,"phase":"load transformer core","completed":21,"total":50,"seconds":20.160996321}
+{"event":"progress","request":2,"phase":"load transformer core","completed":22,"total":50,"seconds":20.459051558}
+{"event":"progress","request":2,"phase":"load transformer core","completed":23,"total":50,"seconds":20.755345120}
+{"event":"progress","request":2,"phase":"load transformer core","completed":24,"total":50,"seconds":21.051468539}
+{"event":"progress","request":2,"phase":"load transformer core","completed":25,"total":50,"seconds":21.353836066}
+{"event":"progress","request":2,"phase":"load transformer core","completed":26,"total":50,"seconds":21.650192284}
+{"event":"progress","request":2,"phase":"load transformer core","completed":27,"total":50,"seconds":21.945788091}
+{"event":"progress","request":2,"phase":"load transformer core","completed":28,"total":50,"seconds":22.240146830}
+{"event":"progress","request":2,"phase":"load transformer core","completed":29,"total":50,"seconds":22.535599290}
+{"event":"progress","request":2,"phase":"load transformer core","completed":30,"total":50,"seconds":22.830618559}
+{"event":"progress","request":2,"phase":"load transformer core","completed":31,"total":50,"seconds":23.132348980}
+{"event":"progress","request":2,"phase":"load transformer core","completed":32,"total":50,"seconds":23.425300192}
+{"event":"progress","request":2,"phase":"load transformer core","completed":33,"total":50,"seconds":23.718406646}
+{"event":"progress","request":2,"phase":"load transformer core","completed":34,"total":50,"seconds":24.016902767}
+{"event":"progress","request":2,"phase":"load transformer core","completed":35,"total":50,"seconds":24.309500457}
+{"event":"progress","request":2,"phase":"load transformer core","completed":36,"total":50,"seconds":24.600868946}
+{"event":"progress","request":2,"phase":"load transformer core","completed":37,"total":50,"seconds":24.894093587}
+{"event":"progress","request":2,"phase":"load transformer core","completed":38,"total":50,"seconds":25.186604510}
+{"event":"progress","request":2,"phase":"load transformer core","completed":39,"total":50,"seconds":25.483794864}
+{"event":"progress","request":2,"phase":"load transformer core","completed":40,"total":50,"seconds":25.773975374}
+{"event":"progress","request":2,"phase":"load transformer core","completed":41,"total":50,"seconds":26.066343198}
+{"event":"progress","request":2,"phase":"load transformer core","completed":42,"total":50,"seconds":26.359044956}
+{"event":"progress","request":2,"phase":"load transformer core","completed":43,"total":50,"seconds":26.651482559}
+{"event":"progress","request":2,"phase":"load transformer core","completed":44,"total":50,"seconds":26.949254003}
+{"event":"progress","request":2,"phase":"load transformer core","completed":45,"total":50,"seconds":27.249740726}
+{"event":"progress","request":2,"phase":"load transformer core","completed":46,"total":50,"seconds":27.542188609}
+{"event":"progress","request":2,"phase":"load transformer core","completed":47,"total":50,"seconds":27.834480333}
+{"event":"progress","request":2,"phase":"load transformer core","completed":48,"total":50,"seconds":28.128771108}
+{"event":"progress","request":2,"phase":"load transformer core","completed":49,"total":50,"seconds":28.429587067}
+{"event":"progress","request":2,"phase":"load transformer core","completed":50,"total":50,"seconds":28.724026622}
+{"event":"progress","request":2,"phase":"denoise","completed":0,"total":20,"seconds":28.904920455}
+{"event":"progress","request":2,"phase":"denoise","completed":1,"total":20,"seconds":29.757586994}
+{"event":"progress","request":2,"phase":"denoise","completed":1,"total":20,"seconds":29.757603046}
+{"event":"progress","request":2,"phase":"denoise","completed":2,"total":20,"seconds":30.637303794}
+{"event":"progress","request":2,"phase":"denoise","completed":2,"total":20,"seconds":30.637320036}
+{"event":"progress","request":2,"phase":"denoise","completed":3,"total":20,"seconds":31.495404967}
+{"event":"progress","request":2,"phase":"denoise","completed":3,"total":20,"seconds":31.495424021}
+{"event":"progress","request":2,"phase":"denoise","completed":4,"total":20,"seconds":32.343619060}
+{"event":"progress","request":2,"phase":"denoise","completed":4,"total":20,"seconds":32.343634318}
+{"event":"progress","request":2,"phase":"denoise","completed":5,"total":20,"seconds":33.203893245}
+{"event":"progress","request":2,"phase":"denoise","completed":5,"total":20,"seconds":33.203919464}
+{"event":"progress","request":2,"phase":"denoise","completed":6,"total":20,"seconds":34.070168867}
+{"event":"progress","request":2,"phase":"denoise","completed":6,"total":20,"seconds":34.070185977}
+{"event":"progress","request":2,"phase":"denoise","completed":7,"total":20,"seconds":34.922409711}
+{"event":"progress","request":2,"phase":"denoise","completed":7,"total":20,"seconds":34.922424466}
+{"event":"progress","request":2,"phase":"denoise","completed":8,"total":20,"seconds":35.788848488}
+{"event":"progress","request":2,"phase":"denoise","completed":8,"total":20,"seconds":35.788864233}
+{"event":"progress","request":2,"phase":"denoise","completed":9,"total":20,"seconds":36.640689706}
+{"event":"progress","request":2,"phase":"denoise","completed":9,"total":20,"seconds":36.640709232}
+{"event":"progress","request":2,"phase":"denoise","completed":10,"total":20,"seconds":37.496393913}
+{"event":"progress","request":2,"phase":"denoise","completed":10,"total":20,"seconds":37.496411975}
+{"event":"progress","request":2,"phase":"denoise","completed":11,"total":20,"seconds":38.346446122}
+{"event":"progress","request":2,"phase":"denoise","completed":11,"total":20,"seconds":38.346462798}
+{"event":"progress","request":2,"phase":"denoise","completed":12,"total":20,"seconds":39.203049365}
+{"event":"progress","request":2,"phase":"denoise","completed":12,"total":20,"seconds":39.203066541}
+{"event":"progress","request":2,"phase":"denoise","completed":13,"total":20,"seconds":40.063346662}
+{"event":"progress","request":2,"phase":"denoise","completed":13,"total":20,"seconds":40.063365482}
+{"event":"progress","request":2,"phase":"denoise","completed":14,"total":20,"seconds":40.932652230}
+{"event":"progress","request":2,"phase":"denoise","completed":14,"total":20,"seconds":40.932669373}
+{"event":"progress","request":2,"phase":"denoise","completed":15,"total":20,"seconds":41.807123510}
+{"event":"progress","request":2,"phase":"denoise","completed":15,"total":20,"seconds":41.807142684}
+{"event":"progress","request":2,"phase":"denoise","completed":16,"total":20,"seconds":42.659411534}
+{"event":"progress","request":2,"phase":"denoise","completed":16,"total":20,"seconds":42.659431369}
+{"event":"progress","request":2,"phase":"denoise","completed":17,"total":20,"seconds":43.854766559}
+{"event":"progress","request":2,"phase":"denoise","completed":17,"total":20,"seconds":43.854784995}
+{"event":"progress","request":2,"phase":"denoise","completed":18,"total":20,"seconds":44.718358427}
+{"event":"progress","request":2,"phase":"denoise","completed":18,"total":20,"seconds":44.718373952}
+{"event":"progress","request":2,"phase":"denoise","completed":19,"total":20,"seconds":45.591403552}
+{"event":"progress","request":2,"phase":"denoise","completed":19,"total":20,"seconds":45.591420195}
+{"event":"progress","request":2,"phase":"denoise","completed":20,"total":20,"seconds":46.440152857}
+{"event":"progress","request":2,"phase":"audio VAE","completed":0,"total":7,"seconds":46.440169032}
+{"event":"progress","request":2,"phase":"audio VAE","completed":1,"total":7,"seconds":48.545359133}
+{"event":"progress","request":2,"phase":"audio VAE","completed":2,"total":7,"seconds":50.232037433}
+{"event":"progress","request":2,"phase":"audio VAE","completed":3,"total":7,"seconds":51.862171712}
+{"event":"progress","request":2,"phase":"audio VAE","completed":4,"total":7,"seconds":53.466062456}
+{"event":"progress","request":2,"phase":"audio VAE","completed":5,"total":7,"seconds":55.069147750}
+{"event":"progress","request":2,"phase":"audio VAE","completed":6,"total":7,"seconds":56.667671753}
+{"event":"progress","request":2,"phase":"audio VAE","completed":7,"total":7,"seconds":58.272701513}
+{"event":"progress","request":2,"phase":"video VAE load","completed":0,"total":36,"seconds":58.344743047}
+{"event":"progress","request":2,"phase":"video VAE load","completed":36,"total":36,"seconds":58.344761520}
+{"event":"progress","request":2,"phase":"FFmpeg","completed":0,"total":56,"seconds":73.087371143}
+{"event":"progress","request":2,"phase":"FFmpeg","completed":56,"total":56,"seconds":73.742037931}
+{"event":"result","request":2,"mode":"changed_prompt_new_seed","seconds":73.775024389,"width":864,"height":480,"frames":56,"fps":24,"seed":9,"cached_dit":1,"cached_video_decoder":1}

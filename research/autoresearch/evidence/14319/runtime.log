@@ -1,0 +1,9 @@
+h3: conditioning cache miss; stored exact BF16
+h3: prepared DiT cache miss; model retained
+h3: video VAE cache miss; decoder retained
+h3: conditioning cache hit
+h3: prepared DiT cache hit
+h3: video VAE cache hit
+h3: conditioning cache miss; stored exact BF16
+h3: prepared DiT cache miss; model retained
+h3: video VAE cache hit

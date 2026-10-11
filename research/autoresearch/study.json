@@ -1,0 +1,214 @@
+{
+  "version": 1,
+  "status": "100-round campaign authorized; preparing frozen oracle and cold-process baseline",
+  "active_protocol": "runs/20261010-100/protocol.json",
+  "seed_release": "/home/cj/h3-cuda/releases/14274",
+  "seed_source_sha256": "70081d0427704e0fa1588822e895c09ebbaf4c10856209f149f7c42f1d2fa5de",
+  "task": {
+    "width": 864,
+    "height": 480,
+    "frames": 56,
+    "fps": 24,
+    "duration_seconds": 2.3333333333333335,
+    "steps": 20,
+    "dit_layers": 50,
+    "audio_required": true,
+    "checkpoint": "MiniMaxAI/MiniMax-H3@42ed227ee7df40d41602854ae760620d6eb651fe/FL2VA",
+    "precision_contract": "../../tests/pytorch/acceptance.json",
+    "reference_sources": "../../tests/pytorch/sources.json"
+  },
+  "objective": {
+    "primary_mode": "new_process_fixed_prompt_fixed_seed_complete_mp4",
+    "assumption": "User explicitly selected cold process startup with an unchanged prompt and fixed randomness.",
+    "score": "Median end-to-end cold-process wall time, correctness as PASS/FAIL gate only.",
+    "timer_start": "Immediately before the evaluator launches a new native process.",
+    "timer_end": "Native process exits after completing video/audio encoding and closing its MP4.",
+    "included": [
+      "process startup",
+      "CUDA/context initialization",
+      "all weight loading and model preparation",
+      "tokenization and text encoding",
+      "all 20 denoising evaluations and 50 layers",
+      "video and audio decode",
+      "transfers and synchronization",
+      "fixed media encoding",
+      "process cleanup"
+    ],
+    "excluded_but_reported": [
+      "Slurm queue",
+      "build",
+      "one-time oracle preparation",
+      "post-run unit comparisons and media checks"
+    ],
+    "secondary_modes": [],
+    "resource_metrics": [
+      "GPU count",
+      "measured topology",
+      "peak memory per GPU",
+      "reserved GPU-seconds",
+      "startup time",
+      "compilation time"
+    ],
+    "gpu_seconds": "Sum of device reservation durations; for N GPUs held throughout a request, N times end-to-end seconds.",
+    "selection": "For the authorized 100-round campaign, use one H200 and select solely by confirmed cold-process E2E seconds after the fixed correctness PASS gate. GPU count/cost frontiers are future study options, not additional ranking objectives in this run.",
+    "file_cache_policy": "New process/model/CUDA state for every sample. Shared OS/filesystem caches are not forcibly cleared; this is not a guaranteed cold-storage benchmark."
+  },
+  "mutable_surface": {
+    "description": "The whole candidate C/C++/CUDA implementation can change, including new kernels and runtime architecture. Numeric knob tuning is only a subset.",
+    "examples": [
+      "kernel sources",
+      "operation fusion",
+      "GEMM/attention implementation",
+      "buffer lifetime and layout",
+      "streams and graphs",
+      "weight residency",
+      "multi-GPU partitioning",
+      "candidate-only build configuration"
+    ],
+    "native_runtime_requirement": "Keep a native CUDA executable; Python may orchestrate experiments and evaluate outputs, but is not an inference runtime dependency."
+  },
+  "frozen_surface": {
+    "files": [
+      "official PyTorch source and its source pins",
+      "acceptance thresholds",
+      "independent input generator",
+      "benchmark runner and its clocks",
+      "reference fixtures",
+      "output encoding configuration"
+    ],
+    "requirements": [
+      "original checkpoint values and mixed-precision contract",
+      "all text/video/audio tokens and their positions",
+      "50 DiT layers",
+      "20 model evaluations and original sigma/Euler semantics",
+      "864x480 output and 56 frames",
+      "fixed VAE tile boundaries and overlap semantics",
+      "audio output"
+    ],
+    "excluded_optimizations": [
+      "step/layer skipping",
+      "prediction or stale-feature reuse",
+      "quantization or TF32",
+      "smaller internal image resolution",
+      "changed VAE tile geometry",
+      "omitting audio",
+      "cached output videos",
+      "request-dependent work before the timing boundary"
+    ],
+    "arithmetic_note": "Implementation rewrites may change rounding only if all fixed numeric checks pass. Preserve existing BF16 rounding boundaries first; do not assume a small local error is safe over 20 steps.",
+    "contract_sha256": {
+      "../../tests/pytorch/acceptance.json": "fcece9d35dacbbf79dac53838bb0df625a1c457319dc250cb326de579fde2f72",
+      "../../tests/pytorch/sources.json": "2cb57568b4ad139ef5005b82df84c2899dc2fdfd598c941a558a624d48989adc"
+    }
+  },
+  "evaluation": {
+    "correctness_oracle": "Pinned official Diffusers/PyTorch on CUDA; separate from the performance baseline.",
+    "performance_baseline": "Accepted native release 14274 is the one-H200 anchor. For N-GPU candidates, also compare against the best correct implementation at the same N/topology once available; do not imply the seed already supports N-GPU execution. Use exactly the same requests, timing mode and CPU resources.",
+    "screening_stages": [
+      "Compile and ABI checks with a timeout.",
+      "Replay the fixed primitive inputs/outputs and captured real activation checks; do not recompute PyTorch reference operators per candidate.",
+      "Affected block or single-forward diagnostic against the frozen reference.",
+      "Full independent 20-step trajectories and float video/audio decoder checks, using each implementation's own evolving state.",
+      "Three isolated cold-process timing samples with the fixed prompt and seed; run the complete 6+1 correctness regression and five paired cold-process comparisons before keeping an improvement."
+    ],
+    "fixture_policy": "PyTorch oracle outputs are frozen once; each candidate is compared with fixed tensors. No large reference-model execution per trial. Fixed-reference-input velocities and independently evolving candidate trajectories are both checked.",
+    "precision_limits": "Read the existing contract without relaxation. Non-finite outputs, incomplete video/audio, missing stages or missing files fail.",
+    "measurement_protocol": {
+      "initial_design": "The active protocol uses three measured candidate samples. Every sample launches a fresh native process with the same prompt and seed 7; no warm or changed-prompt request contributes to ranking.",
+      "order": "For promotion, alternate parent/candidate and candidate/parent order over five pairs on one exclusively reserved H200, using a fresh process for every sample.",
+      "promotion": "Require the complete fixed 6+1 correctness gate. Median paired improvement must exceed max(0.5% of parent median, 2*MAD(paired differences)/sqrt(5)); at least four of five pairs must favor the candidate. This noise guard applies to the single latency score. The authoritative details are in runs/20261010-100/protocol.json.",
+      "profiling": "Profiler runs diagnose CUDA API overhead, kernel time, copies and communication. Their wall times are excluded from the score.",
+      "concurrency": "Agents may generate and compile candidates concurrently; timing workers use exclusive GPU sets. Baseline and candidate use the same CPU allocation and host thread limits.",
+      "reproducibility": "Log source/build/harness/input hashes, hardware topology, library versions, environment, GPU clocks/temperature, and all raw results."
+    }
+  },
+  "search_loop": {
+    "candidate_identity": [
+      "parent source hash",
+      "patch hash",
+      "runtime configuration",
+      "GPU count",
+      "topology"
+    ],
+    "selection": "Profile the current end-to-end critical path; choose a bounded hypothesis from search_space.json or propose another semantics-preserving implementation.",
+    "execution": "Create an isolated candidate checkout/build, apply one interpretable change, compile, screen, validate, benchmark, then record keep/discard/crash with the reason.",
+    "frontier": "Retain about three diverse correct candidates per GPU class when justified; test combinations after their dependencies are satisfied.",
+    "budgets": "Use separate limits for compilation, correctness, profiling, timing and the whole campaign. The original autoresearch five-minute training window is not this task's score or a literal required duration.",
+    "launch_status": "User authorized 100 distinct candidate rounds; one H200 is fixed for this initial workflow trial."
+  },
+  "first_experiments": [
+    "E0: freeze the PyTorch unit oracle once and measure the accepted seed with fresh processes, the fixed prompt, and seed 7.",
+    "E1: optimize cold-process startup and preparation inside the timing boundary; score only complete fixed-prompt, fixed-seed MP4 generation.",
+    "E2: reuse MLP/attention scratch without changing arithmetic or GEMM shape.",
+    "E3: cache existing cuBLASLt/cuDNN descriptors and execution plans before changing algorithms.",
+    "E4: implement an FP32 GPU sampler and keep packed latents on device while preserving Euler rounding behavior.",
+    "E5: use profiles to choose audio-convolution optimization, video-VAE GPU stitching, or elementwise fusion.",
+    "Future study, outside the active one-H200 campaign: test two-GPU distribution of unchanged video VAE tiles and concurrent video/audio decoding.",
+    "Future study, outside the active one-H200 campaign: compare TP2 and Ulysses2 for DiT, then expand to 4/8 GPUs only when measurements justify it."
+  ],
+  "sources": [
+    {
+      "name": "Karpathy autoresearch",
+      "url": "https://github.com/karpathy/autoresearch",
+      "use": "Small editable program, fixed judge, bounded experiments and keep/discard loop; original task is training."
+    },
+    {
+      "name": "KernelAgent",
+      "url": "https://pytorch.org/blog/kernelagent-hardware-guided-gpu-kernel-optimization-via-multi-agent-orchestration/",
+      "use": "Hardware-guided diagnosis, multiple candidate paths and isolated timing."
+    },
+    {
+      "name": "KernelBench",
+      "url": "https://github.com/ScalingIntelligence/KernelBench/blob/main/EVAL.md",
+      "use": "Independent correctness and repeated performance evaluation."
+    },
+    {
+      "name": "SOL-ExecBench",
+      "url": "https://arxiv.org/html/2603.19173v1#S4.SS4",
+      "use": "Separate correctness oracle from speed baseline and prevent invalid measurement shortcuts."
+    },
+    {
+      "name": "CUDA Graphs",
+      "url": "https://docs.nvidia.com/cuda/cuda-programming-guide/04-special-topics/cuda-graphs.html",
+      "use": "Launch replay and graph lifetime requirements."
+    },
+    {
+      "name": "CUDA stream-ordered allocator",
+      "url": "https://developer.nvidia.com/blog/using-cuda-stream-ordered-memory-allocator-part-1/",
+      "use": "Allocation reuse and stream ordering."
+    },
+    {
+      "name": "FlashAttention-3",
+      "url": "https://tridao.me/publications/flash3/flash3.pdf",
+      "use": "Hopper asynchronous tiling; only precision-compatible paths belong in this study."
+    },
+    {
+      "name": "Ulysses",
+      "url": "https://arxiv.org/abs/2309.14509",
+      "use": "Sequence/head all-to-all partitioning."
+    },
+    {
+      "name": "Ring Attention",
+      "url": "https://arxiv.org/abs/2310.01889",
+      "use": "K/V block exchange for context parallelism."
+    },
+    {
+      "name": "Megatron TP",
+      "url": "https://research.nvidia.com/labs/adlr/MegatronLM/",
+      "use": "Column/row linear partitioning and collective reductions."
+    },
+    {
+      "name": "xDiT",
+      "url": "https://github.com/xdit-project/xDiT",
+      "use": "Existing H3 sequence-parallel design to inspect; not a replacement correctness oracle."
+    }
+  ],
+  "exploratory_baseline": {
+    "evidence": "evidence/14319/summary.json",
+    "driver": "baseline.c",
+    "execution": "baseline.sbatch",
+    "summarizer": "summarize.py",
+    "status": "completed; historical warm/new-prompt probe only, excluded from the active cold-process ranking; one observation per mode; no optimized candidate benchmarked",
+    "precision_validation": "Uses unchanged release 14274 model objects. Only media completeness was checked in this probe; release acceptance remains separate."
+  }
+}

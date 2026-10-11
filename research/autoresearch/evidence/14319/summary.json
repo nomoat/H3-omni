@@ -1,0 +1,122 @@
+{
+  "job": 14319,
+  "status": "COMPLETED",
+  "seed_release": 14274,
+  "gpu": "1 NVIDIA H200",
+  "cpu_allocation": 4,
+  "context_load_seconds": 0.964002229,
+  "timing_boundary": "From immediately before h3_generate to its return after the output file is closed; context loading is separate.",
+  "cache": "h3_cache_set_enabled(ctx, 1); all three requests use one process in the listed order.",
+  "samples_per_mode": 1,
+  "results": [
+    {
+      "event": "result",
+      "request": 0,
+      "mode": "first_request",
+      "seconds": 87.548998535,
+      "width": 864,
+      "height": 480,
+      "frames": 56,
+      "fps": 24,
+      "seed": 7,
+      "cached_dit": 1,
+      "cached_video_decoder": 1,
+      "coarse_host_wall_spans_seconds": {
+        "request_setup_text_and_dit_preparation": 31.114709533,
+        "denoising_including_host_work_and_transfers": 17.227898212000003,
+        "audio_vae_load_decode_and_cleanup": 13.379001021,
+        "video_vae_cache_or_load_decode_and_rgb_conversion": 25.188738461,
+        "media_encoding_and_return": 0.6386513079999929
+      }
+    },
+    {
+      "event": "result",
+      "request": 1,
+      "mode": "cached_same_prompt_new_seed",
+      "seconds": 44.464585628,
+      "width": 864,
+      "height": 480,
+      "frames": 56,
+      "fps": 24,
+      "seed": 8,
+      "cached_dit": 1,
+      "cached_video_decoder": 1,
+      "coarse_host_wall_spans_seconds": {
+        "request_setup_text_and_dit_preparation": 0.013462849,
+        "denoising_including_host_work_and_transfers": 17.243311288,
+        "audio_vae_load_decode_and_cleanup": 11.927409755,
+        "video_vae_cache_or_load_decode_and_rgb_conversion": 14.725546983000001,
+        "media_encoding_and_return": 0.5548547530000008
+      }
+    },
+    {
+      "event": "result",
+      "request": 2,
+      "mode": "changed_prompt_new_seed",
+      "seconds": 73.775024389,
+      "width": 864,
+      "height": 480,
+      "frames": 56,
+      "fps": 24,
+      "seed": 9,
+      "cached_dit": 1,
+      "cached_video_decoder": 1,
+      "coarse_host_wall_spans_seconds": {
+        "request_setup_text_and_dit_preparation": 28.904920455,
+        "denoising_including_host_work_and_transfers": 17.535248577,
+        "audio_vae_load_decode_and_cleanup": 11.904574015000001,
+        "video_vae_cache_or_load_decode_and_rgb_conversion": 14.742628095999997,
+        "media_encoding_and_return": 0.6876532459999964
+      }
+    }
+  ],
+  "media_check": {
+    "passed": true,
+    "cases": [
+      {
+        "file": "request-0.mp4",
+        "frames": 56,
+        "size": [
+          864,
+          480
+        ],
+        "decoded_audio_bytes": 598016
+      },
+      {
+        "file": "request-1.mp4",
+        "frames": 56,
+        "size": [
+          864,
+          480
+        ],
+        "decoded_audio_bytes": 598016
+      },
+      {
+        "file": "request-2.mp4",
+        "frames": 56,
+        "size": [
+          864,
+          480
+        ],
+        "decoded_audio_bytes": 598016
+      }
+    ]
+  },
+  "limitations": [
+    "Exploratory observations, not a statistically confirmed benchmark or an optimization speedup.",
+    "Phase spans come from CPU progress callbacks, include setup/transfers/cleanup, and are not kernel profiler measurements.",
+    "The node was shared with other jobs; the allocated GPU was exclusive, but shared host/storage contention was not controlled.",
+    "First-request timing uses available local/filesystem caches and does not include process launch or context loading; it is not a cold-disk measurement.",
+    "Mode, seed, prompt and request order vary; the measurements do not isolate the causal cost of any one cache.",
+    "This probe links unchanged accepted inference objects. It checks media completeness, not a new full numerical acceptance run for all three inputs.",
+    "The future frozen evaluator must separately implement resident fresh-input timing and independent numerical comparison; this probe is not that evaluator."
+  ],
+  "evidence_sha256": {
+    "events.jsonl": "1e3c3d46aa21daddd336136aaefdcb963b695f556d8003859e3a3a1ef46d131e",
+    "media-check.json": "c6f8895f34d9f15ea83492d7b48bdefde4ecccd5f3b3775a8c6f7a6461dceb96",
+    "source-and-object-sha256.txt": "a8b6c4727364b57d59944776c10424732209c1f692bb4bbb7cc46d0aec69539e",
+    "baseline.c": "807122d452fcc2c9d1c6586d06d7ebf02509a3b0a40b14a336a0df18a0583d97",
+    "prompt-a.txt": "153a0cfd999f9aa6661c0b5d0303e9c3343eb665bdfb3bb6943a8892050df289",
+    "prompt-b.txt": "c44b1d75a67082de8201acf3809a7c662a455d60dc1a474a807af2c789f7ba92"
+  }
+}
