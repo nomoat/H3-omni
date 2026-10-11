@@ -1,4 +1,4 @@
-# H200 correctness backend
+# h3.cu: H200 backend details
 
 [FastH3 Preview v1 support](FASTH3.md) is available as the optional `VSA=1`
 build, with its own converted checkpoint and four-step schedule.
@@ -206,8 +206,9 @@ one keeps 19 GB (a TF32 high and low part of its four block projections). Detail
 rejected experiments: [WORKLOG.md](WORKLOG.md).
 
 The resident video VAE decodes its tiles as a pipeline: the GPU works on the
-next tile while a host thread rearranges, blends and normalizes the previous
-one, and FFmpeg encodes each finished chunk during the decode. Both modes
+next tile while the previous one is rearranged, blended and normalized (on the
+host until WORKLOG #17, on the GPU since), and FFmpeg encodes each finished
+chunk during the decode. Both modes
 give the same bytes as the serial path (job 14473/14474 bit checks); a warm
 10 s request spends 32.1 of its 33.0 s video VAE on the GPU (job 14476).
 
@@ -222,9 +223,12 @@ process: one thread and one complete model copy per GPU, NCCL between them.
   sequence with 56/N heads. Input packing, final heads and the sampler run
   on every GPU, so all GPUs hold the same latents. N divides the 56 heads:
   1, 2, 4, 7 or 8.
-- Video VAE: tile i runs on GPU i % N; one host thread per GPU unpacks its
-  tiles, and one thread stitches them in order.
-- Text encoder and audio VAE stay on GPU 0.
+- Video VAE: tile i runs on GPU i % N. Each GPU unpacks its tiles and copies
+  them over NVLink to GPU 0, where a stitching stream blends, normalizes and
+  converts each chunk to RGB24 (`vae_post.cuh`); only RGB24 frames reach the
+  host.
+- Text encoder on GPU 0. The audio VAE runs on the last GPU, in parallel with
+  the video VAE.
 
 Output is bit-identical to one GPU (latents, audio and RGB) for N = 2, 4, 7
 and 8, in two requests each (jobs 14780, 14781, 14783, 14785, 14789, 14792;
