@@ -111,6 +111,11 @@ int h3_gpu_video_qkv_rope_bias_f16(h3_gpu *gpu, h3_gpu_tensor *query,
                                    uint32_t sequence, uint32_t heads,
                                    uint32_t head_dim, uint32_t rope_half,
                                    float epsilon);
+int h3_gpu_scale_add_bias_rms_f16(h3_gpu *gpu, h3_gpu_tensor *output,
+                                  h3_gpu_tensor *normed, const h3_gpu_tensor *residual,
+                                  const h3_gpu_tensor *branch, const h3_gpu_tensor *bias,
+                                  const h3_gpu_tensor *scale, const h3_gpu_tensor *weight,
+                                  uint32_t rows, uint32_t width, float eps);
 int h3_gpu_swiglu_bias_f16_out(h3_gpu *gpu, h3_gpu_tensor *output,
                                const h3_gpu_tensor *fused,
                                const h3_gpu_tensor *bias, uint32_t rows,

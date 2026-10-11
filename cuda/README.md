@@ -192,10 +192,10 @@ from before the change.
 
 ## Serving latency
 
-| Request (warm, 864x480, 20 steps) | Reference mode, job 14419 | Default mode, job 14734 | vLLM-Omni, 1 GPU |
+| Request (warm, 864x480, 20 steps) | Reference mode, job 14419 | Default mode, job 14771 | vLLM-Omni, 1 GPU |
 | --- | --- | --- | --- |
-| 5 s video | 81.7 s | 32.4 s | 33.0 s |
-| 10 s video | 201.3 s | 81.2 s | 82.9 s |
+| 5 s video | 81.7 s | 32.0 s | 33.0 s |
+| 10 s video | 201.3 s | 80.4 s | 82.9 s |
 
 Job 14419 predates the stream-ordered memory pool, which is bit-exact and on
 in both modes. The FP16 video VAE keeps 4.8 GB of block weights; the 3xTF32

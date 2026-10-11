@@ -59,6 +59,11 @@ typedef struct {
     int tf32_attention; /* fused 3xTF32 attention (CUDA default mode) */
 } vae_block;
 
+/* Tiles in flight in the CUDA tile pipeline. The host thread blends and
+ * finalizes each temporal chunk (tens of ms); with two slots the GPU idled
+ * at every chunk boundary, with four it keeps decoding the next tiles. */
+enum { PIPELINE_SLOTS = 4 };
+
 typedef struct {
     h3_gpu *gpu;
     h3_weight_store *weights;
@@ -93,7 +98,10 @@ typedef struct {
     h3_gpu_tensor *norm_parts;
     h3_gpu_tensor *act_parts;
     h3_gpu_tensor *zero;           /* resident suffix token */
-    h3_gpu_tensor *projected_next; /* second readback slot of the tile pipeline */
+    /* FP16 mode: `norm` already holds this block's norm1 output, written by
+     * the previous block's fused MLP residual. */
+    int norm_ready;
+    h3_gpu_tensor *projected_slots[PIPELINE_SLOTS - 1]; /* other readback slots */
     uint32_t patches;
     uint32_t sequence;
     int latent_h;
@@ -101,10 +109,6 @@ typedef struct {
     int latent_t;
     int output_frames;
 } vae_context;
-
-#ifdef H3_CUDA
-enum { PIPELINE_SLOTS = 2 };
-#endif
 
 struct h3_video_vae_decoder {
     vae_context vae;
@@ -188,7 +192,9 @@ static void cleanup(vae_context *vae) {
     free_tensor(&vae->activated); free_tensor(&vae->rope_cos);
     free_tensor(&vae->rope_sin); free_tensor(&vae->projected);
     free_tensor(&vae->norm_parts); free_tensor(&vae->act_parts);
-    free_tensor(&vae->zero); free_tensor(&vae->projected_next);
+    free_tensor(&vae->zero);
+    for (int slot = 0; slot < PIPELINE_SLOTS - 1; slot++)
+        free_tensor(&vae->projected_slots[slot]);
     h3_gpu_free(vae->gpu);
     h3_weight_store_free(vae->weights);
     memset(vae, 0, sizeof(*vae));
@@ -313,7 +319,18 @@ static int load_output_weights(vae_context *vae, char *error,
                       error, error_size);
     vae->proj_b = f1(vae, "decoder.proj_out.bias", OUTPUT_PATCH,
                       error, error_size);
-    return vae->norm_out_w && vae->norm_out_b && vae->proj_w && vae->proj_b;
+    if (!vae->norm_out_w || !vae->norm_out_b || !vae->proj_w || !vae->proj_b)
+        return 0;
+#ifdef H3_CUDA
+    /* FP16 mode: the output projection runs as a 3xTF32 tensor-core product
+     * (FP32-level accuracy) instead of an FP32 SIMT GEMM, 3% of the decode. */
+    if (use_fp16() && !h3_gpu_tensor_split_tf32(vae->gpu, vae->proj_w)) {
+        fail(error, error_size, "cannot split video VAE output weight: %s",
+             h3_gpu_error(vae->gpu));
+        return 0;
+    }
+#endif
+    return 1;
 }
 
 static int parse_float_array(const char *json, const char *key, float *values,
@@ -548,8 +565,13 @@ static int run_block(vae_context *vae, int index, char *error,
     /* FP16: each product reads FP16 inputs and returns FP32; the bias is
      * added in FP32 where the product is consumed. */
     if (h3_gpu_tensor_dtype(weight->qkv_w) == H3_GPU_F16) {
-        OP(h3_gpu_rms_norm_f16_out(vae->gpu, vae->norm, vae->hidden,
-            weight->norm1, rows, HIDDEN, 1e-5f), "video VAE attention norm");
+        /* Each residual add also writes the next RMSNorm (FP16): norm2 here,
+         * and the next block's norm1 when its weights are resident. */
+        const vae_block *next = index + 1 < LAYERS ? &vae->blocks[index + 1] : NULL;
+        if (!vae->norm_ready)
+            OP(h3_gpu_rms_norm_f16_out(vae->gpu, vae->norm, vae->hidden,
+                weight->norm1, rows, HIDDEN, 1e-5f), "video VAE attention norm");
+        vae->norm_ready = 0;
         OP(h3_gpu_linear_f16_f32_out(vae->gpu, vae->qkv, vae->norm,
             weight->qkv_w, rows, HIDDEN, INNER * 3), "video VAE QKV");
         OP(h3_gpu_video_qkv_rope_bias_f16(vae->gpu, vae->query, vae->key,
@@ -560,20 +582,27 @@ static int run_block(vae_context *vae, int index, char *error,
            "video VAE attention");
         OP(h3_gpu_linear_f16_f32_out(vae->gpu, vae->branch, vae->heads,
             weight->out_w, rows, INNER, HIDDEN), "video VAE attention output");
-        OP(h3_gpu_scale_add_bias_f32(vae->gpu, vae->hidden, vae->hidden,
-            vae->branch, weight->out_b, weight->scale1, rows, HIDDEN),
-           "video VAE attention residual");
-        OP(h3_gpu_rms_norm_f16_out(vae->gpu, vae->norm, vae->hidden,
-            weight->norm2, rows, HIDDEN, 1e-5f), "video VAE MLP norm");
+        OP(h3_gpu_scale_add_bias_rms_f16(vae->gpu, vae->hidden, vae->norm,
+            vae->hidden, vae->branch, weight->out_b, weight->scale1,
+            weight->norm2, rows, HIDDEN, 1e-5f),
+           "video VAE attention residual and MLP norm");
         OP(h3_gpu_linear_f16_f32_out(vae->gpu, vae->ff1, vae->norm,
             weight->w1, rows, HIDDEN, FFN * 2), "video VAE MLP input");
         OP(h3_gpu_swiglu_bias_f16_out(vae->gpu, vae->activated, vae->ff1,
             weight->w1_b, rows, FFN), "video VAE SwiGLU");
         OP(h3_gpu_linear_f16_f32_out(vae->gpu, vae->branch, vae->activated,
             weight->w2, rows, FFN, HIDDEN), "video VAE MLP output");
-        OP(h3_gpu_scale_add_bias_f32(vae->gpu, vae->hidden, vae->hidden,
-            vae->branch, weight->w2_b, weight->scale2, rows, HIDDEN),
-           "video VAE MLP residual");
+        if (next && next->norm1) {
+            OP(h3_gpu_scale_add_bias_rms_f16(vae->gpu, vae->hidden, vae->norm,
+                vae->hidden, vae->branch, weight->w2_b, weight->scale2,
+                next->norm1, rows, HIDDEN, 1e-5f),
+               "video VAE MLP residual and next attention norm");
+            vae->norm_ready = 1;
+        } else {
+            OP(h3_gpu_scale_add_bias_f32(vae->gpu, vae->hidden, vae->hidden,
+                vae->branch, weight->w2_b, weight->scale2, rows, HIDDEN),
+               "video VAE MLP residual");
+        }
         return 1;
     }
     /* 3xTF32: the norms and SwiGLU write TF32 parts for the next product, and
@@ -673,6 +702,7 @@ static int run_decoder(vae_context *vae, h3_video_vae_progress progress,
         h3_gpu_tensor_free(zero); return 0;                                    \
     }                                                                           \
 } while (0)
+    vae->norm_ready = 0;
     OP(h3_gpu_begin(vae->gpu), "begin video VAE decoder");
     OP(h3_gpu_linear_f32(vae->gpu, vae->post, vae->latent, vae->post_w,
         vae->post_b, vae->patches, LATENT_CHANNELS, LATENT_CHANNELS),
@@ -752,6 +782,7 @@ static int run_resident_tile(vae_context *vae, h3_gpu_tensor *projected,
         RELEASE_ZERO(); return 0;                                               \
     }                                                                           \
 } while (0)
+    vae->norm_ready = 0;
     OP(h3_gpu_begin(vae->gpu), "begin tiled video VAE decoder");
     OP(h3_gpu_linear_f32(vae->gpu, vae->post, vae->latent, vae->post_w,
         vae->post_b, vae->patches, LATENT_CHANNELS, LATENT_CHANNELS),
@@ -1254,14 +1285,18 @@ static int pipeline_prepare(h3_video_vae_decoder *decoder, char *error,
     if (vae->latent && h3_gpu_tensor_elements(vae->latent) != latent_count)
         free_tensor(&vae->latent);
     if (!vae->latent) vae->latent = h3_gpu_tensor_new_f32(vae->gpu, latent_count);
-    if (!vae->projected_next)
-        vae->projected_next = h3_gpu_tensor_new_f32(vae->gpu, rows_count);
+    int slots_ok = 1;
+    for (int slot = 0; slot < PIPELINE_SLOTS - 1; slot++) {
+        if (!vae->projected_slots[slot])
+            vae->projected_slots[slot] = h3_gpu_tensor_new_f32(vae->gpu, rows_count);
+        slots_ok = slots_ok && vae->projected_slots[slot];
+    }
     if (!vae->zero) {
         float zeros[HIDDEN];
         memset(zeros, 0, sizeof(zeros));
         vae->zero = h3_gpu_tensor_from_f32(vae->gpu, zeros, HIDDEN);
     }
-    if (!vae->latent || !vae->projected_next || !vae->zero) {
+    if (!vae->latent || !slots_ok || !vae->zero) {
         fail(error, error_size, "cannot allocate video VAE pipeline tensors: %s",
              h3_gpu_error(vae->gpu));
         return 0;
@@ -1290,7 +1325,9 @@ static int pipeline_run(vae_pipeline *pipeline, char *error, size_t error_size) 
         fail(error, error_size, "cannot start video VAE host thread");
         return 0;
     }
-    h3_gpu_tensor *outputs[PIPELINE_SLOTS] = {vae->projected, vae->projected_next};
+    h3_gpu_tensor *outputs[PIPELINE_SLOTS] = {vae->projected};
+    for (int slot = 1; slot < PIPELINE_SLOTS; slot++)
+        outputs[slot] = vae->projected_slots[slot - 1];
     size_t latent_count = decoder->pinned_latent_count;
     size_t rows_count = decoder->pinned_rows_count;
     int ok = gpu_op(vae, h3_gpu_begin(vae->gpu), error, error_size,
@@ -1576,7 +1613,8 @@ static void free_tile_activations(vae_context *vae) {
     free_tensor(&vae->activated); free_tensor(&vae->rope_cos);
     free_tensor(&vae->rope_sin); free_tensor(&vae->projected);
     free_tensor(&vae->norm_parts); free_tensor(&vae->act_parts);
-    free_tensor(&vae->projected_next);
+    for (int slot = 0; slot < PIPELINE_SLOTS - 1; slot++)
+        free_tensor(&vae->projected_slots[slot]);
 }
 
 int h3_video_vae_decoder_reshape(h3_video_vae_decoder *decoder,
