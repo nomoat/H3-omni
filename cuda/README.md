@@ -226,18 +226,18 @@ process: one thread and one complete model copy per GPU, NCCL between them.
   tiles, and one thread stitches them in order.
 - Text encoder and audio VAE stay on GPU 0.
 
-Output is bit-identical to one GPU (latents, audio and RGB) for N = 2, 4 and
-7, in two requests each (jobs 14780, 14781, 14783, 14785, 14789;
+Output is bit-identical to one GPU (latents, audio and RGB) for N = 2, 4, 7
+and 8, in two requests each (jobs 14780, 14781, 14783, 14785, 14789, 14792;
 `tests/serving/multigpu.sbatch`, `compare_gpus.py`). FastH3, token
 reduction, core reuse and SSD streaming are refused with N > 1.
 
-| Request (warm, 864x480, 20 steps) | 1 GPU | 2 GPUs | 4 GPUs | vLLM-Omni 2 / 4 GPUs |
-| --- | --- | --- | --- | --- |
-| 5 s video | 32.0 s | 18.1-18.3 s | 9.2-9.4 s | 18.9 / 10.2 s |
-| 10 s video | 80.4 s | 44.2-44.7 s | 22.2-22.4 s | 45.4 / 24.0 s |
+| Request (warm, 864x480, 20 steps) | 1 GPU | 2 GPUs | 4 GPUs | 8 GPUs | vLLM-Omni 2 / 4 / 8 GPUs |
+| --- | --- | --- | --- | --- | --- |
+| 5 s video | 32.0 s | 18.1-18.3 s | 9.2-9.4 s | 5.4-5.7 s | 18.9 / 10.2 / 6.1 s |
+| 10 s video | 80.4 s | 44.2-44.7 s | 22.2-22.4 s | 12.6-13.1 s | 45.4 / 24.0 / 13.6 s |
 
 2 GPUs: job 14781 (before the parallel host passes of the video VAE);
-4 GPUs: job 14789. Memory: GPU 0 holds the text encoder, VAEs and its DiT
+4 GPUs: job 14789; 8 GPUs: job 14792 (gpu-h200x8-2, shared-storage weights). Memory: GPU 0 holds the text encoder, VAEs and its DiT
 copy (about 101 GB); the other GPUs about 53 GB each.
 
 ## Deployment requirements
