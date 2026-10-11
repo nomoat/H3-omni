@@ -61,6 +61,10 @@ $(BUILD)/serve_check.o: $(ROOT)/tests/serving/serve_check.c $(ROOT)/h3.h | $(BUI
 	$(CC) $(CFLAGS) -c $< -o $@
 $(BUILD)/h3_serve_check: $(OBJ) $(BUILD)/serve_check.o $(BUILD)/h3_tokenizer_portable.o
 	$(NVCC) -o $@ $^ $(LDLIBS) -L$(ICU_ROOT)/lib/x86_64-linux-gnu -Xlinker=--disable-new-dtags -Xlinker=-rpath=$(ICU_ROOT)/lib/x86_64-linux-gnu -licuuc -licui18n
+$(BUILD)/h3_worker.o: $(ROOT)/serve/h3_worker.c $(ROOT)/h3.h | $(BUILD)
+	$(CC) $(CFLAGS) -c $< -o $@
+$(BUILD)/h3_worker: $(OBJ) $(BUILD)/h3_worker.o $(BUILD)/h3_tokenizer_portable.o
+	$(NVCC) -o $@ $^ $(LDLIBS) -L$(ICU_ROOT)/lib/x86_64-linux-gnu -Xlinker=--disable-new-dtags -Xlinker=-rpath=$(ICU_ROOT)/lib/x86_64-linux-gnu -licuuc -licui18n
 $(BUILD)/h3_tokenizer_portable.o:$(ROOT)/cuda/h3_tokenizer_portable.cpp $(ROOT)/cuda/vendor/json.hpp $(ROOT)/h3_tokenizer.h | $(BUILD)
 	$(CXX) -O2 -std=c++17 -fPIC -I$(ROOT) -I$(ICU_ROOT)/include -c $< -o $@
 $(BUILD)/h3_fasth3_config.o: $(ROOT)/cuda/h3_fasth3_config.cpp $(ROOT)/h3_fasth3.h $(ROOT)/cuda/vendor/json.hpp | $(BUILD)
@@ -72,6 +76,6 @@ $(BUILD)/libh3_tokenizer.so: $(BUILD)/h3_tokenizer_portable.o
 clean:
 	rm -f $(BUILD)/*.o $(BUILD)/.config-vsa* $(BUILD)/h3 $(BUILD)/libh3_cuda.so $(BUILD)/libh3_model.so
 
-$(addprefix $(BUILD)/,$(addsuffix .o,$(LIB_C))) $(BUILD)/h3_gpu_cuda.o $(BUILD)/main.o $(BUILD)/h3_cli.o $(BUILD)/linenoise.o $(BUILD)/model_bridge.o $(BUILD)/serve_check.o: $(BUILD)/.config-vsa$(VSA)
+$(addprefix $(BUILD)/,$(addsuffix .o,$(LIB_C))) $(BUILD)/h3_gpu_cuda.o $(BUILD)/main.o $(BUILD)/h3_cli.o $(BUILD)/linenoise.o $(BUILD)/model_bridge.o $(BUILD)/serve_check.o $(BUILD)/h3_worker.o: $(BUILD)/.config-vsa$(VSA)
 
 -include $(wildcard $(BUILD)/*.d)

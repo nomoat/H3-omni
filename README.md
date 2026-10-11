@@ -109,6 +109,28 @@ Without `-p` the binary starts an interactive session that keeps every model
 resident between prompts. FastH3 needs a converted checkpoint; see
 [cuda/FASTH3.md](cuda/FASTH3.md).
 
+## HTTP service
+
+`serve/` turns the engine into a small video API for one node:
+
+- `h3_worker` (C) loads the model once, keeps it resident on all GPUs and reads
+  one request per stdin line.
+- `server.py` (Python standard library only) puts it behind
+  `POST /v1/videos` → `video/mp4`, with a bearer key, a short queue (429 when
+  full) and a warm-up generation before `/health` reports ready.
+- `h3-video.sbatch` builds and runs both as a Slurm job with no time limit.
+
+```sh
+sbatch --gres=gpu:8 serve/h3-video.sbatch src.tar 8 18960
+curl -H "Authorization: Bearer $KEY" -d '{"prompt":"A fox in snow.","seconds":5}' \
+  http://NODE:18960/v1/videos -o fox.mp4
+```
+
+It backs the video model in the autograd.run playground. Measured through
+that path on 8 H200 (FastH3, 864x480, warm): 2 s video 1.15 s, 5 s video
+1.8 s, 10 s video 3.5 s of GPU time per request. The first request after
+start takes about 2 minutes to load the weights; the warm-up absorbs it.
+
 ## Documents
 
 | File | Content |
