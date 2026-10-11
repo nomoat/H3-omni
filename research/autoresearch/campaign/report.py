@@ -55,14 +55,14 @@ def read_json(root, relative, inputs, warnings, required=False):
     except (ValueError, UnicodeError) as error:
         if required:
             raise ValueError(f"Invalid required input: {path}") from error
-        warnings.append(f"{relative} 尚未完整或不是有效 JSON；本次不使用。")
+        warnings.append(f"{relative} is incomplete or not valid JSON; not used this time.")
         return None
 
 
 def read_events(root, inputs, warnings):
     path = root / "events.jsonl"
     if not path.is_file():
-        warnings.append("缺少 events.jsonl，无法核对本地 ledger。")
+        warnings.append("events.jsonl is missing; cannot check the local ledger.")
         return []
     raw = path.read_bytes()
     inputs["events.jsonl"] = {"sha256": sha256(raw), "bytes": len(raw)}
@@ -70,7 +70,7 @@ def read_events(root, inputs, warnings):
     lines = raw.splitlines(keepends=True)
     for index, line in enumerate(lines, 1):
         if not line.endswith(b"\n"):
-            warnings.append("events.jsonl 末行未写完；只读取此前完整记录。")
+            warnings.append("The last line of events.jsonl is incomplete; only the complete records before it are read.")
             break
         try:
             event = json.loads(line)
@@ -79,7 +79,7 @@ def read_events(root, inputs, warnings):
                     or event["event_hash"] != sha256(encoded(payload))):
                 raise ValueError("hash chain differs")
         except (ValueError, KeyError, TypeError) as error:
-            warnings.append(f"events.jsonl 第 {index} 行校验失败；只读取此前有效记录。")
+            warnings.append(f"events.jsonl line {index} failed validation; only the valid records before it are read.")
             break
         events.append(event)
         previous = event["event_hash"]
@@ -89,57 +89,57 @@ def read_events(root, inputs, warnings):
 def terminal_problem(record, entry, progress, root):
     """Fail closed on incomplete/foreign evidence; do not re-run the judge."""
     if not isinstance(record, dict):
-        return "result 不是对象"
+        return "result is not an object"
     if record.get("terminal") is not True or record.get("status") not in TERMINAL:
-        return "没有完整终态"
+        return "no complete final state"
     if any(record.get(key) != value for key, value in entry.items()):
-        return "result 身份与 plan 不同"
+        return "result identity differs from the plan"
     if (progress.get("campaign_identity_sha256") and
             record.get("campaign_identity_sha256") != progress["campaign_identity_sha256"]):
-        return "campaign identity 与 progress 不同"
+        return "campaign identity differs from progress"
     attempts = record.get("attempts", [])
     if not isinstance(attempts, list) or any(not isinstance(a, dict) for a in attempts):
-        return "attempts 格式无效"
+        return "invalid attempts format"
     real_attempts = [a for a in attempts if isinstance(a, dict)
                      and a.get("stage") in ("build", "run")
                      and a.get("outcome") in ("success", "candidate_error")]
     if not real_attempts or attempts[-1].get("outcome") == "infra_error":
-        return "没有真实候选 build/run 结果，或末次是基础设施错误"
+        return "no real candidate build/run result, or the last attempt was an infrastructure error"
     if record["status"] != "crash" and not any(a["stage"] == "run" for a in real_attempts):
-        return "非 crash 终态缺少 run 记录"
+        return "non-crash final state has no run record"
     if type(record.get("correctness")) is not bool or not positive(record.get("finished_unix")):
-        return "缺少明确正确性结果或完成时间"
+        return "no explicit correctness result or finish time"
     parent = record.get("benchmark_parent")
     if type(parent) is not int or parent < 0:
-        return "缺少实测 benchmark_parent"
+        return "no measured benchmark_parent"
     source = root / f"sources/{entry['candidate']:04d}.cu"
     if not source.is_file() or sha256(source.read_bytes()) != entry["source_sha256"]:
-        return "本地候选源码缺失或 hash 不符"
+        return "local candidate source missing or hash mismatch"
     score = record.get("score_seconds")
     if score is not None and not positive(score):
-        return "冷启动秒数无效"
+        return "invalid cold-start seconds"
     if score is not None:
         samples = record.get("samples", [])
         if not isinstance(samples, list) or len(samples) != 3 or not all(map(positive, samples)):
-            return "缺少三个有效的原始初测样本"
+            return "fewer than three valid raw initial samples"
         confirmation = record.get("confirmation")
         if confirmation is not None:
             if not isinstance(confirmation, dict):
-                return "confirmation 格式无效"
+                return "invalid confirmation format"
             pairs = confirmation.get("pairs", [])
             if (not isinstance(pairs, list) or len(pairs) != 5 or not all(isinstance(pair, dict) and
                     positive(pair.get("parent")) and positive(pair.get("candidate")) for pair in pairs)):
-                return "配对确认样本不完整"
+                return "paired confirmation samples incomplete"
             expected = statistics.median(pair["candidate"] for pair in pairs)
         else:
             expected = statistics.median(samples)
         if not math.isclose(score, expected, rel_tol=1e-10, abs_tol=1e-10):
-            return "分数与原始样本中位数不同"
+            return "score differs from the median of the raw samples"
     if record["status"] == "keep" and not (
             record["correctness"] is True and record.get("fullgate") is True
             and isinstance(record.get("confirmation"), dict)
             and record["confirmation"].get("passed") is True and positive(score)):
-        return "keep 缺少 fullgate、confirmation 或有效分数"
+        return "keep without fullgate, confirmation or a valid score"
     return None
 
 
@@ -173,16 +173,16 @@ def collect(root):
         record = read_json(root, result_path, inputs, warnings)
         problem = terminal_problem(record, entry, progress, root) if record is not None else None
         if record is not None and not problem and entry["source_sha256"] in source_hashes:
-            problem = "与已有完成候选的源码重复"
+            problem = "same source as an already completed candidate"
         complete = record is not None and problem is None
         if complete and record["benchmark_parent"] not in {0, *numbers}:
-            problem, complete = "benchmark_parent 不属于此 plan", False
+            problem, complete = "benchmark_parent is not in this plan", False
         if complete:
             source_hashes.add(entry["source_sha256"])
         if problem:
-            warnings.append(f"候选 {number:04d} 不计入完成：{problem}。")
+            warnings.append(f"Candidate {number:04d} not counted as complete: {problem}.")
         if number in finishes and not complete:
-            warnings.append(f"候选 {number:04d} 有 ledger finish，但缺少可核对的 compact 终态证据。")
+            warnings.append(f"Candidate {number:04d} has a ledger finish but no compact final-state evidence to check.")
         row = dict(entry, source_parent_candidate=commit_numbers.get(entry["parent_commit"]),
                    completed=complete, status=record["status"] if complete else "pending",
                    correctness=record["correctness"] if complete else None,
@@ -193,7 +193,7 @@ def collect(root):
                    benchmark_parent=record.get("benchmark_parent") if complete else None,
                    samples=record.get("samples", []) if complete else [],
                    confirmation=record.get("confirmation") if complete else None,
-                   reason=record.get("reason", "") if complete else (problem or "尚无正式终态结果"),
+                   reason=record.get("reason", "") if complete else (problem or "no final result yet"),
                    attempts=record.get("attempts", []) if complete else [],
                    started_unix=record.get("started_unix") if complete else None,
                    finished_unix=record.get("finished_unix") if complete else None,
@@ -210,7 +210,7 @@ def collect(root):
             finish = finishes[number]
             if (finish.get("status") != row["status"] or finish.get("correctness") != row["correctness"]
                     or finish.get("e2e_latency_seconds") != row["score_seconds"]):
-                warnings.append(f"候选 {number:04d} 的 ledger 与 compact 终态不同；本报告保留 compact 原值。")
+                warnings.append(f"Candidate {number:04d}: ledger differs from the compact final state; this report keeps the compact value.")
         rows.append(row)
     completed = [row for row in rows if row["completed"]]
     completed_ids = [row["candidate"] for row in completed]
@@ -218,12 +218,12 @@ def collect(root):
                 and row["fullgate"] is True and (row["confirmation"] or {}).get("passed") is True]
     best = min(eligible, key=lambda row: (row["score_seconds"], row["candidate"])) if eligible else None
     if progress and progress.get("completed", []) != completed_ids:
-        warnings.append("compact 终态与 worker progress 完成列表不同；可能仍在归档或同步。本报告只计有效终态。")
+        warnings.append("Compact final states differ from the worker progress list; archiving or sync may still be running. This report counts only valid final states.")
     if status.get("completed_rounds", 0) != len(completed):
-        warnings.append("status.json 的完成计数与 compact 终态不同；status 可能尚未同步。")
+        warnings.append("The completed count in status.json differs from the compact final states; status may not be synced yet.")
     missing = set(progress.get("completed", [])) - set(numbers)
     if missing:
-        warnings.append(f"worker progress 含 plan 外的候选：{sorted(missing)}。")
+        warnings.append(f"worker progress has candidates outside the plan: {sorted(missing)}.")
     counts = Counter(row["status"] for row in completed)
     durations = [row["wall_seconds"] for row in completed if positive(row["wall_seconds"])]
     baseline_samples = progress.get("baseline_samples", [])
@@ -273,12 +273,12 @@ def render(report):
         return "baseline" if number == 0 else (link(f"#round-{number:04d}", f"{number:04d}") if number is not None else "—")
     summary = report["summary"]
     best = summary["best_confirmed"]
-    best_text = (f'候选 {best["candidate"]:04d} · {seconds(best["score_seconds"])} 秒'
-                 if best else "暂无通过完整 gate 与配对确认的候选")
-    warning_html = ("<aside><strong>数据核对</strong><ul>" + "".join(f"<li>{esc(w)}</li>" for w in report["warnings"]) + "</ul></aside>"
+    best_text = (f'Candidate {best["candidate"]:04d} · {seconds(best["score_seconds"])} s'
+                 if best else "No candidate has passed the full gate and paired confirmation yet")
+    warning_html = ("<aside><strong>Data checks</strong><ul>" + "".join(f"<li>{esc(w)}</li>" for w in report["warnings"]) + "</ul></aside>"
                     if report["warnings"] else "")
-    cards = [("正式完成", f'{summary["completed"]} / {summary["budget"]}'),
-             ("正确性 PASS / FAIL", f'{summary["correctness_pass"]} / {summary["correctness_fail"]}'),
+    cards = [("Completed", f'{summary["completed"]} / {summary["budget"]}'),
+             ("Correctness PASS / FAIL", f'{summary["correctness_pass"]} / {summary["correctness_fail"]}'),
              ("keep / discard / crash", f'{summary["keep"]} / {summary["discard"]} / {summary["crash"]}')]
     card_html = "".join(f"<div class=card><span>{label}</span><strong>{value}</strong></div>" for label, value in cards)
     rows = []
@@ -293,56 +293,56 @@ def render(report):
         confirmation = row["confirmation"] or {}
         pairs = confirmation.get("pairs", [])
         pair_text = "; ".join(f'{p["parent"]:.6f} → {p["candidate"]:.6f}' for p in pairs)
-        sample_label = "确认中位数" if pairs else "初测中位数" if row["score_seconds"] is not None else "未计时"
-        details = (f'<details><summary>原始样本与配置</summary><p>初测 3 次（秒）：{esc(samples)}</p>'
-                   + (f'<p>5 对 parent → candidate（秒）：{esc(pair_text)}</p>' if pairs else '')
+        sample_label = "confirmed median" if pairs else "initial median" if row["score_seconds"] is not None else "not timed"
+        details = (f'<details><summary>Raw samples and configuration</summary><p>3 initial runs (s): {esc(samples)}</p>'
+                   + (f'<p>5 parent → candidate pairs (s): {esc(pair_text)}</p>' if pairs else '')
                    + f'<pre>{esc(json.dumps(row["config"], ensure_ascii=False, indent=2))}</pre>'
-                   + f'<p>源码 SHA-256：<code>{esc(row["source_sha256"])}</code></p>'
-                   + f'<p>source parent：{esc(row["parent"])}；parent commit：<code>{esc(row["parent_commit"])}</code></p>'
-                   + f'<p>started_unix：{esc(row["started_unix"])}；finished_unix：{esc(row["finished_unix"])}</p>'
-                   + f'<p>终态已同步到 ledger：{"是" if row["ledger_finished"] else "否"}；worker progress：{"是" if row["worker_completed"] else "否"}</p></details>')
+                   + f'<p>Source SHA-256: <code>{esc(row["source_sha256"])}</code></p>'
+                   + f'<p>source parent: {esc(row["parent"])}; parent commit: <code>{esc(row["parent_commit"])}</code></p>'
+                   + f'<p>started_unix: {esc(row["started_unix"])}; finished_unix: {esc(row["finished_unix"])}</p>'
+                   + f'<p>Final state synced to ledger: {"yes" if row["ledger_finished"] else "no"}; worker progress: {"yes" if row["worker_completed"] else "no"}</p></details>')
         local_links = " · ".join(link(row["links"][key], label) for key, label in
-                                (("worktree", "worktree"), ("source", "源码"), ("patch", "patch"), ("result", "结果"))
+                                (("worktree", "worktree"), ("source", "source"), ("patch", "patch"), ("result", "result"))
                                 if row["links"][key])
         rows.append(f'<tr id="round-{number:04d}" data-status="{state}"><td><strong>{number:04d}</strong><br><small>{esc(", ".join(row["families"]))}</small></td>'
                     f'<td>{parent(row["source_parent_candidate"])} → {number:04d}<br>{link(row["links"]["worktree"], row["commit"][:12], row["commit"])}</td>'
-                    f'<td>{parent(row["benchmark_parent"])}</td><td><span class="badge {state}">{state if state != "pending" else "运行中" if active else "待完成"}</span>'
+                    f'<td>{parent(row["benchmark_parent"])}</td><td><span class="badge {state}">{state if state != "pending" else "running" if active else "pending"}</span>'
                     + (f'<br><small>{esc(report["worker"]["phase"])}</small>' if active else '') + '</td>'
                     f'<td>{correct}</td><td class=num>{seconds(row["score_seconds"])}<br><small>{sample_label}</small></td>'
                     f'<td class=num>{seconds(row["wall_seconds"])}</td>'
                     f'<td>{esc(row["reason"])}<br>{local_links}{details}</td></tr>')
     worker = report["worker"]
     worker_text = (f'{worker["status"]} · active={worker["active"]} · phase={worker["phase"]}'
-                   if worker["status"] else "尚无 worker progress")
+                   if worker["status"] else "no worker progress yet")
     baseline = report["baseline"]
-    baseline_text = (f'基准：{seconds(baseline["score_seconds"])} 秒；原始样本：' +
-                     " / ".join(f"{sample:.6f}" for sample in baseline["samples"]) + "。基准和预检均不计入正式搜索轮次。") if positive(baseline["score_seconds"]) else "基准计分记录尚未同步。"
+    baseline_text = (f'Baseline: {seconds(baseline["score_seconds"])} s; raw samples: ' +
+                     " / ".join(f"{sample:.6f}" for sample in baseline["samples"]) + ". Neither the baseline nor the preflight counts as a search round.") if positive(baseline["score_seconds"]) else "The baseline score record is not synced yet."
     if positive(baseline["fullgate_wall_seconds"]):
-        baseline_text += f' 完整基准 gate：{"PASS" if baseline["fullgate_passed"] else "FAIL"}，验证耗时 {seconds(baseline["fullgate_wall_seconds"])} 秒；这是验证成本。'
+        baseline_text += f' Full baseline gate: {"PASS" if baseline["fullgate_passed"] else "FAIL"}, validation took {seconds(baseline["fullgate_wall_seconds"])} s; this is validation cost.'
     timing = report["campaign_timing"]
-    timing_text = (f'已观测 {timing["observed_rounds"]} 轮执行耗时，中位数 {seconds(timing["median_round_seconds"])} 秒，累计 {seconds(timing["sum_round_seconds"])} 秒。'
-                   f' 按此中位数粗估剩余 {timing["rough_remaining_seconds"]/3600:.2f} 小时。后续完整 gate 比例、排队和基础设施中断会改变耗时；此值不是完成时间承诺。'
-                   if timing["observed_rounds"] else '尚无完成轮次的执行耗时，暂不估算剩余时间。')
-    empty_text = '<p class=empty>目前正式完成 0 轮。已有源码提交及预检不代表搜索完成，也不能证明性能提升。</p>' if not summary["completed"] else ''
+    timing_text = (f'Observed {timing["observed_rounds"]} rounds, median {seconds(timing["median_round_seconds"])} s, total {seconds(timing["sum_round_seconds"])} s.'
+                   f' Rough remaining time at this median: {timing["rough_remaining_seconds"]/3600:.2f} h. The share of full gates, queueing and infrastructure failures change this; it is not a promised finish time.'
+                   if timing["observed_rounds"] else 'No completed round timed yet; no estimate of the remaining time.')
+    empty_text = '<p class=empty>0 rounds completed. Committed sources and preflight checks do not mean the search is done and do not prove a speedup.</p>' if not summary["completed"] else ''
     return f'''<!doctype html>
 <html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>H3 H200 · 100 轮搜索</title><style>
+<title>H3 H200 · 100-round search</title><style>
 :root{{color-scheme:light;--ink:#193044;--muted:#526575;--line:#dbe3e9}}*{{box-sizing:border-box}}body{{margin:0;background:#f4f7fa;color:var(--ink);font:15px/1.55 system-ui,sans-serif}}main{{max-width:1500px;margin:auto;padding:30px 24px}}h1{{font-size:28px;margin:0 0 8px}}h2{{font-size:20px;margin:26px 0 8px}}p{{margin:8px 0}}a{{color:#0759a8}}small,.muted{{color:var(--muted)}}.cards{{display:flex;gap:14px;flex-wrap:wrap;margin:22px 0}}.card{{background:white;border:1px solid var(--line);border-radius:9px;padding:16px 22px;min-width:240px}}.card span{{display:block;color:var(--muted)}}.card strong{{display:block;font-size:28px;margin-top:4px}}.best{{background:#eaf2fa;border-left:4px solid #3478b6;padding:14px 18px}}.empty,aside{{padding:14px 18px;background:#fff3d7;border-radius:6px}}.tablewrap{{overflow:auto;background:white;border:1px solid var(--line);border-radius:8px}}table{{border-collapse:collapse;width:100%;min-width:1180px}}th,td{{padding:12px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}}th{{background:#edf2f7;font-weight:600}}td:last-child{{max-width:470px}}.num{{white-space:nowrap;font-variant-numeric:tabular-nums}}code,pre{{font-size:12px;overflow-wrap:anywhere;white-space:pre-wrap}}.badge{{display:inline-block;padding:2px 7px;border-radius:4px;background:#edf0f3;white-space:nowrap}}.keep{{background:#daf1e1;color:#1d6538}}.discard{{background:#fff0cd;color:#775614}}.crash{{background:#fde3e1;color:#9b2720}}details{{margin-top:8px}}summary{{cursor:pointer;color:#0759a8}}select{{padding:6px;margin:12px 0}}tr:target{{background:#eff8ff}}footer{{color:var(--muted);margin-top:24px;font-size:13px}}[hidden]{{display:none!important}}
 </style></head><body><main>
-<h1>H3 · 单张 H200 自动搜索</h1>
-<p>864 × 480 × 56 帧 · 20 步 · 50 层 · 固定 prompt / seed 7</p>
-<p class=muted>每次启动新进程，从启动到完整 MP4 输出并退出。唯一性能分数是冷启动端到端秒数，越低越好；验证不计入秒数。共享系统的文件页缓存不强制清空。</p>
+<h1>H3 · automatic search on one H200</h1>
+<p>864 × 480 × 56 frames · 20 steps · 50 layers · fixed prompt / seed 7</p>
+<p class=muted>Each run starts a new process and measures from start until the complete MP4 is written and the process exits. The only performance score is cold-start end-to-end seconds, lower is better; validation is not counted. The shared system's page cache is not dropped.</p>
 <div class=cards>{card_html}</div>{empty_text}
-<div class=best><strong>最好已确认候选</strong><p>{esc(best_text)}</p><small>需 correctness PASS、fullgate PASS、confirmation PASS 且状态为 keep。</small></div>
-<p>{esc(baseline_text)}</p><p class=muted>worker：{esc(worker_text)}；已封存源码 {summary["sealed"]} 个，ledger 已结算 {summary["ledger_completed"]} 轮。</p>
+<div class=best><strong>Best confirmed candidate</strong><p>{esc(best_text)}</p><small>Requires correctness PASS, fullgate PASS, confirmation PASS and status keep.</small></div>
+<p>{esc(baseline_text)}</p><p class=muted>worker: {esc(worker_text)}; sealed sources: {summary["sealed"]}; rounds settled in the ledger: {summary["ledger_completed"]}.</p>
 <p class=muted>{esc(timing_text)}</p>
 {warning_html}
-<h2>每轮结果与源码关系</h2>
-<p>“源码父节点 → 候选”显示 Git 源码继承关系；“实测 benchmark_parent”显示该轮测速时的 incumbent。两者独立。尚未运行的候选不填实测父节点。</p>
-<p class=muted>“本轮耗时”是 finished_unix − started_unix，含构建、验证和全部测速，不含终态后归档。它用于估算搜索进度，不是性能分数。</p>
-<label>显示 <select id=filter><option value=all>全部候选</option><option value=complete>正式完成</option><option value=keep>keep</option><option value=discard>discard</option><option value=crash>crash</option><option value=pending>待完成</option></select></label>
-<div class=tablewrap><table><thead><tr><th>轮次 / 变更族</th><th>源码父节点 → 候选<br>source commit</th><th>实测<br>benchmark_parent</th><th>判定</th><th>正确性</th><th>冷启动 E2E 秒</th><th>本轮耗时<br>秒</th><th>原因 / 本地证据</th></tr></thead><tbody>{''.join(rows)}</tbody></table></div>
-<footer>生成时间：{esc(report["generated_at"])}。仅汇总本地已有证据，无 GPU 运行或外部发布。{link("report.json", "完整 JSON")} · {link("plan.json", "plan")} · {link("status.json", "status")} · {link("events.jsonl", "events")} · {link("evidence/search/", "搜索结果目录")}</footer>
+<h2>Results per round and source lineage</h2>
+<p>"Source parent → candidate" shows the Git source lineage; "measured benchmark_parent" shows the incumbent when the round was timed. The two are independent. Candidates that have not run have no measured parent.</p>
+<p class=muted>"Round time" is finished_unix − started_unix: build, validation and all timing runs, without archiving after the final state. It estimates search progress; it is not a performance score.</p>
+<label>Show <select id=filter><option value=all>all candidates</option><option value=complete>completed</option><option value=keep>keep</option><option value=discard>discard</option><option value=crash>crash</option><option value=pending>pending</option></select></label>
+<div class=tablewrap><table><thead><tr><th>Round / change family</th><th>Source parent → candidate<br>source commit</th><th>Measured<br>benchmark_parent</th><th>Verdict</th><th>Correctness</th><th>Cold-start E2E s</th><th>Round time<br>s</th><th>Reason / local evidence</th></tr></thead><tbody>{''.join(rows)}</tbody></table></div>
+<footer>Generated: {esc(report["generated_at"])}. Summarizes local evidence only; no GPU runs and nothing published.{link("report.json", "full JSON")} · {link("plan.json", "plan")} · {link("status.json", "status")} · {link("events.jsonl", "events")} · {link("evidence/search/", "search results")}</footer>
 </main><script>document.getElementById('filter').addEventListener('change',function(){{document.querySelectorAll('tbody tr').forEach(row=>{{row.hidden=this.value!=='all'&&(this.value==='complete'?row.dataset.status==='pending':row.dataset.status!==this.value);}});}});</script></body></html>'''
 
 
@@ -390,7 +390,7 @@ def self_test():
         (root / "events.jsonl").write_bytes(b"".join(encoded(event)+b"\n" for event in events))
         report = collect(root)
         assert report["summary"]["completed"] == 0 and report["summary"]["best_confirmed"] is None
-        assert "目前正式完成 0 轮" in render(report)
+        assert "0 rounds completed" in render(report)
         good = dict(plan[0], terminal=True, status="keep", correctness=True, fullgate=True,
                     benchmark_parent=0, score_seconds=9, samples=[9,9,9], started_unix=10, finished_unix=100,
                     attempts=[dict(stage="build", outcome="success"),dict(stage="run", outcome="success")],

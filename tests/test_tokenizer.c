@@ -44,7 +44,7 @@ int main(int argc, char **argv) {
                sizeof(fox) / sizeof(fox[0]));
     const uint32_t unicode[] = {9707, 11, 50891, 0, 220, 220, 17, 15, 17,
                                 21, 198, 104811, 51950, 594};
-    check_case(tokenizer, "Hello, WORLD!  2026\n中文 café's", unicode,
+    check_case(tokenizer, "Hello, WORLD!  2026\n\xe4\xb8\xad\xe6\x96\x87" " café's", unicode,
                sizeof(unicode) / sizeof(unicode[0]));
     const uint32_t emoji[] = {145080, 64, 4894};
     check_case(tokenizer, "🙂a!\n", emoji,

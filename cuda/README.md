@@ -51,8 +51,12 @@ including `summary.json`, `acceptance-result.json`, `extended/results.json` and
 `source-verification.json`. Complete fixtures, per-step tensors, decoded tensors,
 build source and logs are retained at `/home/cj/h3-cuda/results/14274`.
 The compact local copy omits large tensors; run `accept.py` against the complete
-cluster directory. The current 96 implementation/build/test files match the
-archived build source. Documentation and compact reports are added afterward.
+cluster directory. At job 14274 the 96 implementation/build/test files matched
+the archived build source. Documentation and compact reports were added
+afterward. Later, Chinese test prompts in `tests/pytorch/text.py` and
+`tests/test_tokenizer.c` were rewritten as escape sequences (the same bytes at
+run time), and Chinese text in compact JSON/log reports as `\uXXXX` escapes, so
+the repository contains only ASCII-range English text.
 
 ## Contract
 

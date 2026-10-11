@@ -90,7 +90,7 @@ class FastMonitorTests(unittest.TestCase):
         report=fast.summarize(self.root,progress,records,dict(job=9,scheduler_state='RUNNING'),2)
         page=(self.root/'report-fast.html').read_text()
         self.assertEqual(report['budget_exceeded'],1)
-        self.assertIn('<td>预算超时</td><td>未完成</td>',page)
+        self.assertIn('<td>over budget</td><td>not finished</td>',page)
         self.assertIsNone(report['provisional_best_seconds'])
 
     def test_keep_requires_two_samples_and_matching_score(self):

@@ -40,7 +40,7 @@ def main():
     if not tokenizer:
         raise RuntimeError(error.value.decode())
     reference_tokenizer = Tokenizer.from_file(str(tokenizer_file))
-    prompts = ["", "A cat walks through a sunny garden.", "一只猫在花园里走动。", "a\r\nb\n\n c\t ",
+    prompts = ["", "A cat walks through a sunny garden.", "\u4e00\u53ea\u732b\u5728\u82b1\u56ed\u91cc\u8d70\u52a8\u3002", "a\r\nb\n\n c\t ",
                "café cafe\u0301", "I'm WE'RE can't he'd", "1234567890 ½²Ⅷ", "🙂👨‍👩‍👧‍👦", "<|im_start|>user\nhello<|im_end|>"]
     ids_by_prompt, records = {}, []
     for prompt in dict.fromkeys(prompts + args.prompt):

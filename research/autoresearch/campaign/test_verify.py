@@ -60,7 +60,7 @@ class ManifestTests(unittest.TestCase):
             (self.root / case["key"]).mkdir()
             for name in names:
                 (self.root / case["key"] / (name + ".safetensors")).write_bytes(name.encode())
-        texts = [("english", "A cat walks through a sunny garden."), ("chinese", "一只猫在花园里走动。"),
+        texts = [("english", "A cat walks through a sunny garden."), ("chinese", "\u4e00\u53ea\u732b\u5728\u82b1\u56ed\u91cc\u8d70\u52a8\u3002"),
                  ("long_prompt", verify.read_json(verify.TESTS / "extended.json")["prompt"])]
         for key, _ in texts:
             (self.root / ("text-" + key + ".safetensors")).write_bytes(key.encode())

@@ -338,21 +338,21 @@ def summarize(root, progress, records, scheduler, total):
     rows = []
     for r in records:
         screen = r.get('screen',{}).get('passed')
-        accuracy = 'PASS' if screen is True else ('FAIL' if screen is False else '未完成')
-        state = '预算超时' if r.get('budget_exceeded') else r['status']
+        accuracy = 'PASS' if screen is True else ('FAIL' if screen is False else 'not finished')
+        state = 'over budget' if r.get('budget_exceeded') else r['status']
         rows.append('<tr>'+''.join('<td>'+escape(x)+'</td>' for x in (
             r['candidate'],state,accuracy,r.get('score_seconds'),r.get('samples',[]),
             round(r['finished_unix']-r['started_unix'],3),r['benchmark_parent'],
             r['commit'][:12],r['parent_commit'][:12],r['reason']))+
-            f'<td><a href="evidence/search-fast/{r["candidate"]:04d}/result.json">原始结果</a></td></tr>')
+            f'<td><a href="evidence/search-fast/{r["candidate"]:04d}/result.json">raw result</a></td></tr>')
     page = f'''<!doctype html><html lang="zh-CN"><meta charset="utf-8"><title>H3 fast search</title>
 <style>body{{font:15px system-ui;margin:24px;color:#17212f}}table{{border-collapse:collapse;font-size:13px}}td,th{{padding:8px;border-bottom:1px solid #ddd;text-align:left}}p{{max-width:1100px}}code{{background:#eee}}</style>
-<h1>H3 · 两样本 / 300 秒协议</h1><p>完成 <b>{value['completed']} / {total}</b>；v2 新完成 {len(records)}；旧协议保留 {len(legacy)}。</p>
-<p>Slurm {escape(scheduler.get('scheduler_state'))}；worker {escape(value['worker_status'])}；正在执行 {escape(value['active'])} / {escape(value['phase'])}。</p>
-<p>暂定最好候选：{escape(value['provisional_best_candidate'])}；冷启动 E2E：{escape(value['provisional_best_seconds'])} 秒。每个分数为两次独立进程样本的中位数。</p>
-<p>本轮 keep 只要求冻结的 extended screen PASS；完整 6+1 回归留给最终赢家。所有 v2 keep 均是暂定结果。预算超时单独显示，不等同精度 FAIL。旧协议结果没有转换成两样本结果。</p>
-<p>最后读取：{escape(value['checked_utc'])}。source parent 表示源码 Git 父节点；benchmark parent 表示实测 incumbent。</p>
-<table><thead><tr>{''.join('<th>'+name+'</th>' for name in ('候选','判定','screen','E2E 秒','原始样本','本轮秒','benchmark parent','source commit','source parent','原因','证据'))}</tr></thead><tbody>{''.join(rows)}</tbody></table></html>'''
+<h1>H3 · two-sample / 300 s protocol</h1><p>Completed <b>{value['completed']} / {total}</b>; new in v2: {len(records)}; kept from the old protocol: {len(legacy)}.</p>
+<p>Slurm {escape(scheduler.get('scheduler_state'))}; worker {escape(value['worker_status'])}; running {escape(value['active'])} / {escape(value['phase'])}.</p>
+<p>Provisional best candidate: {escape(value['provisional_best_candidate'])}; cold-start E2E: {escape(value['provisional_best_seconds'])} s. Each score is the median of two samples in separate processes.</p>
+<p>In this round, keep only requires a PASS of the frozen extended screen; the full 6+1 regression is for the final winner. Every v2 keep is provisional. Over budget is shown separately and is not an accuracy FAIL. Old-protocol results are not converted to two-sample results.</p>
+<p>Last read: {escape(value['checked_utc'])}. Source parent is the Git parent of the source; benchmark parent is the measured incumbent.</p>
+<table><thead><tr>{''.join('<th>'+name+'</th>' for name in ('candidate','verdict','screen','E2E s','raw samples','round s','benchmark parent','source commit','source parent','reason','evidence'))}</tr></thead><tbody>{''.join(rows)}</tbody></table></html>'''
     atomic_write(root/'report-fast.html', page.encode())
     return {k:v for k,v in value.items() if k!='records'}
 

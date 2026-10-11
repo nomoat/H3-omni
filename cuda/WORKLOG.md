@@ -161,7 +161,7 @@ final-latent drift over the six required cases by 1.5x the math-SDPA drift
 (mean and maximum). The factor covers sampling noise of six chaotic cases.
 The limits come from the math-SDPA baseline; the FA3 run (fa3-14434.json)
 passes them. Visual check: `/home/homo/model/h3-samples/compare/`, user review
-2026-10-10: "挺好的" (good).
+2026-10-10: good.
 
 ## Open items and ideas
 

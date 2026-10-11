@@ -277,7 +277,7 @@ def prepare(args, report):
     torch, load_file, save_file, *_ = dependencies()
     texts = []
     for key, prefix, index, prompt in (("english", "text", 0, "A cat walks through a sunny garden."),
-             ("chinese", "text", 1, "一只猫在花园里走动。"),
+             ("chinese", "text", 1, "\u4e00\u53ea\u732b\u5728\u82b1\u56ed\u91cc\u8d70\u52a8\u3002"),
              ("long_prompt", "extended/text", 2, read_json(TESTS / "extended.json")["prompt"])):
         archive = source / prefix / f"text-{index}.safetensors"
         tensors = load_file(str(archive))
@@ -333,7 +333,7 @@ def load_manifest(args):
     require(manifest["harness_sha256"] == harness_hashes(), "Frozen harness changed since oracle preparation")
     require(manifest["reference_timestep_plan"] == TIMESTEP_PLAN and manifest["reference_timestep_rows"] == [1] + [2] * 19,
             "Oracle timestep metadata differs")
-    expected_texts = [("english", "A cat walks through a sunny garden."), ("chinese", "一只猫在花园里走动。"),
+    expected_texts = [("english", "A cat walks through a sunny garden."), ("chinese", "\u4e00\u53ea\u732b\u5728\u82b1\u56ed\u91cc\u8d70\u52a8\u3002"),
                       ("long_prompt", read_json(TESTS / "extended.json")["prompt"])]
     require([(t["key"], t["prompt"]) for t in manifest["texts"]] == expected_texts and
             all(t["file"] == "text-" + t["key"] + ".safetensors" for t in manifest["texts"]),

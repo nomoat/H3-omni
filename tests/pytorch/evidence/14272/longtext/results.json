@@ -32,7 +32,7 @@
       ]
     },
     {
-      "prompt": "一只猫在花园里走动。",
+      "prompt": "\u4e00\u53ea\u732b\u5728\u82b1\u56ed\u91cc\u8d70\u52a8\u3002",
       "passed": true,
       "native": [
         102292,
@@ -380,7 +380,7 @@
       "native_load_and_encode_seconds": 5.248796567320824
     },
     {
-      "prompt": "一只猫在花园里走动。",
+      "prompt": "\u4e00\u53ea\u732b\u5728\u82b1\u56ed\u91cc\u8d70\u52a8\u3002",
       "tokens": 8,
       "relative_l2": 0.0,
       "normalized_max": 0.0,

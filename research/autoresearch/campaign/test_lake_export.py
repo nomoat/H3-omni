@@ -166,7 +166,7 @@ class ExportTests(unittest.TestCase):
             export.attempt_id(2, {})
 
     def test_all_text_encodings_reconstruct_exact_original_bytes(self):
-        fixtures = [b'', b'line1\r\nline2\n\x00', ('\ufeff中文🙂e\u0301\r\n' * 20000).encode(),
+        fixtures = [b'', b'line1\r\nline2\n\x00', ('\ufeff\u4e2d\u6587🙂e\u0301\r\n' * 20000).encode(),
                     bytes(range(256)) * 700]
         for index, data in enumerate(fixtures):
             with self.subTest(index=index):
