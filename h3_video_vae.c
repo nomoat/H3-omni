@@ -117,13 +117,12 @@ struct h3_video_vae_decoder {
     float latent_mean[LATENT_CHANNELS];
     float latent_std[LATENT_CHANNELS];
 #ifdef H3_CUDA
-    /* Tile pipeline: page-locked latent inputs and output patches, and the
-     * events that mark each slot's readback as complete. */
+    /* Tile pipeline: page-locked latent inputs and the events that mark
+     * each slot's tile as finished. */
     float *pinned_latent[PIPELINE_SLOTS];
-    float *pinned_rows[PIPELINE_SLOTS];
     size_t pinned_latent_count;
-    size_t pinned_rows_count;
     h3_gpu_event *readback[PIPELINE_SLOTS];
+    h3_gpu *post;  /* GPU 0 stream that stitches and finishes the output */
     /* Multi-GPU (H3_GPUS=N): complete decoders on devices 1..N-1. Tile i of
      * a decode runs on device i % N; the host stitches tiles in order. */
     int world;
@@ -1229,16 +1228,22 @@ static int stitch_tiles(float **tiles, const tile_axis *y_axis,
 }
 
 #ifdef H3_CUDA
-/* Tile pipeline. The main thread queues tile k+1 on the GPU while a host
- * thread rearranges, stitches, blends and finalizes tile k. Each tile's
- * output patches go to a page-locked buffer through an asynchronous copy on a
- * separate stream. Two slots alternate; a slot is reused only after the host
- * thread has released the tile that used it. The GPU and host operations are
- * the same as in the serial path, in the same order per value, so the output
- * is bit-identical. */
+/* Tile pipeline, all on the GPU. Tile i of a decode runs on GPU i % N: the
+ * latent tile is uploaded, decoded, and rearranged into pixels
+ * (vae_post.cuh); GPUs other than 0 copy the pixels to GPU 0 over NVLink.
+ * A stitching thread on GPU 0 (its own stream, decoder->post) stitches the
+ * tiles in order into a chunk canvas and hands each finished chunk to the
+ * sink, which blends, normalizes and converts it on the GPU and downloads
+ * only the result. The kernels repeat the host arithmetic exactly, so the
+ * output bytes are those of the host path.
+ *
+ * Ordering: tile i's pixels land in store[chunk % 2]; event tile_ready[i]
+ * marks it. The stitching stream waits on it. A store half is reused for
+ * chunk c + 2 only after the stitches of chunk c are queued, and the GPU
+ * writing it waits on store_free[c % 2]. Host latent slots are reused after
+ * the slot's previous tile has finished (decoder->readback[slot]). */
 typedef struct vae_pipeline vae_pipeline;
-typedef int (*vae_chunk_sink)(vae_pipeline *pipeline, int chunk,
-                              h3_video_frames *stitched, char *error,
+typedef int (*vae_chunk_sink)(vae_pipeline *pipeline, int chunk, char *error,
                               size_t error_size);
 
 struct vae_pipeline {
@@ -1251,17 +1256,21 @@ struct vae_pipeline {
     int frame_count;
     int tile_count;
     int items;
-    vae_chunk_sink sink;  /* runs on the host thread; owns `stitched` */
+    vae_chunk_sink sink;  /* runs on the stitching thread */
     void *sink_state;
-    float **tiles;
-    float **unpacked;  /* per item: RGB tile from an unpack thread */
-    int consumed;      /* items the stitching thread has taken */
-    h3_video_frames stitched;  /* chunk being stitched (host thread) */
+    h3_gpu *post;                 /* GPU 0 stream for stitching and output */
+    h3_gpu_tensor *store[2];      /* tile pixels of two chunks, on GPU 0 */
+    h3_gpu_tensor *canvas;        /* stitched chunk, raw decoder values */
+    h3_gpu_event **tile_ready;    /* per item, created on the tile's GPU */
+    h3_gpu_event *store_free[2];
+    size_t tile_elements;
+    size_t frame_elements;
+    int full_h;
+    int full_w;
     pthread_mutex_t lock;
     pthread_cond_t changed;
-    /* Per GPU g, counted in that GPU's own tiles (items g, g+N, g+2N...). */
-    int posted[MAX_VAE_GPUS];    /* tiles queued on the GPU */
-    int released[MAX_VAE_GPUS];  /* tiles whose slot the host has read */
+    int posted[MAX_VAE_GPUS];  /* per GPU, in that GPU's own tiles */
+    int stitched_chunks;       /* chunks whose stitches are queued */
     int stop;
     int failed;
     char error[512];
@@ -1270,148 +1279,49 @@ struct vae_pipeline {
 static void pipeline_set(vae_pipeline *pipeline, int *field, int value,
                          const char *error) {
     pthread_mutex_lock(&pipeline->lock);
-    *field = value;
+    if (field) *field = value;
     if (error && !pipeline->failed) {
         pipeline->failed = 1;
+        pipeline->stop = 1;
         snprintf(pipeline->error, sizeof(pipeline->error), "%s", error);
     }
     pthread_cond_broadcast(&pipeline->changed);
     pthread_mutex_unlock(&pipeline->lock);
 }
 
-/* One per GPU: wait for each of that GPU's tiles to reach host memory,
- * rearrange it into RGB frames and release the slot. Tiles are independent,
- * so N threads unpack in parallel; at most two chunks run ahead of the
- * stitching thread. */
-typedef struct {
-    vae_pipeline *pipeline;
-    int gpu;
-} pipeline_unpack_job;
-
-static void *pipeline_unpacker(void *opaque) {
-    pipeline_unpack_job *job = opaque;
-    vae_pipeline *pipeline = job->pipeline;
-    h3_video_vae_decoder *root = pipeline->decoder;
-    int world = root->world > 1 ? root->world : 1;
-    h3_video_vae_decoder *owner = job->gpu ? root->peers[job->gpu - 1] : root;
-    int window = 2 * pipeline->tile_count;
-    char error[512] = "";
-    for (int item = job->gpu, local = 0; item < pipeline->items;
-         item += world, local++) {
-        pthread_mutex_lock(&pipeline->lock);
-        while ((pipeline->posted[job->gpu] <= local ||
-                item - pipeline->consumed >= window) && !pipeline->stop)
-            pthread_cond_wait(&pipeline->changed, &pipeline->lock);
-        int stop = pipeline->stop;
-        pthread_mutex_unlock(&pipeline->lock);
-        if (stop) break;
-        int slot = local % PIPELINE_SLOTS;
-        h3_video_frames tile;
-        memset(&tile, 0, sizeof(tile));
-        int ok = h3_gpu_event_wait(owner->readback[slot], error, sizeof(error)) &&
-            unpack_rows(&owner->vae, owner->pinned_rows[slot],
-                        pipeline->selected_frame >= 0 ? pipeline->selected_frame : 0,
-                        pipeline->frame_count, &tile, error, sizeof(error));
-        pthread_mutex_lock(&pipeline->lock);
-        pipeline->unpacked[item] = tile.rgb;
-        pthread_mutex_unlock(&pipeline->lock);
-        pipeline_set(pipeline, &pipeline->released[job->gpu], local + 1,
-                     ok ? NULL : error);
-        if (!ok) {
-            pipeline_set(pipeline, &pipeline->stop, 1, error);
-            break;
-        }
-    }
-    return NULL;
+static h3_video_vae_decoder *pipeline_gpu(vae_pipeline *pipeline, int gpu) {
+    return gpu ? pipeline->decoder->peers[gpu - 1] : pipeline->decoder;
 }
 
-/* Stitches tiles in item order and hands each finished chunk to the sink. */
-static void *pipeline_worker(void *opaque) {
-    vae_pipeline *pipeline = opaque;
-    h3_video_vae_decoder *decoder = pipeline->decoder;
-    char error[512] = "";
-    for (int item = 0; item < pipeline->items; item++) {
-        pthread_mutex_lock(&pipeline->lock);
-        while (!pipeline->unpacked[item] && !pipeline->stop)
-            pthread_cond_wait(&pipeline->changed, &pipeline->lock);
-        float *rgb = pipeline->unpacked[item];
-        pipeline->unpacked[item] = NULL;
-        pthread_mutex_unlock(&pipeline->lock);
-        if (!rgb) break;
-        pipeline_set(pipeline, &pipeline->consumed, item + 1, NULL);
-        int index = item % pipeline->tile_count;
-        pipeline->tiles[index] = rgb;
-        const tile_axis *y_axis = &decoder->y_axis, *x_axis = &decoder->x_axis;
-        int full_h = y_axis->starts[y_axis->count - 1] + y_axis->length;
-        int full_w = x_axis->starts[x_axis->count - 1] + x_axis->length;
-        if (!index) {
-            memset(&pipeline->stitched, 0, sizeof(pipeline->stitched));
-            pipeline->stitched.rgb = malloc((size_t)pipeline->frame_count *
-                (size_t)full_h * (size_t)full_w * 3 * sizeof(float));
-            if (!pipeline->stitched.rgb) {
-                pipeline_set(pipeline, &pipeline->stop, 1,
-                             "out of memory stitching video VAE tiles");
-                break;
-            }
-        }
-        /* Stitch each tile as it arrives, so only the last tile's region
-         * is left when the GPU finishes the chunk. */
-        stitch_tile(pipeline->tiles, y_axis, x_axis, pipeline->frame_count,
-                    index, pipeline->stitched.rgb);
-        if (index + 1 < pipeline->tile_count) continue;
-        h3_video_frames stitched = pipeline->stitched;
-        memset(&pipeline->stitched, 0, sizeof(pipeline->stitched));
-        stitched.frames = pipeline->frame_count;
-        stitched.height = full_h;
-        stitched.width = full_w;
-        for (int tile_index = 0; tile_index < pipeline->tile_count; tile_index++) {
-            free(pipeline->tiles[tile_index]);
-            pipeline->tiles[tile_index] = NULL;
-        }
-        int ok = pipeline->sink(pipeline,
-                            pipeline->first_chunk + item / pipeline->tile_count,
-                            &stitched, error, sizeof(error));
-        if (!ok) {
-            pipeline_set(pipeline, &pipeline->stop, 1, error);
-            break;
-        }
-    }
-    return NULL;
+static int pipeline_world(const vae_pipeline *pipeline) {
+    return pipeline->decoder->world > 1 ? pipeline->decoder->world : 1;
 }
 
-/* Resident buffers for the pipeline; reallocated only when the tile geometry
- * changes. */
+/* Per-GPU resources kept between decodes: page-locked latent slots, slot
+ * events, the input tensor and the output patch slots. */
 static int pipeline_prepare(h3_video_vae_decoder *decoder, char *error,
                             size_t error_size) {
     vae_context *vae = &decoder->vae;
     size_t latent_count = (size_t)vae->patches * LATENT_CHANNELS;
     size_t rows_count = (size_t)vae->sequence * OUTPUT_PATCH;
-    if (decoder->pinned_latent_count != latent_count ||
-        decoder->pinned_rows_count != rows_count) {
+    if (decoder->pinned_latent_count != latent_count) {
         for (int slot = 0; slot < PIPELINE_SLOTS; slot++) {
             h3_gpu_host_free(decoder->pinned_latent[slot]);
-            h3_gpu_host_free(decoder->pinned_rows[slot]);
             decoder->pinned_latent[slot] = NULL;
-            decoder->pinned_rows[slot] = NULL;
         }
-        decoder->pinned_latent_count = decoder->pinned_rows_count = 0;
-        for (int slot = 0; slot < PIPELINE_SLOTS; slot++) {
-            decoder->pinned_latent[slot] =
-                h3_gpu_host_alloc(latent_count * sizeof(float));
-            decoder->pinned_rows[slot] =
-                h3_gpu_host_alloc(rows_count * sizeof(float));
-            if (!decoder->pinned_latent[slot] || !decoder->pinned_rows[slot]) {
+        decoder->pinned_latent_count = 0;
+        for (int slot = 0; slot < PIPELINE_SLOTS; slot++)
+            if (!(decoder->pinned_latent[slot] =
+                      h3_gpu_host_alloc(latent_count * sizeof(float)))) {
                 fail(error, error_size, "cannot allocate page-locked video VAE buffers");
                 return 0;
             }
-        }
         decoder->pinned_latent_count = latent_count;
-        decoder->pinned_rows_count = rows_count;
     }
     for (int slot = 0; slot < PIPELINE_SLOTS; slot++)
         if (!decoder->readback[slot] &&
             !(decoder->readback[slot] = h3_gpu_event_new(vae->gpu))) {
-            fail(error, error_size, "cannot create video VAE readback event: %s",
+            fail(error, error_size, "cannot create video VAE slot event: %s",
                  h3_gpu_error(vae->gpu));
             return 0;
         }
@@ -1437,46 +1347,67 @@ static int pipeline_prepare(h3_video_vae_decoder *decoder, char *error,
     return 1;
 }
 
-/* Queue every tile owned by one GPU (items gpu, gpu + N, ...) on that
- * GPU's decoder. Runs on a thread whose current device is that GPU. */
-typedef struct {
-    vae_pipeline *pipeline;
-    int gpu;
-    int ok;
-    char error[512];
-} pipeline_issue_job;
+/* Waits until *field >= value or the pipeline stops; returns 0 on stop. */
+static int pipeline_wait(vae_pipeline *pipeline, const int *field, int value) {
+    pthread_mutex_lock(&pipeline->lock);
+    while (*field < value && !pipeline->stop)
+        pthread_cond_wait(&pipeline->changed, &pipeline->lock);
+    int ready = !pipeline->stop;
+    pthread_mutex_unlock(&pipeline->lock);
+    return ready;
+}
 
+/* Queue every tile owned by one GPU (items gpu, gpu + N, ...). Runs on a
+ * thread whose current device is that GPU. */
 static int pipeline_issue(vae_pipeline *pipeline, int gpu, char *error,
                           size_t error_size) {
     h3_video_vae_decoder *root = pipeline->decoder;
-    int world = root->world > 1 ? root->world : 1;
-    h3_video_vae_decoder *decoder = gpu ? root->peers[gpu - 1] : root;
+    h3_video_vae_decoder *decoder = pipeline_gpu(pipeline, gpu);
     vae_context *vae = &decoder->vae;
+    int world = pipeline_world(pipeline);
     if (!pipeline_prepare(decoder, error, error_size)) return 0;
     h3_gpu_tensor *outputs[PIPELINE_SLOTS] = {vae->projected};
     for (int slot = 1; slot < PIPELINE_SLOTS; slot++)
         outputs[slot] = vae->projected_slots[slot - 1];
+    /* GPUs other than 0 unpack into a local slot and copy it to GPU 0. */
+    if (gpu) h3_gpu_enable_peer_access(0);
+    h3_gpu_tensor *pixels = gpu ? h3_gpu_tensor_new_f32(
+        vae->gpu, pipeline->tile_elements * PIPELINE_SLOTS) : NULL;
+    if (gpu && !pixels) {
+        fail(error, error_size, "cannot allocate video VAE tile pixels: %s",
+             h3_gpu_error(vae->gpu));
+        return 0;
+    }
+    int first_frame = pipeline->selected_frame >= 0 ? pipeline->selected_frame : 0;
+    int gap = vae->output_frames == FIRST_CHUNK_FRAMES ? 3 : 0;
     size_t latent_count = decoder->pinned_latent_count;
-    size_t rows_count = decoder->pinned_rows_count;
     int ok = gpu_op(vae, h3_gpu_begin(vae->gpu), error, error_size,
                     "begin pipelined video VAE decoder");
     for (int item = gpu, local = 0; item < pipeline->items && ok;
          item += world, local++) {
         int slot = local % PIPELINE_SLOTS;
-        pthread_mutex_lock(&pipeline->lock);
-        while (pipeline->released[gpu] < local - PIPELINE_SLOTS + 1 &&
-               !pipeline->failed && !pipeline->stop)
-            pthread_cond_wait(&pipeline->changed, &pipeline->lock);
-        int failed = pipeline->failed || pipeline->stop;
-        pthread_mutex_unlock(&pipeline->lock);
-        if (failed) { ok = 0; break; }
-        int chunk = pipeline->first_chunk + item / pipeline->tile_count;
+        int chunk = item / pipeline->tile_count;
         int tile = item % pipeline->tile_count;
+        int half = chunk % 2;
+        if (local >= PIPELINE_SLOTS &&
+            !h3_gpu_event_wait(decoder->readback[slot], error, error_size)) {
+            ok = 0;
+            break;
+        }
+        if (chunk >= 2) {
+            if (!pipeline_wait(pipeline, &pipeline->stitched_chunks, chunk - 1)) {
+                ok = 0;
+                break;
+            }
+            ok = gpu_op(vae, h3_gpu_stream_wait_event(vae->gpu, pipeline->store_free[half]),
+                        error, error_size, "order video VAE tile store");
+            if (!ok) break;
+        }
         int tile_y = tile / root->x_axis.count;
         int tile_x = tile % root->x_axis.count;
         float *input = extract_latent_tile(
             pipeline->latent, pipeline->latent_time, root->latent_h,
-            root->latent_w, chunk * 5,
+            root->latent_w, (pipeline->first_chunk + chunk) * 5,
             root->y_axis.starts[tile_y] / SPATIAL_RATIO,
             root->x_axis.starts[tile_x] / SPATIAL_RATIO,
             CHUNK_LATENT_TIME, vae->latent_h, vae->latent_w, error, error_size);
@@ -1484,98 +1415,154 @@ static int pipeline_issue(vae_pipeline *pipeline, int gpu, char *error,
         fill_input_rows(vae, input, root->latent_mean, root->latent_std,
                         decoder->pinned_latent[slot]);
         free(input);
-        ok = gpu_op(vae, h3_gpu_tensor_upload_f32_async(vae->gpu, vae->latent,
+        size_t store_offset = (size_t)tile * pipeline->tile_elements;
+        size_t pixel_offset = (size_t)slot * pipeline->tile_elements;
+        h3_gpu_event *ready = h3_gpu_event_new(vae->gpu);
+        pthread_mutex_lock(&pipeline->lock);
+        pipeline->tile_ready[item] = ready;
+        pthread_mutex_unlock(&pipeline->lock);
+        ok = ready &&
+            gpu_op(vae, h3_gpu_tensor_upload_f32_async(vae->gpu, vae->latent,
                         decoder->pinned_latent[slot], latent_count),
-                    error, error_size, "upload video VAE tile latent") &&
-            /* The readback of this slot's previous tile must finish before the
-             * output projection overwrites the slot. */
-            (local < PIPELINE_SLOTS ||
-             gpu_op(vae, h3_gpu_stream_wait_event(vae->gpu, decoder->readback[slot]),
-                    error, error_size, "order video VAE readback")) &&
+                   error, error_size, "upload video VAE tile latent") &&
             run_resident_tile(vae, outputs[slot], 0, error, error_size) &&
-            gpu_op(vae, h3_gpu_tensor_download_f32_async(vae->gpu, outputs[slot],
-                        decoder->pinned_rows[slot], rows_count,
-                        decoder->readback[slot]),
-                   error, error_size, "read video VAE output patches");
+            gpu_op(vae, h3_gpu_vae_unpack_tile_f32(vae->gpu,
+                        gpu ? pixels : pipeline->store[half],
+                        gpu ? pixel_offset : store_offset, outputs[slot],
+                        vae->latent_h, vae->latent_w, first_frame,
+                        pipeline->frame_count, FRAME_OFFSET, 17, gap, OUTPUT_PATCH),
+                   error, error_size, "unpack video VAE tile") &&
+            (!gpu || gpu_op(vae, h3_gpu_copy_peer_f32(vae->gpu, pipeline->store[half],
+                        store_offset, pixels, pixel_offset, pipeline->tile_elements),
+                   error, error_size, "copy video VAE tile to GPU 0")) &&
+            gpu_op(vae, h3_gpu_event_record(vae->gpu, ready), error, error_size,
+                   "mark video VAE tile") &&
+            gpu_op(vae, h3_gpu_event_record(vae->gpu, decoder->readback[slot]),
+                   error, error_size, "mark video VAE slot");
+        if (!ok && (!error || !*error))
+            fail(error, error_size, "cannot queue video VAE tile: %s",
+                 h3_gpu_error(vae->gpu));
         if (ok) pipeline_set(pipeline, &pipeline->posted[gpu], local + 1, NULL);
     }
-    /* Wait for the compute stream (and close the timing interval) even after
-     * a failure, so no queued copy still targets the page-locked buffers. */
+    /* Wait for the stream even after a failure, so nothing queued still
+     * reads the host slots or this GPU's tensors. */
     int submitted = h3_gpu_submit(vae->gpu);
     if (ok && !submitted)
         ok = gpu_op(vae, 0, error, error_size, "submit pipelined video VAE decoder");
-    if (!ok) {
-        if (!error || !*error) fail(error, error_size, "video VAE GPU %d failed", gpu);
-        pipeline_set(pipeline, &pipeline->stop, 1, error);
-    }
-    for (int slot = 0; slot < PIPELINE_SLOTS; slot++)
-        h3_gpu_event_wait(decoder->readback[slot], NULL, 0);
+    free_tensor(&pixels);
+    if (!ok) pipeline_set(pipeline, NULL, 0, error && *error ? error :
+                          "video VAE tile queue failed");
     return ok;
 }
 
+typedef struct {
+    vae_pipeline *pipeline;
+    int gpu;
+    int ok;
+    char error[512];
+} pipeline_job;
+
 static void *pipeline_issue_thread(void *opaque) {
-    pipeline_issue_job *job = opaque;
+    pipeline_job *job = opaque;
     job->ok = h3_gpu_select_device(job->gpu, job->error, sizeof(job->error)) &&
               pipeline_issue(job->pipeline, job->gpu, job->error, sizeof(job->error));
-    if (!job->ok) pipeline_set(job->pipeline, &job->pipeline->stop, 1, job->error);
+    if (!job->ok) pipeline_set(job->pipeline, NULL, 0, job->error);
     return NULL;
+}
+
+/* Stitches tiles in item order on GPU 0 and runs the sink per chunk. */
+static int pipeline_stitch(vae_pipeline *pipeline, char *error, size_t error_size) {
+    h3_video_vae_decoder *decoder = pipeline->decoder;
+    const tile_axis *y_axis = &decoder->y_axis, *x_axis = &decoder->x_axis;
+    int world = pipeline_world(pipeline);
+    h3_gpu *post = pipeline->post;
+    for (int item = 0; item < pipeline->items; item++) {
+        int gpu = item % world, local = item / world;
+        if (!pipeline_wait(pipeline, &pipeline->posted[gpu], local + 1)) return 0;
+        int chunk = item / pipeline->tile_count;
+        int index = item % pipeline->tile_count;
+        h3_gpu_tensor *store = pipeline->store[chunk % 2];
+        int tile_y = index / x_axis->count, tile_x = index % x_axis->count;
+        h3_vae_stitch geometry = {
+            pipeline->frame_count, y_axis->length, x_axis->length,
+            pipeline->full_h, pipeline->full_w,
+            y_axis->starts[tile_y], x_axis->starts[tile_x],
+            tile_y ? y_axis->overlaps[tile_y - 1] : 0,
+            tile_x ? x_axis->overlaps[tile_x - 1] : 0,
+            y_axis->length - (tile_y + 1 < y_axis->count ? y_axis->overlaps[tile_y] : 0),
+            x_axis->length - (tile_x + 1 < x_axis->count ? x_axis->overlaps[tile_x] : 0)
+        };
+        size_t size = pipeline->tile_elements;
+        if (!h3_gpu_stream_wait_event(post, pipeline->tile_ready[item]) ||
+            !h3_gpu_vae_stitch_tile_f32(post, pipeline->canvas, store, index * size,
+                tile_y ? (long long)((index - x_axis->count) * size) : -1,
+                tile_x ? (long long)((index - 1) * size) : -1, &geometry)) {
+            fail(error, error_size, "cannot stitch video VAE tile: %s", h3_gpu_error(post));
+            return 0;
+        }
+        if (index + 1 < pipeline->tile_count) continue;
+        if (!h3_gpu_event_record(post, pipeline->store_free[chunk % 2])) {
+            fail(error, error_size, "cannot mark video VAE tile store: %s",
+                 h3_gpu_error(post));
+            return 0;
+        }
+        pipeline_set(pipeline, &pipeline->stitched_chunks, chunk + 1, NULL);
+        if (!pipeline->sink(pipeline, pipeline->first_chunk + chunk, error, error_size))
+            return 0;
+    }
+    return 1;
 }
 
 static int pipeline_run(vae_pipeline *pipeline, char *error, size_t error_size) {
     h3_video_vae_decoder *decoder = pipeline->decoder;
-    int world = decoder->world > 1 ? decoder->world : 1;
+    int world = pipeline_world(pipeline);
     pipeline->tile_count = decoder->y_axis.count * decoder->x_axis.count;
     pipeline->items = pipeline->chunk_count * pipeline->tile_count;
-    pipeline->tiles = calloc((size_t)pipeline->tile_count, sizeof(*pipeline->tiles));
-    pipeline->unpacked = calloc((size_t)pipeline->items, sizeof(*pipeline->unpacked));
-    if (!pipeline->tiles || !pipeline->unpacked) {
-        free(pipeline->tiles);
-        free(pipeline->unpacked);
-        fail(error, error_size, "out of memory retaining video VAE tiles");
+    pipeline->full_h = decoder->y_axis.starts[decoder->y_axis.count - 1] +
+                       decoder->y_axis.length;
+    pipeline->full_w = decoder->x_axis.starts[decoder->x_axis.count - 1] +
+                       decoder->x_axis.length;
+    pipeline->frame_elements = (size_t)pipeline->full_h * (size_t)pipeline->full_w * 3;
+    pipeline->tile_elements = (size_t)pipeline->frame_count *
+        (size_t)decoder->y_axis.length * (size_t)decoder->x_axis.length * 3;
+    if (!decoder->post &&
+        !(decoder->post = h3_gpu_create("h3_shaders.metal", error, error_size)))
         return 0;
+    h3_gpu *post = decoder->post;
+    pipeline->post = post;
+    for (int half = 0; half < 2; half++) {
+        pipeline->store[half] = h3_gpu_tensor_new_f32(
+            post, pipeline->tile_elements * (size_t)pipeline->tile_count);
+        pipeline->store_free[half] = h3_gpu_event_new(post);
     }
+    pipeline->canvas = h3_gpu_tensor_new_f32(
+        post, (size_t)pipeline->frame_count * pipeline->frame_elements);
+    pipeline->tile_ready = calloc((size_t)pipeline->items, sizeof(*pipeline->tile_ready));
+    int ok = pipeline->store[0] && pipeline->store[1] && pipeline->store_free[0] &&
+             pipeline->store_free[1] && pipeline->canvas && pipeline->tile_ready;
+    if (!ok) fail(error, error_size, "cannot allocate video VAE output buffers: %s",
+                  h3_gpu_error(post));
     pthread_mutex_init(&pipeline->lock, NULL);
     pthread_cond_init(&pipeline->changed, NULL);
-    pthread_t worker;
-    pthread_t unpackers[MAX_VAE_GPUS];
-    pipeline_unpack_job unpack_jobs[MAX_VAE_GPUS];
-    int unpackers_started = 0;
-    int worker_started = !pthread_create(&worker, NULL, pipeline_worker, pipeline);
-    int threads_ok = worker_started;
-    for (int gpu = 0; gpu < world && threads_ok; gpu++) {
-        unpack_jobs[gpu] = (pipeline_unpack_job){pipeline, gpu};
-        threads_ok = !pthread_create(&unpackers[gpu], NULL, pipeline_unpacker,
-                                     &unpack_jobs[gpu]);
-        if (threads_ok) unpackers_started++;
-    }
-    if (!threads_ok) {
-        fail(error, error_size, "cannot start video VAE host thread");
-        pipeline_set(pipeline, &pipeline->stop, 1, error);
-        for (int gpu = 0; gpu < unpackers_started; gpu++)
-            pthread_join(unpackers[gpu], NULL);
-        if (worker_started) pthread_join(worker, NULL);
-        pthread_cond_destroy(&pipeline->changed);
-        pthread_mutex_destroy(&pipeline->lock);
-        free(pipeline->tiles);
-        free(pipeline->unpacked);
-        return 0;
-    }
-    pipeline_issue_job jobs[MAX_VAE_GPUS];
+    pipeline_job jobs[MAX_VAE_GPUS];
     pthread_t issuers[MAX_VAE_GPUS];
     int started[MAX_VAE_GPUS] = {0};
-    int ok = 1;
-    for (int gpu = 1; gpu < world; gpu++) {
-        jobs[gpu] = (pipeline_issue_job){pipeline, gpu, 0, ""};
-        started[gpu] = !pthread_create(&issuers[gpu], NULL,
-                                       pipeline_issue_thread, &jobs[gpu]);
+    for (int gpu = 0; gpu < world && ok; gpu++) {
+        jobs[gpu] = (pipeline_job){pipeline, gpu, 0, ""};
+        started[gpu] = !pthread_create(&issuers[gpu], NULL, pipeline_issue_thread,
+                                       &jobs[gpu]);
         if (!started[gpu]) {
             fail(error, error_size, "cannot start video VAE thread for GPU %d", gpu);
-            pipeline_set(pipeline, &pipeline->stop, 1, error);
+            pipeline_set(pipeline, NULL, 0, error);
             ok = 0;
         }
     }
-    if (ok) ok = pipeline_issue(pipeline, 0, error, error_size);
-    for (int gpu = 1; gpu < world; gpu++) {
+    /* This thread (GPU 0) stitches. */
+    if (ok && !pipeline_stitch(pipeline, error, error_size)) {
+        pipeline_set(pipeline, NULL, 0, error && *error ? error : "video VAE stitch failed");
+        ok = 0;
+    }
+    for (int gpu = 0; gpu < world; gpu++) {
         if (!started[gpu]) continue;
         pthread_join(issuers[gpu], NULL);
         if (ok && !jobs[gpu].ok) {
@@ -1583,30 +1570,44 @@ static int pipeline_run(vae_pipeline *pipeline, char *error, size_t error_size) 
             ok = 0;
         }
     }
-    if (!ok) pipeline_set(pipeline, &pipeline->stop, 1, NULL);
-    for (int gpu = 0; gpu < world; gpu++) pthread_join(unpackers[gpu], NULL);
-    pthread_join(worker, NULL);
     if (ok && pipeline->failed) {
         fail(error, error_size, "%s", pipeline->error);
         ok = 0;
     }
-    for (int index = 0; index < pipeline->tile_count; index++)
-        free(pipeline->tiles[index]);
-    free(pipeline->tiles);
-    for (int item = 0; item < pipeline->items; item++)
-        free(pipeline->unpacked[item]);
-    free(pipeline->unpacked);
-    h3_video_frames_free(&pipeline->stitched);
+    /* Every issuing stream has been synchronized; drain GPU 0's. */
+    if (!h3_gpu_submit(post) && ok) {
+        fail(error, error_size, "video VAE output: %s", h3_gpu_error(post));
+        ok = 0;
+    }
+    for (int item = 0; pipeline->tile_ready && item < pipeline->items; item++)
+        h3_gpu_event_free(pipeline->tile_ready[item]);
+    free(pipeline->tile_ready);
+    for (int half = 0; half < 2; half++) {
+        free_tensor(&pipeline->store[half]);
+        h3_gpu_event_free(pipeline->store_free[half]);
+    }
+    free_tensor(&pipeline->canvas);
     pthread_cond_destroy(&pipeline->changed);
     pthread_mutex_destroy(&pipeline->lock);
     return ok;
 }
 
-static int single_chunk_sink(vae_pipeline *pipeline, int chunk,
-                             h3_video_frames *stitched, char *error,
+/* Preview: the stitched raw frames, read back to the host. */
+static int single_chunk_sink(vae_pipeline *pipeline, int chunk, char *error,
                              size_t error_size) {
-    (void)chunk; (void)error; (void)error_size;
-    *(h3_video_frames *)pipeline->sink_state = *stitched;
+    (void)chunk;
+    h3_video_frames *output = pipeline->sink_state;
+    size_t count = (size_t)pipeline->frame_count * pipeline->frame_elements;
+    output->rgb = malloc(count * sizeof(float));
+    if (!output->rgb ||
+        !h3_gpu_download(pipeline->post, pipeline->canvas, 0, output->rgb, count)) {
+        fail(error, error_size, "cannot read video VAE preview: %s",
+             h3_gpu_error(pipeline->post));
+        return 0;
+    }
+    output->frames = pipeline->frame_count;
+    output->height = pipeline->full_h;
+    output->width = pipeline->full_w;
     return 1;
 }
 
@@ -1639,71 +1640,50 @@ static int decoder_decode_chunk(h3_video_vae_decoder *decoder,
     return ok;
 }
 
-/* Temporal blending of consecutive chunks, as in the serial decoder. Frames
- * that are final are normalized and clipped here, on the host thread. */
+/* Temporal blending of consecutive chunks, as in the serial decoder, then
+ * normalization, clipping and RGB24 conversion, all on GPU 0. Only the
+ * requested results are read back. */
 typedef struct {
-    float *final_rgb;
-    float *temporal_overlap;
-    size_t frame_elements;
+    float *final_rgb;   /* optional F32 frames */
+    uint8_t *rgb8;      /* optional RGB24 frames */
     int chunks;
-    uint8_t *rgb8;  /* optional RGB24 copy of the final frames */
+    h3_gpu_tensor *overlap;  /* last five raw frames of the previous chunk */
+    h3_gpu_tensor *bytes;    /* RGB24 staging, FIRST_CHUNK_FRAMES frames */
     h3_video_frames_ready ready;
     void *ready_opaque;
 } video_sink_state;
 
-static void emit_final_frames(video_sink_state *state, int first_frame,
-                              int frame_count) {
-    if (!state->rgb8) return;
-    size_t offset = (size_t)first_frame * state->frame_elements;
-    pixels_to_rgb8(state->final_rgb + offset, state->rgb8 + offset,
-                   (size_t)frame_count * state->frame_elements);
+static int emit_frames(vae_pipeline *pipeline, video_sink_state *state,
+                       h3_gpu_tensor *source, int first_frame, int frame_count) {
+    h3_gpu *post = pipeline->post;
+    size_t count = (size_t)frame_count * pipeline->frame_elements;
+    size_t offset = (size_t)first_frame * pipeline->frame_elements;
+    if (!h3_gpu_vae_finalize_f32(post, source, 0, count)) return 0;
+    if (state->final_rgb &&
+        !h3_gpu_download(post, source, 0, state->final_rgb + offset, count)) return 0;
+    if (!state->rgb8) return 1;
+    if (!h3_gpu_vae_rgb8(post, state->bytes, source, 0, count) ||
+        !h3_gpu_download(post, state->bytes, 0, state->rgb8 + offset, count)) return 0;
     if (state->ready)
-        state->ready(state->ready_opaque, state->rgb8 + offset, first_frame,
-                     frame_count);
-}
-
-/* The first five frames of a chunk fade in over the previous chunk's
- * overlap: frame f weighs the new chunk by f / 5. */
-typedef struct {
-    float *rgb;
-    const float *overlap;
-    size_t frame_elements;
-} temporal_blend_job;
-
-static void temporal_blend_range(void *context, size_t begin, size_t end) {
-    temporal_blend_job *job = context;
-    for (size_t index = begin; index < end; index++) {
-        float alpha = (float)(index / job->frame_elements) / 5.0f;
-        job->rgb[index] = job->overlap[index] * (1.0f - alpha) +
-                          job->rgb[index] * alpha;
-    }
-}
-
-static int video_chunk_sink(vae_pipeline *pipeline, int chunk,
-                            h3_video_frames *decoded, char *error,
-                            size_t error_size) {
-    (void)error; (void)error_size;
-    video_sink_state *state = pipeline->sink_state;
-    size_t frame_elements = state->frame_elements;
-    if (chunk) {
-        temporal_blend_job job = {decoded->rgb, state->temporal_overlap,
-                                  frame_elements};
-        parallel_ranges(5 * frame_elements, 1u << 20, temporal_blend_range, &job);
-    }
-    float *final_frames = state->final_rgb + (size_t)chunk * 17 * frame_elements;
-    memcpy(final_frames, decoded->rgb, 17 * frame_elements * sizeof(float));
-    finalize_pixel_range(final_frames, 17 * frame_elements);
-    memcpy(state->temporal_overlap, decoded->rgb + 17 * frame_elements,
-           5 * frame_elements * sizeof(float));
-    h3_video_frames_free(decoded);
-    emit_final_frames(state, chunk * 17, 17);
-    if (chunk + 1 == state->chunks) {
-        float *tail = state->final_rgb + (size_t)state->chunks * 17 * frame_elements;
-        memcpy(tail, state->temporal_overlap, 5 * frame_elements * sizeof(float));
-        finalize_pixel_range(tail, 5 * frame_elements);
-        emit_final_frames(state, state->chunks * 17, 5);
-    }
+        state->ready(state->ready_opaque, state->rgb8 + offset, first_frame, frame_count);
     return 1;
+}
+
+static int video_chunk_sink(vae_pipeline *pipeline, int chunk, char *error,
+                            size_t error_size) {
+    video_sink_state *state = pipeline->sink_state;
+    h3_gpu *post = pipeline->post;
+    size_t frame_elements = pipeline->frame_elements;
+    int ok = (!chunk || h3_gpu_vae_temporal_blend_f32(post, pipeline->canvas,
+                                                      state->overlap, frame_elements, 5)) &&
+             h3_gpu_copy_f32(post, state->overlap, 0, pipeline->canvas,
+                             17 * frame_elements, 5 * frame_elements) &&
+             emit_frames(pipeline, state, pipeline->canvas, chunk * 17, 17) &&
+             (chunk + 1 < state->chunks ||
+              emit_frames(pipeline, state, state->overlap, state->chunks * 17, 5));
+    if (!ok) fail(error, error_size, "cannot finish video VAE chunk %d: %s", chunk,
+                  h3_gpu_error(post));
+    return ok;
 }
 #else
 static int decoder_decode_chunk(h3_video_vae_decoder *decoder,
@@ -2040,7 +2020,8 @@ int h3_video_vae_decoder_preview(h3_video_vae_decoder *decoder,
 
 static int decoder_decode_all(h3_video_vae_decoder *decoder,
                               const float *normalized_latent, int latent_time,
-                              h3_video_frames *output, uint8_t **rgb8,
+                              h3_video_frames *output, int keep_float,
+                              uint8_t **rgb8,
                               h3_video_frames_ready ready, void *ready_opaque,
                               char *error, size_t error_size) {
     if (output) memset(output, 0, sizeof(*output));
@@ -2057,28 +2038,19 @@ static int decoder_decode_all(h3_video_vae_decoder *decoder,
     int pixel_w = decoder->latent_w * SPATIAL_RATIO;
     size_t frame_elements = (size_t)pixel_h * (size_t)pixel_w * 3;
     size_t output_elements = (size_t)output_frames * frame_elements;
-    float *final_rgb = malloc(output_elements * sizeof(*final_rgb));
-    float *temporal_overlap = malloc(5 * frame_elements *
-                                     sizeof(*temporal_overlap));
-    if (!final_rgb || !temporal_overlap) {
+#ifdef H3_CUDA
+    /* All chunks in one tile pipeline; GPU 0 blends and finishes each chunk
+     * while the GPUs decode the next tiles. F32 frames are read back only
+     * when asked for (keep_float), RGB24 only when rgb8 is given. */
+    float *final_rgb = keep_float ? malloc(output_elements * sizeof(*final_rgb)) : NULL;
+    uint8_t *bytes = rgb8 ? malloc(output_elements) : NULL;
+    if ((keep_float && !final_rgb) || (rgb8 && !bytes)) {
         free(final_rgb);
-        free(temporal_overlap);
+        free(bytes);
         fail(error, error_size, "out of memory retaining decoded video frames");
         return 0;
     }
-    int ok = 1;
-#ifdef H3_CUDA
-    /* All chunks in one tile pipeline; the host thread blends and finalizes
-     * each chunk while the GPU decodes the next tiles. */
-    uint8_t *bytes = NULL;
-    if (rgb8 && !(bytes = malloc(output_elements))) {
-        free(final_rgb);
-        free(temporal_overlap);
-        fail(error, error_size, "out of memory converting decoded video frames");
-        return 0;
-    }
-    video_sink_state state = {final_rgb, temporal_overlap, frame_elements, chunks,
-                              bytes, ready, ready_opaque};
+    video_sink_state state = {final_rgb, bytes, chunks, NULL, NULL, ready, ready_opaque};
     vae_pipeline pipeline;
     memset(&pipeline, 0, sizeof(pipeline));
     pipeline.decoder = decoder;
@@ -2090,7 +2062,21 @@ static int decoder_decode_all(h3_video_vae_decoder *decoder,
     pipeline.frame_count = FIRST_CHUNK_FRAMES;
     pipeline.sink = video_chunk_sink;
     pipeline.sink_state = &state;
-    ok = pipeline_run(&pipeline, error, error_size);
+    int ok = decoder->post ||
+             (decoder->post = h3_gpu_create("h3_shaders.metal", error, error_size));
+    if (ok) {
+        state.overlap = h3_gpu_tensor_new_f32(decoder->post, 5 * frame_elements);
+        state.bytes = rgb8 ? h3_gpu_tensor_new_i8(decoder->post,
+                                                  17 * frame_elements) : NULL;
+        ok = state.overlap && (!rgb8 || state.bytes);
+        if (!ok) fail(error, error_size, "cannot allocate video VAE output: %s",
+                      h3_gpu_error(decoder->post));
+    }
+    if (ok) ok = pipeline_run(&pipeline, error, error_size);
+    if (decoder->post) {
+        free_tensor(&state.overlap);
+        free_tensor(&state.bytes);
+    }
     if (ok) {
         output->frames = output_frames;
         output->height = pixel_h;
@@ -2100,7 +2086,6 @@ static int decoder_decode_all(h3_video_vae_decoder *decoder,
         ok = h3_gpu_get_stats(decoder->vae.gpu, &output->gpu_stats);
     }
     free(final_rgb);
-    free(temporal_overlap);
     if (!ok) {
         h3_video_frames_free(output);
         free(bytes);
@@ -2109,6 +2094,17 @@ static int decoder_decode_all(h3_video_vae_decoder *decoder,
     }
     return ok;
 #else
+    (void)ready; (void)ready_opaque; (void)keep_float;
+    float *final_rgb = malloc(output_elements * sizeof(*final_rgb));
+    float *temporal_overlap = malloc(5 * frame_elements *
+                                     sizeof(*temporal_overlap));
+    if (!final_rgb || !temporal_overlap) {
+        free(final_rgb);
+        free(temporal_overlap);
+        fail(error, error_size, "out of memory retaining decoded video frames");
+        return 0;
+    }
+    int ok = 1;
     for (int chunk = 0; chunk < chunks && ok; chunk++) {
         h3_video_frames decoded;
         memset(&decoded, 0, sizeof(decoded));
@@ -2166,12 +2162,12 @@ int h3_video_vae_decoder_decode(h3_video_vae_decoder *decoder,
                         h3_video_frames *output,
                         char *error, size_t error_size) {
     return decoder_decode_all(decoder, normalized_latent, latent_time, output,
-                              NULL, NULL, NULL, error, error_size);
+                              1, NULL, NULL, NULL, error, error_size);
 }
 
 int h3_video_vae_decoder_decode_rgb8(h3_video_vae_decoder *decoder,
                         const float *normalized_latent, int latent_time,
-                        h3_video_frames *output, uint8_t **rgb8,
+                        h3_video_frames *output, int keep_float, uint8_t **rgb8,
                         h3_video_frames_ready ready, void *ready_opaque,
                         char *error, size_t error_size) {
     if (rgb8) *rgb8 = NULL;
@@ -2181,7 +2177,8 @@ int h3_video_vae_decoder_decode_rgb8(h3_video_vae_decoder *decoder,
         return 0;
     }
     return decoder_decode_all(decoder, normalized_latent, latent_time, output,
-                              rgb8, ready, ready_opaque, error, error_size);
+                              keep_float, rgb8, ready, ready_opaque, error,
+                              error_size);
 }
 
 void h3_video_vae_decoder_free(h3_video_vae_decoder *decoder) {
@@ -2195,8 +2192,8 @@ void h3_video_vae_decoder_free(h3_video_vae_decoder *decoder) {
     for (int slot = 0; slot < PIPELINE_SLOTS; slot++) {
         h3_gpu_event_free(decoder->readback[slot]);
         h3_gpu_host_free(decoder->pinned_latent[slot]);
-        h3_gpu_host_free(decoder->pinned_rows[slot]);
     }
+    h3_gpu_free(decoder->post);
 #endif
     cleanup(&decoder->vae);
     tile_axis_free(&decoder->y_axis);

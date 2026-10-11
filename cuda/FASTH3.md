@@ -174,6 +174,9 @@ single-GPU node.
 | 5 s video | 10.5-11.6 s | 4.55-4.69 s | 2.62-2.81 s | 1.85-2.21 s |
 | 10 s video | 21.0-22.5 s | 8.91-9.02 s | 5.07-5.18 s | 3.47-3.84 s |
 
+With the video VAE output on the GPU (job 15087, 8 GPUs): 5 s video
+1.71-1.98 s, 10 s video 3.05-3.49 s, bytes unchanged.
+
 All multi-GPU runs are bit-identical to one GPU on the two check requests.
 At 8 GPUs a 5 s request spends 0.85-0.9 s in denoise and 0.6 s in the video
 VAE, whose host passes no longer shrink with more GPUs.

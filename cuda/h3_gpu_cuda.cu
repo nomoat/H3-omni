@@ -1444,6 +1444,7 @@ extern "C" int h3_gpu_adaln_linear_bf16(h3_gpu *g, h3_gpu_tensor *y, h3_gpu_tens
 #include "vae_fused.cuh"
 #include "vae_fp16.cuh"
 #include "parallel.cuh"
+#include "vae_post.cuh"
 #ifdef H3_VSA
 #include "vsa.cuh"
 #else

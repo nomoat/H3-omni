@@ -24,6 +24,32 @@ int h3_gpu_ulysses_gather_heads_bf16(h3_gpu *gpu, h3_gpu_comm *comm, h3_gpu_tens
 int h3_gpu_zero(h3_gpu *gpu, h3_gpu_tensor *tensor);
 int h3_gpu_all_gather_bf16(h3_gpu *gpu, h3_gpu_comm *comm, h3_gpu_tensor *output,
                            const h3_gpu_tensor *input, size_t count);
+typedef struct h3_gpu_event h3_gpu_event;
+/* Video VAE output on the GPU (cuda/vae_post.cuh). Tiles are
+ * [frames][length_y][length_x][3] F32; the canvas [frames][full_h][full_w][3]. */
+typedef struct {
+    int frames, length_y, length_x, full_h, full_w;
+    int start_y, start_x, overlap_y, overlap_x, keep_h, keep_w;
+} h3_vae_stitch;
+int h3_gpu_event_record(h3_gpu *gpu, h3_gpu_event *event);
+void h3_gpu_enable_peer_access(int peer_device);
+int h3_gpu_copy_peer_f32(h3_gpu *gpu, h3_gpu_tensor *destination, size_t destination_offset,
+                         const h3_gpu_tensor *source, size_t source_offset, size_t count);
+int h3_gpu_download(h3_gpu *gpu, const h3_gpu_tensor *tensor, size_t offset, void *host,
+                    size_t count);
+int h3_gpu_vae_unpack_tile_f32(h3_gpu *gpu, h3_gpu_tensor *destination,
+                               size_t destination_offset, const h3_gpu_tensor *rows,
+                               int latent_h, int latent_w, int first_frame, int frame_count,
+                               int frame_offset, int gap_from, int gap, int output_patch);
+int h3_gpu_vae_stitch_tile_f32(h3_gpu *gpu, h3_gpu_tensor *canvas, const h3_gpu_tensor *store,
+                               size_t current, long long above, long long left,
+                               const h3_vae_stitch *geometry);
+int h3_gpu_vae_temporal_blend_f32(h3_gpu *gpu, h3_gpu_tensor *rgb,
+                                  const h3_gpu_tensor *overlap, size_t frame_elements,
+                                  int frames);
+int h3_gpu_vae_finalize_f32(h3_gpu *gpu, h3_gpu_tensor *rgb, size_t offset, size_t count);
+int h3_gpu_vae_rgb8(h3_gpu *gpu, h3_gpu_tensor *output, const h3_gpu_tensor *rgb,
+                    size_t offset, size_t count);
 typedef struct h3_gpu_vsa h3_gpu_vsa;
 h3_gpu_vsa *h3_gpu_vsa_new(h3_gpu *gpu, uint32_t text_rows, uint32_t audio_rows,
                            uint32_t time, uint32_t height, uint32_t width, uint32_t heads);

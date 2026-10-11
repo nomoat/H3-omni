@@ -1,0 +1,12 @@
+objcopy --keep-global-symbol=h3_flash3_bf16 --keep-global-symbol=h3_flash3_f16_d64 /var/tmp/h3-bitcheck-15088/build-cuda/flash3_attention.raw.o /var/tmp/h3-bitcheck-15088/build-cuda/flash3_attention.o
+nvcc -o /var/tmp/h3-bitcheck-15088/build-cuda/h3_serve_check /var/tmp/h3-bitcheck-15088/build-cuda/h3.o /var/tmp/h3-bitcheck-15088/build-cuda/h3_host.o /var/tmp/h3-bitcheck-15088/build-cuda/h3_safetensors.o /var/tmp/h3-bitcheck-15088/build-cuda/h3_weights.o /var/tmp/h3-bitcheck-15088/build-cuda/h3_text_encoder.o /var/tmp/h3-bitcheck-15088/build-cuda/h3_dit_schedule.o /var/tmp/h3-bitcheck-15088/build-cuda/h3_dit.o /var/tmp/h3-bitcheck-15088/build-cuda/h3_video_vae.o /var/tmp/h3-bitcheck-15088/build-cuda/h3_video_encoder.o /var/tmp/h3-bitcheck-15088/build-cuda/h3_audio_vae.o /var/tmp/h3-bitcheck-15088/build-cuda/h3_ffmpeg.o /var/tmp/h3-bitcheck-15088/build-cuda/h3_terminal.o /var/tmp/h3-bitcheck-15088/build-cuda/h3_vision_encoder.o /var/tmp/h3-bitcheck-15088/build-cuda/h3_multimodal.o /var/tmp/h3-bitcheck-15088/build-cuda/h3_gpu_cuda.o /var/tmp/h3-bitcheck-15088/build-cuda/flash_attention.o /var/tmp/h3-bitcheck-15088/build-cuda/flash3_attention.o /var/tmp/h3-bitcheck-15088/build-cuda/h3_fasth3_config.o /var/tmp/h3-bitcheck-15088/build-cuda/serve_check.o /var/tmp/h3-bitcheck-15088/build-cuda/h3_tokenizer_portable.o -lnccl -lcublas -lcublasLt -L/opt/conda/lib/python3.11/site-packages/nvidia/cudnn/lib -Xlinker=-rpath=/opt/conda/lib/python3.11/site-packages/nvidia/cudnn/lib -l:libcudnn.so.9 -lpthread -lm -L/var/tmp/h3-bitcheck-15088/icu/usr/lib/x86_64-linux-gnu -Xlinker=--disable-new-dtags -Xlinker=-rpath=/var/tmp/h3-bitcheck-15088/icu/usr/lib/x86_64-linux-gnu -licuuc -licui18n
+nvcc warning : Support for offline compilation for architectures prior to '<compute/sm/lto>_75' will be removed in a future release (Use -Wno-deprecated-gpu-targets to suppress warning).
+r1-boat 87.06 denoise 13.44
+r2-fox 26.19 denoise 13.33
+r3-boat 26.24 denoise 13.44
+r4-cat 5.47 denoise 2.71
+r5-fox 26.17 denoise 13.35
+r6-city 8.11 denoise 0.53
+r7-fox 33.32 denoise 13.33
+ 99363 MiB
+{"passed": true, "requests": {"r1-boat": true, "r2-fox": true, "r3-boat": true, "r4-cat": true, "r5-fox": true, "r6-city": true, "r7-fox": true}}

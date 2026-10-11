@@ -37,7 +37,7 @@ $(BUILD)/.config-vsa$(VSA): | $(BUILD)
 	touch $@
 $(BUILD)/%.o: $(ROOT)/%.c | $(BUILD)
 	$(CC) $(CFLAGS) -c $< -o $@
-$(BUILD)/h3_gpu_cuda.o: $(ROOT)/cuda/h3_gpu_cuda.cu $(ROOT)/cuda/h3_cuda.h $(ROOT)/cuda/h3_flash.h $(ROOT)/h3_gpu.h $(ROOT)/cuda/primitives.cuh $(ROOT)/cuda/fast_primitives.cuh $(ROOT)/cuda/primitive_wrappers.inc $(ROOT)/cuda/dispatch.inc $(ROOT)/cuda/unsupported.inc $(ROOT)/cuda/vae_fused.cuh $(ROOT)/cuda/vae_attention.cuh $(ROOT)/cuda/vsa.cuh $(ROOT)/cuda/vae_fp16.cuh $(ROOT)/cuda/parallel.cuh | $(BUILD)
+$(BUILD)/h3_gpu_cuda.o: $(ROOT)/cuda/h3_gpu_cuda.cu $(ROOT)/cuda/h3_cuda.h $(ROOT)/cuda/h3_flash.h $(ROOT)/h3_gpu.h $(ROOT)/cuda/primitives.cuh $(ROOT)/cuda/fast_primitives.cuh $(ROOT)/cuda/primitive_wrappers.inc $(ROOT)/cuda/dispatch.inc $(ROOT)/cuda/unsupported.inc $(ROOT)/cuda/vae_fused.cuh $(ROOT)/cuda/vae_attention.cuh $(ROOT)/cuda/vsa.cuh $(ROOT)/cuda/vae_fp16.cuh $(ROOT)/cuda/parallel.cuh $(ROOT)/cuda/vae_post.cuh | $(BUILD)
 	$(NVCC) $(NVFLAGS) -c $< -o $@
 $(BUILD)/flash_attention.o: $(ROOT)/cuda/flash_attention.cu $(ROOT)/cuda/h3_flash.h $(FLASH_ROOT)/flash_fwd_kernel.h | $(BUILD)
 	$(NVCC) -O3 -std=c++17 -arch=$(CUDA_ARCH) --expt-relaxed-constexpr --expt-extended-lambda -DUNFUSE_FMA -DFLASHATTENTION_DISABLE_ALIBI -DFLASHATTENTION_DISABLE_SOFTCAP -Xcompiler=-fPIC -I$(ROOT)/cuda -I$(FLASH_ROOT) -I$(CUTLASS_ROOT)/include -c $< -o $@

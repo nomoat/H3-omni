@@ -947,6 +947,11 @@ static char *h3_dit_weights_key(const char *dit_path, const h3_params *params) {
 /* Opt-in diagnostic: raw float32 copies of the final denoised latents and the
  * decoded media, for exact comparisons between serving modes. Never enabled in
  * timing runs. */
+static int h3_dump_requested(void) {
+    const char *directory = getenv("H3_DUMP_DIR");
+    return directory && *directory;
+}
+
 static int h3_dump_f32(const char *name, const float *values, size_t count) {
     const char *directory = getenv("H3_DUMP_DIR");
     if (!directory || !*directory) return 1;
@@ -2014,7 +2019,8 @@ h3_result *h3_generate(h3_ctx *ctx, const char *prompt,
     int video_ok = preview_decoder ?
         (av_stream ?
          h3_video_vae_decoder_decode_rgb8(
-            preview_decoder, video, temporal.video_t, &frames, &rgb8,
+            preview_decoder, video, temporal.video_t, &frames,
+            h3_dump_requested(), &rgb8,
             h3_stream_frames, &frame_stream, detail, sizeof(detail)) :
          h3_video_vae_decoder_decode(
             preview_decoder, video, temporal.video_t, &frames,
