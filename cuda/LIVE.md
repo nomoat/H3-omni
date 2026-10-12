@@ -255,3 +255,17 @@ boundary and resets KV for the next independent session. Resident weights stay.
 CPU checks: `tests/live/stream_encoder.c` proves media exists before encoder
 finish; `python3 -m unittest discover -s tests/live -p test_live_server.py -v`
 checks incremental delivery, admission, limits and disconnect cancellation.
+
+The final native audio endpoint can be slightly shorter than the video
+endpoint because audio latents span 800 samples. Twelve requests produce
+1,910,400 native audio samples, 267 samples (8.34 ms) short of the rounded
+video endpoint. The adapter ends audio at the native boundary; intermediate
+parts still use absolute video timestamps. It never pads each part or reads
+beyond the decoded PCM. The CPU regression covers every 1–12 request endpoint
+and cancellation using stub model/decoder output and the real adapter:
+
+```sh
+cc -std=c11 -g -fsanitize=address,undefined -I. \
+  tests/live/stream_lengths.c h3_live_stream.c -lm -o /tmp/h3-live-lengths-test
+/tmp/h3-live-lengths-test
+```
