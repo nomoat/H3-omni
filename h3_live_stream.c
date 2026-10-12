@@ -1,5 +1,6 @@
 /* Finite streaming adapter. Prefix decoding is deliberately retained from the
  * continuity oracle. The 12-request cap bounds CPU memory and decoder work. */
+#define _POSIX_C_SOURCE 200809L
 #include "h3_live.h"
 #include "h3_video_vae.h"
 #include "h3_audio_vae.h"
@@ -8,6 +9,13 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
+
+static double live_time(void) {
+    struct timespec t;
+    clock_gettime(CLOCK_MONOTONIC, &t);
+    return t.tv_sec + t.tv_nsec * 1e-9;
+}
 
 static void copy_time(float *dst, int dt, int start, const float *src,
                       int st, int n, int channels, size_t area) {
@@ -43,10 +51,12 @@ int h3_live_stream_generate(h3_dit *dit, const h3_text_embedding *text,
     encoder=h3_ffmpeg_live_open(p->output_path,p->width,p->height,error,capacity);
     REQUIRE(encoder);
     for (int r=0;r<requests;r++) {
+        double begin=live_time();
         PROGRESS("live generating",r);
         h3_live_part part;
         REQUIRE(h3_live_session_next(session,v,24*37*area,a,64*207,&part,
             NULL,NULL,error,capacity));
+        double generated=live_time();
         PROGRESS("live decoding",r);
         int frames=part.frame_start+part.frame_count;
         int vt=part.video_start+part.video_t,at=part.audio_start+part.audio_t;
@@ -58,6 +68,7 @@ int h3_live_stream_generate(h3_dit *dit, const h3_text_embedding *text,
             &decoded,0,&rgb,NULL,NULL,error,capacity));
         REQUIRE(h3_audio_vae_decoder_decode(audio_decoder,pa,at,NULL,NULL,
             &wave,error,capacity));
+        double decoded_at=live_time();
         PROGRESS("live encoding",r);
         int end=r==requests-1?frames:frames-24;
         int sample_end=(int)llround((double)end*32000/24);
@@ -80,6 +91,9 @@ int h3_live_stream_generate(h3_dit *dit, const h3_text_embedding *text,
         emitted_frames=end; emitted_samples=sample_end;
         free(cut); cut=NULL; free(rgb); rgb=NULL;
         h3_video_frames_free(&decoded); h3_audio_waveform_free(&wave);
+        fprintf(stderr,"h3: live stream part %d/%d: generate=%.3fs decode=%.3fs encode=%.3fs total=%.3fs emitted_frames=%d\n",
+            r+1,requests,generated-begin,decoded_at-generated,live_time()-decoded_at,
+            live_time()-begin,emitted_frames);
         PROGRESS("live part",r+1);
     }
     ok=h3_ffmpeg_live_finish(encoder,error,capacity); encoder=NULL;
