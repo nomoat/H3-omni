@@ -104,8 +104,10 @@ def make_live_handler(worker, key, work_dir, gpus):
                 try:
                     result['seconds'] = worker.generate(prompt.strip(), width, height,
                                                         -PARTS, seed, str(output))
+                    print(f"live session complete: {result['seconds']:.3f}s, {PARTS} parts", flush=True)
                 except (RuntimeError, ValueError, OSError) as error:
                     result['error'] = str(error)
+                    print(f'live generation failed: {error}', flush=True)
                 finally:
                     finished.set()
                     reader_done.wait()

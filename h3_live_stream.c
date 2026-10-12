@@ -61,8 +61,17 @@ int h3_live_stream_generate(h3_dit *dit, const h3_text_embedding *text,
         PROGRESS("live encoding",r);
         int end=r==requests-1?frames:frames-24;
         int sample_end=(int)llround((double)end*32000/24);
+        /* The audio latent grid is 800 samples. Its final edge can precede
+         * the video edge by less than one grid cell (267 samples for 12
+         * requests). Preserve native audio rather than reading past it. */
+        if (r==requests-1 && sample_end>wave.samples &&
+            sample_end-wave.samples<800) sample_end=wave.samples;
         int samples=sample_end-emitted_samples;
-        REQUIRE(decoded.frames==frames && wave.samples>=sample_end);
+        if (decoded.frames!=frames || wave.samples<sample_end || samples<1) {
+            snprintf(error,capacity,"live decode length mismatch: video %d/%d, audio %d/%d",
+                decoded.frames,frames,wave.samples,sample_end);
+            goto done;
+        }
         cut=malloc((size_t)2*samples*sizeof(float)); REQUIRE(cut);
         for (int c=0;c<2;c++) memcpy(cut+(size_t)c*samples,
             wave.pcm+(size_t)c*wave.samples+emitted_samples,(size_t)samples*sizeof(float));
