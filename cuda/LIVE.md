@@ -43,6 +43,11 @@ not part of this mode.
 
 ## Execution contract
 
+The contract below also applies to incremental sessions. In `h3_generate`, all
+audio guidance is prepared before student generation. In a session, guidance
+is prepared only for the current request, with student KV retained while the
+audio teacher runs.
+
 1. The original base model, with the adapter disabled, generates audio guidance
    in nine evaluations per request. Later requests use the previous 40 clean
    audio latents per channel as a frozen reference. States 3, 6 and 9 guide
@@ -78,6 +83,8 @@ This implements the released H3 chunk-generation pipeline. Audio guidance is
 prepared first, and decoding starts after latent generation. It does not add
 an RTMP/WebRTC server or an interactive prompt queue. Independent `h3_generate`
 calls start independent streams; history carries between chunks inside a call.
+For cross-call history, the low-level `h3_live_session` interface described below
+keeps one resident DiT dedicated to a stream.
 The native normal RNG differs from `torch.randn`, and the normalization reducer
 also has a different floating-point reduction order. Equal seeds do not imply
 bit-identical output with the upstream Python program.
@@ -130,9 +137,10 @@ These are individual measurements, not a latency distribution. The initial
 small request includes model loading from shared storage and takes minutes.
 Two GPUs are slower than playback. Four GPUs are faster than playback in
 these short warm runs, but this does not validate a sustained live broadcast.
-The runtime still decodes after latent generation and resets history between
-independent calls; continuous serving needs persistent cross-call history,
-streamed decode/output and buffering. The current API retains its 362-frame limit (three requests).
+The ordinary `h3_generate` API still decodes after latent generation and resets
+history between independent calls. It retains its 362-frame limit (three
+requests). The incremental session below removes that limit for latent
+generation; a production service still needs bounded decoding and transport.
 
 The regression job passed 69 existing CUDA primitive cases, six rectangular
 attention cases, eight released-adapter projection cases plus the FP32 sampler,
@@ -176,3 +184,52 @@ To repeat using the documented build cache:
 sbatch --export=ALL --nodelist=gpu-h200x8-0 tests/live/benchmark.sbatch \
   /home/cj/h3-live/build-cache-15182.tar /home/cj/h3-live/benchmark-4gpu.tar
 ```
+
+## Incremental latent sessions
+
+`h3_live.h` exposes `h3_live_session_new`, `h3_live_session_next`, and
+`h3_live_session_free`. A session borrows a live DiT and a text embedding;
+these must stay alive and cannot serve another request during the session.
+Creation resets history once. Each successful `next` returns one new request:
+124 frames / 37 video latents first, then 119 frames / 35 video latents.
+Audio counts follow the cumulative 40 Hz timeline. Output arrays are
+channel-major FP32; allocate at least `24*37*latent_height*latent_width`
+video floats and `64*207` audio floats.
+
+The session retains historical KV in the DiT, first-chunk normalization
+statistics, the previous 40 audio latents, and absolute timeline positions.
+Each call generates its own audio guidance and four student chunks, committing
+clean KV after each chunk. No later request is generated early. An inference
+failure makes the session terminal; freeing it does not free the borrowed DiT
+or embedding. The interface currently keeps one fixed prompt and canvas.
+
+`tests/live/continuity.c` exercises ten sequential requests on one resident
+model and emits each part before calling `next` again. It first compares the
+first two requests against the existing 243-frame path, element for element.
+For decoder correctness it decodes the known latent prefix and holds back
+24 frames (one second). At every request it compares previously emitted RGB
+and PCM against the new prefix decode. This repeated prefix decode is an
+explicit test oracle, not a bounded-cost streaming decoder or latency claim.
+The emitted parts contain 100, eight times 119, and 143 frames. Together they
+contain 1,195 frames (49.7917 seconds). The combined file encodes their original
+RGB/PCM once, avoiding independent AAC encoder padding at concatenation seams.
+
+Reproduce on four H200s with the existing build cache:
+
+```sh
+sbatch --export=ALL tests/live/continuity.sbatch \
+  /home/cj/h3-live/build-cache-15182.tar /home/cj/h3-live/continuity-overlay.tar
+```
+
+The overlay must contain `h3_live.c`, `h3_live.h`, `cuda/Makefile`, and the three
+`tests/live/continuity*` files from this revision. The script retains the cached
+build path because compiled object dependencies and ICU RPATHs refer to it.
+
+The first ten-request run passed on four H200s (job 15225). Its first two
+requests exactly match the legacy 10-second path. Across all ten requests,
+previously emitted RGB remained byte-identical to later prefix decodes;
+PCM changed by at most 3.07e-6. Sampled inspection of all nine request seams
+and nine output seams found no obvious identity or background switch.
+See [the session evidence](../tests/live/evidence/15225/README.md) for the
+measurements, inspection scope and limitations. This validates one fixed
+prompt and seed over 49.79 seconds, not a long-running interactive broadcast.

@@ -233,3 +233,21 @@ MLP FC2 (K=14336, N=5376); 56-to-14-head attention stays exact. The runtime was
 not changed in this benchmark. The full-size sample stays visually continuous,
 but no strict cross-count parity or broad quality claim is made. See
 `tests/live/evidence/15202/` for complete timings, hashes, comparisons and probe.
+
+## 2026-10-12: persistent live session and 50-second continuity check
+
+Added the low-level `h3_live_session` lifecycle. Each call generates only the
+next request, keeping KV in the resident DiT and retaining the prior audio
+tail, first-chunk statistics and absolute positions. The audio teacher can
+run between student requests without clearing history. The ordinary clip API
+is unchanged. Added a reproducible four-H200 session harness and seam review.
+
+Job 15225 passed: ten requests, 40 clean commits, 1,195 frames (49.7917 s).
+First two requests exactly match the legacy 243-frame path's video/audio
+latents. With one second held back for decoding, every emitted RGB byte is
+stable under later prefix decodes; maximum PCM difference is 3.07e-6.
+All 12 videos decode and local hashes match. Visual samples at all request
+and publication seams preserve person/background without an obvious cut.
+No listening or changing-prompt evaluation was performed. The decoder uses
+repeated full prefixes as a correctness oracle, so this is not a real-time
+throughput claim. Details: `tests/live/evidence/15225/README.md`.

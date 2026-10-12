@@ -84,3 +84,8 @@ $(BUILD)/live_resident.o: $(ROOT)/tests/live/resident.c | $(BUILD)
 	$(CC) $(CFLAGS) -c $< -o $@
 $(BUILD)/h3_live_resident: $(OBJ) $(BUILD)/live_resident.o $(BUILD)/h3_tokenizer_portable.o
 	$(NVCC) -o $@ $^ $(LDLIBS) -L$(ICU_ROOT)/lib/x86_64-linux-gnu -Xlinker=--disable-new-dtags -Xlinker=-rpath=$(ICU_ROOT)/lib/x86_64-linux-gnu -licuuc -licui18n
+
+$(BUILD)/live_continuity.o: $(ROOT)/tests/live/continuity.c | $(BUILD)
+	$(CC) $(CFLAGS) -c $< -o $@
+$(BUILD)/h3_live_continuity: $(OBJ) $(BUILD)/live_continuity.o $(BUILD)/h3_tokenizer_portable.o
+	$(NVCC) -o $@ $^ $(LDLIBS) -L$(ICU_ROOT)/lib/x86_64-linux-gnu -Xlinker=--disable-new-dtags -Xlinker=-rpath=$(ICU_ROOT)/lib/x86_64-linux-gnu -licuuc -licui18n

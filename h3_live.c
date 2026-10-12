@@ -296,3 +296,138 @@ done:
     return ok;
 #undef REQUIRE
 }
+
+struct h3_live_session {
+    h3_dit *dit;
+    const h3_text_embedding *text;
+    int height, width, request, previous_audio_t, failed;
+    uint64_t seed;
+    float previous_tail[64*40], mean[96], std[96];
+};
+
+h3_live_session *h3_live_session_new(h3_dit *dit,
+    const h3_text_embedding *text, int height, int width, uint64_t seed,
+    char *error, size_t capacity) {
+    if (!dit || !text || !text->values || !text->tokens ||
+        height < 2 || width < 2 || height % 2 || width % 2) {
+        if (error && capacity) snprintf(error,capacity,"invalid live session inputs");
+        return NULL;
+    }
+    h3_live_session *s = calloc(1,sizeof(*s));
+    if (!s) {
+        if (error && capacity) snprintf(error,capacity,"cannot allocate live session");
+        return NULL;
+    }
+    s->dit=dit; s->text=text; s->height=height; s->width=width; s->seed=seed;
+    if (!h3_dit_live_control(dit,0,0,0,1,0,0,error,capacity)) { free(s); return NULL; }
+    return s;
+}
+
+void h3_live_session_free(h3_live_session *s) { free(s); }
+
+int h3_live_session_next(h3_live_session *s,
+    float *video, size_t video_capacity, float *audio, size_t audio_capacity,
+    h3_live_part *part, h3_dit_progress progress, void *opaque,
+    char *error, size_t capacity) {
+    if (error && capacity) *error=0;
+    /* Keep timeline arithmetic within signed int, including frame * 5. */
+    if (!s || s->failed || s->request >= 1000000 || !part || !video || !audio) {
+        if (error && capacity) snprintf(error,capacity,"invalid or failed live session");
+        return 0;
+    }
+    int r=s->request;
+    h3_live_part p={.request_index=r, .frame_start=r?5+r*119:0,
+        .frame_count=r?119:124, .video_start=r?2+r*35:0, .video_t=r?35:37};
+    p.audio_start=audio_boundary(p.frame_start);
+    p.audio_t=audio_boundary(p.frame_start+p.frame_count)-p.audio_start;
+    size_t area=(size_t)s->height*s->width;
+    if (video_capacity<(size_t)24*p.video_t*area || audio_capacity<(size_t)64*p.audio_t) {
+        if (error && capacity) snprintf(error,capacity,"live session output buffers are too small");
+        return 0;
+    }
+    float *official_video=NULL,*official_audio=NULL,*rows=NULL;
+    float *v=NULL,*vv=NULL,*a=NULL,*av=NULL,*milestones[3]={0},*cuts[3]={0};
+    float reference_rows[64*40];
+    h3_layout layout={0}; h3_sigma_schedule schedule;
+    int ok=0;
+    double begin=now(),teacher_done=begin;
+#define REQUIRE(test) do { if (!(test)) goto done; } while (0)
+    official_video=malloc(24*37*area*sizeof(float));
+    official_audio=malloc(64*207*sizeof(float)); rows=malloc(64*207*sizeof(float));
+    v=malloc(24*12*area*sizeof(float)); vv=malloc(24*12*area*sizeof(float));
+    a=malloc(64*207*sizeof(float)); av=malloc(64*207*sizeof(float));
+    for (int i=0;i<3;i++) {
+        milestones[i]=malloc(64*207*sizeof(float)); cuts[i]=malloc(64*207*sizeof(float));
+    }
+    REQUIRE(official_video && official_audio && rows && v && vv && a && av &&
+        milestones[0] && milestones[1] && milestones[2] && cuts[0] && cuts[1] && cuts[2]);
+    h3_rng rng; h3_rng_seed(&rng,s->seed+(uint64_t)r);
+    h3_rng_fill_normal(&rng,official_video,24*37*area);
+    h3_rng_fill_normal(&rng,rows,64*207);
+    REQUIRE(h3_dit_unpack_audio(rows,32,207,official_audio,64*207));
+    slice(video,official_video,24,37,r?2:0,p.video_t,area);
+    slice(audio,official_audio,64,207,207-p.audio_t,p.audio_t,1);
+    memcpy(a,audio,(size_t)64*p.audio_t*sizeof(float));
+    /* The teacher bypasses the student cache but never clears it. */
+    REQUIRE(h3_dit_live_control(s->dit,0,0,0,0,0,0,error,capacity));
+    teacher_schedule(&schedule);
+    if (r) REQUIRE(h3_dit_pack_audio(s->previous_tail,32,40,reference_rows,64*40));
+    REQUIRE(layout_build(&layout,s->text,0,s->height,s->width,p.audio_t,
+        0,0,0,1,s->previous_audio_t,error,capacity));
+    REQUIRE(rebind(s->dit,s->text,&layout,&schedule,r?reference_rows:NULL,error,capacity));
+    h3_layout_free(&layout);
+    for (int step=0;step<9;step++) {
+        REQUIRE(h3_dit_forward(s->dit,step,v,a,vv,av,error,capacity));
+        update(a,av,(size_t)64*p.audio_t,schedule.audio[step],schedule.audio[step+1]);
+        if ((step+1)%3==0)
+            memcpy(milestones[(step+1)/3-1],a,(size_t)64*p.audio_t*sizeof(float));
+        if (progress) progress("live session audio",step+1,9,opaque);
+    }
+    teacher_done=now();
+    REQUIRE(h3_dit_live_control(s->dit,1,1,0,0,0,r && r%12==0,error,capacity));
+    h3_live_schedule_build(&schedule);
+    int vs=0,as=0,fs=0;
+    for (int phase=0;phase<4;phase++) {
+        int groups=phase==3?1:2;
+        int vt=groups*5+(r==0 && phase==0?2:0);
+        int frames=groups*17+(r==0 && phase==0?5:0);
+        int ae=audio_boundary(p.frame_start+fs+frames)-p.audio_start,at=ae-as;
+        size_t vn=(size_t)24*vt*area;
+        slice(v,video,24,p.video_t,vs,vt,area);
+        slice(a,audio,64,p.audio_t,as,at,1);
+        REQUIRE(layout_build(&layout,s->text,vt,s->height,s->width,at,
+            p.video_start+vs,p.video_start,p.audio_start+as,0,0,error,capacity));
+        REQUIRE(rebind(s->dit,s->text,&layout,&schedule,NULL,error,capacity));
+        h3_layout_free(&layout);
+        for (int i=0;i<3;i++) slice(cuts[i],milestones[i],64,p.audio_t,as,at,1);
+        REQUIRE(h3_dit_live_chunk(s->dit,v,a,(const float *const *)cuts,error,capacity));
+        REQUIRE(renorm(v,vt,s->height,s->width,s->mean,s->std,r==0 && phase==0));
+        REQUIRE(h3_dit_live_control(s->dit,1,1,1,0,0,0,error,capacity));
+        REQUIRE(h3_dit_forward(s->dit,3,v,a,vv,av,error,capacity));
+        REQUIRE(h3_dit_live_control(s->dit,1,1,0,0,1,0,error,capacity));
+        insert(video,v,24,p.video_t,vs,vt,area);
+        for (size_t i=0;i<vn;i++) REQUIRE(isfinite(v[i]));
+        if (progress) progress("live session video",phase+1,4,opaque);
+        vs+=vt; as=ae; fs+=frames;
+    }
+    memcpy(audio,milestones[2],(size_t)64*p.audio_t*sizeof(float));
+    for (size_t i=0;i<(size_t)64*p.audio_t;i++) REQUIRE(isfinite(audio[i]));
+    slice(s->previous_tail,audio,64,p.audio_t,p.audio_t-40,40,1);
+    s->previous_audio_t=p.audio_t;
+    s->request++; *part=p; ok=1;
+    fprintf(stderr,"h3: live session request %d returned: frames [%d,%d), "
+        "video [%d,%d), audio [%d,%d), commits=%d, teacher=%.3fs, student=%.3fs\n",
+        r+1,p.frame_start,p.frame_start+p.frame_count,p.video_start,p.video_start+p.video_t,
+        p.audio_start,p.audio_start+p.audio_t,s->request*4,teacher_done-begin,now()-teacher_done);
+ done:
+    h3_layout_free(&layout);
+    free(official_video); free(official_audio); free(rows);
+    free(v); free(vv); free(a); free(av);
+    for (int i=0;i<3;i++) { free(milestones[i]); free(cuts[i]); }
+    if (!ok) {
+        s->failed=1;
+        if (error && capacity && !*error) snprintf(error,capacity,"live session generation failed");
+    }
+    return ok;
+#undef REQUIRE
+}

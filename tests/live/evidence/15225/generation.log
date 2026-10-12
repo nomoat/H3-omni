@@ -1,0 +1,73 @@
+h3: resident text encoder loaded
+h3: conditioning cache miss; stored exact BF16
+h3: prepared DiT cache miss; model retained
+h3: live audio teacher: 2 requests, 18 forwards, 16.980s
+h3: live clean commit 1: 4990 retained media tokens per layer, 14 heads per GPU
+h3: live request 1 chunk 1: 39 frames, 3 noisy + 1 clean, 0.696s
+h3: live clean commit 2: 9154 retained media tokens per layer, 14 heads per GPU
+h3: live request 1 chunk 2: 34 frames, 3 noisy + 1 clean, 0.520s
+h3: live clean commit 3: 13186 retained media tokens per layer, 14 heads per GPU
+h3: live request 1 chunk 3: 34 frames, 3 noisy + 1 clean, 0.552s
+h3: live clean commit 4: 11105 retained media tokens per layer, 14 heads per GPU
+h3: live request 1 chunk 4: 17 frames, 3 noisy + 1 clean, 0.339s
+h3: live clean commit 5: 11105 retained media tokens per layer, 14 heads per GPU
+h3: live request 2 chunk 1: 34 frames, 3 noisy + 1 clean, 0.567s
+h3: live clean commit 6: 13186 retained media tokens per layer, 14 heads per GPU
+h3: live request 2 chunk 2: 34 frames, 3 noisy + 1 clean, 0.569s
+h3: live clean commit 7: 13188 retained media tokens per layer, 14 heads per GPU
+h3: live request 2 chunk 3: 34 frames, 3 noisy + 1 clean, 0.592s
+h3: live clean commit 8: 11105 retained media tokens per layer, 14 heads per GPU
+h3: live request 2 chunk 4: 17 frames, 3 noisy + 1 clean, 0.330s
+h3: live DiT total 28.887s (audio 16.980s, video 11.907s), 8 clean commits
+h3: resident audio VAE loaded
+h3: video VAE cache miss; decoder retained
+h3: live clean commit 1: 4990 retained media tokens per layer, 14 heads per GPU
+h3: live clean commit 2: 9154 retained media tokens per layer, 14 heads per GPU
+h3: live clean commit 3: 13186 retained media tokens per layer, 14 heads per GPU
+h3: live clean commit 4: 11105 retained media tokens per layer, 14 heads per GPU
+h3: live session request 1 returned: frames [0,124), video [0,37), audio [0,207), commits=4, teacher=0.225s, student=2.032s
+h3: live clean commit 5: 11105 retained media tokens per layer, 14 heads per GPU
+h3: live clean commit 6: 13186 retained media tokens per layer, 14 heads per GPU
+h3: live clean commit 7: 13188 retained media tokens per layer, 14 heads per GPU
+h3: live clean commit 8: 11105 retained media tokens per layer, 14 heads per GPU
+h3: live session request 2 returned: frames [124,243), video [37,72), audio [207,405), commits=8, teacher=0.226s, student=2.153s
+h3: live clean commit 9: 11105 retained media tokens per layer, 14 heads per GPU
+h3: live clean commit 10: 13186 retained media tokens per layer, 14 heads per GPU
+h3: live clean commit 11: 13186 retained media tokens per layer, 14 heads per GPU
+h3: live clean commit 12: 11105 retained media tokens per layer, 14 heads per GPU
+h3: live session request 3 returned: frames [243,362), video [72,107), audio [405,603), commits=12, teacher=0.227s, student=2.147s
+h3: live clean commit 13: 11105 retained media tokens per layer, 14 heads per GPU
+h3: live clean commit 14: 13188 retained media tokens per layer, 14 heads per GPU
+h3: live clean commit 15: 13186 retained media tokens per layer, 14 heads per GPU
+h3: live clean commit 16: 11105 retained media tokens per layer, 14 heads per GPU
+h3: live session request 4 returned: frames [362,481), video [107,142), audio [603,802), commits=16, teacher=0.234s, student=2.155s
+h3: live clean commit 17: 11105 retained media tokens per layer, 14 heads per GPU
+h3: live clean commit 18: 13186 retained media tokens per layer, 14 heads per GPU
+h3: live clean commit 19: 13188 retained media tokens per layer, 14 heads per GPU
+h3: live clean commit 20: 11105 retained media tokens per layer, 14 heads per GPU
+h3: live session request 5 returned: frames [481,600), video [142,177), audio [802,1000), commits=20, teacher=0.228s, student=2.152s
+h3: live clean commit 21: 11105 retained media tokens per layer, 14 heads per GPU
+h3: live clean commit 22: 13186 retained media tokens per layer, 14 heads per GPU
+h3: live clean commit 23: 13186 retained media tokens per layer, 14 heads per GPU
+h3: live clean commit 24: 11105 retained media tokens per layer, 14 heads per GPU
+h3: live session request 6 returned: frames [600,719), video [177,212), audio [1000,1198), commits=24, teacher=0.227s, student=2.167s
+h3: live clean commit 25: 11105 retained media tokens per layer, 14 heads per GPU
+h3: live clean commit 26: 13188 retained media tokens per layer, 14 heads per GPU
+h3: live clean commit 27: 13186 retained media tokens per layer, 14 heads per GPU
+h3: live clean commit 28: 11105 retained media tokens per layer, 14 heads per GPU
+h3: live session request 7 returned: frames [719,838), video [212,247), audio [1198,1397), commits=28, teacher=0.228s, student=2.152s
+h3: live clean commit 29: 11105 retained media tokens per layer, 14 heads per GPU
+h3: live clean commit 30: 13186 retained media tokens per layer, 14 heads per GPU
+h3: live clean commit 31: 13188 retained media tokens per layer, 14 heads per GPU
+h3: live clean commit 32: 11105 retained media tokens per layer, 14 heads per GPU
+h3: live session request 8 returned: frames [838,957), video [247,282), audio [1397,1595), commits=32, teacher=0.226s, student=2.157s
+h3: live clean commit 33: 11105 retained media tokens per layer, 14 heads per GPU
+h3: live clean commit 34: 13186 retained media tokens per layer, 14 heads per GPU
+h3: live clean commit 35: 13186 retained media tokens per layer, 14 heads per GPU
+h3: live clean commit 36: 11105 retained media tokens per layer, 14 heads per GPU
+h3: live session request 9 returned: frames [957,1076), video [282,317), audio [1595,1793), commits=36, teacher=0.228s, student=2.157s
+h3: live clean commit 37: 11105 retained media tokens per layer, 14 heads per GPU
+h3: live clean commit 38: 13188 retained media tokens per layer, 14 heads per GPU
+h3: live clean commit 39: 13186 retained media tokens per layer, 14 heads per GPU
+h3: live clean commit 40: 11105 retained media tokens per layer, 14 heads per GPU
+h3: live session request 10 returned: frames [1076,1195), video [317,352), audio [1793,1992), commits=40, teacher=0.227s, student=2.162s
