@@ -1,0 +1,627 @@
+{
+  "job": 15202,
+  "reference_job": 15192,
+  "gpus": 4,
+  "node": "gpu-h200x8-0",
+  "runtime_commit": "1a1f588",
+  "comparisons": [
+    {
+      "file": "small.mp4",
+      "reference_sha256": "91d63cc8dbde8f71adf4d34e91464bd9b7210e728143c291b62b74035ed2cbb5",
+      "candidate_sha256": "e1e7bf4a09ae0a46ad9d917efbf2c0277fcee41618cc89ecea109091ecddf4ec",
+      "equal": false
+    },
+    {
+      "file": "full-cold.mp4",
+      "reference_sha256": "7523129a3511f06fdd02936622dd49f9f1d7d23eb040fcc57ef6538276df748c",
+      "candidate_sha256": "0ad922e96025a44a3e11721d21438442ceb02b9b9fff439d41276f1d5275f70c",
+      "equal": false
+    },
+    {
+      "file": "full-warm.mp4",
+      "reference_sha256": "7523129a3511f06fdd02936622dd49f9f1d7d23eb040fcc57ef6538276df748c",
+      "candidate_sha256": "0ad922e96025a44a3e11721d21438442ceb02b9b9fff439d41276f1d5275f70c",
+      "equal": false
+    },
+    {
+      "file": "full-host.mp4",
+      "reference_sha256": "7523129a3511f06fdd02936622dd49f9f1d7d23eb040fcc57ef6538276df748c",
+      "candidate_sha256": "0ad922e96025a44a3e11721d21438442ceb02b9b9fff439d41276f1d5275f70c",
+      "equal": false
+    },
+    {
+      "file": "small-latents/audio_latent.f32",
+      "reference_sha256": "92da030366be33b7644fa09c8c2842dd0b1e97d6ee15592d31d2be6b4c69c3a9",
+      "candidate_sha256": "5ee5080e1cad90757c01fd08c6833b78db045baad0d3a01a548e8dc463665752",
+      "equal": false
+    },
+    {
+      "file": "small-latents/audio_pcm.f32",
+      "reference_sha256": "11477e775f0756ab592a748081ebbcb07fa8562bb604239d87304526ce373e8d",
+      "candidate_sha256": "d9f75f663a832af8c5d22c190fcf3b210a3151506f24fc30f83c630ae8d37831",
+      "equal": false
+    },
+    {
+      "file": "small-latents/video_latent.f32",
+      "reference_sha256": "eedc55ba76c3fa5bab63f750569b8a1ed1f9c99930195c451c3a0d95b3dac804",
+      "candidate_sha256": "41083127178944d17fca5888dd068268097247edb0549dc209965cb3a28f1e43",
+      "equal": false
+    },
+    {
+      "file": "small-latents/video_rgb.f32",
+      "reference_sha256": "3ba9dab9084fa4cebc2355c28e1dd8aea9f4df78f62b69c4c8d4f4bfc889bf78",
+      "candidate_sha256": "fda3948d4e51996bc15f473d80f10cdf42bf941b88a1e610920abb1ebfa68793",
+      "equal": false
+    }
+  ],
+  "all_comparisons_equal": false,
+  "all_mp4_decode": true,
+  "timings": [
+    {
+      "case": "small",
+      "width": 256,
+      "height": 256,
+      "frames": 243,
+      "seconds": 145.208022
+    },
+    {
+      "case": "full-cold",
+      "width": 864,
+      "height": 480,
+      "frames": 243,
+      "seconds": 24.254079
+    },
+    {
+      "case": "full-warm",
+      "width": 864,
+      "height": 480,
+      "frames": 243,
+      "seconds": 8.870986
+    },
+    {
+      "case": "full-host",
+      "width": 864,
+      "height": 480,
+      "frames": 243,
+      "seconds": 8.598809
+    },
+    {
+      "case": "10s-repeat1",
+      "width": 864,
+      "height": 480,
+      "frames": 243,
+      "seconds": 8.622497
+    },
+    {
+      "case": "10s-repeat2",
+      "width": 864,
+      "height": 480,
+      "frames": 243,
+      "seconds": 8.38272
+    },
+    {
+      "case": "5s-cold",
+      "width": 864,
+      "height": 480,
+      "frames": 124,
+      "seconds": 19.66787
+    },
+    {
+      "case": "5s-warm1",
+      "width": 864,
+      "height": 480,
+      "frames": 124,
+      "seconds": 4.46978
+    },
+    {
+      "case": "5s-warm2",
+      "width": 864,
+      "height": 480,
+      "frames": 124,
+      "seconds": 4.518223
+    },
+    {
+      "case": "5s-warm3",
+      "width": 864,
+      "height": 480,
+      "frames": 124,
+      "seconds": 4.633644
+    }
+  ],
+  "benchmarks": [
+    {
+      "frames": 243,
+      "playback_seconds": 10.125,
+      "runs": [
+        8.870986,
+        8.622497,
+        8.38272
+      ],
+      "minimum": 8.38272,
+      "median": 8.622497,
+      "maximum": 8.870986,
+      "median_playback_speed": 1.1742538153391067,
+      "all_faster_than_playback": true
+    },
+    {
+      "frames": 124,
+      "playback_seconds": 5.166666666666667,
+      "runs": [
+        4.46978,
+        4.518223,
+        4.633644
+      ],
+      "minimum": 4.46978,
+      "median": 4.518223,
+      "maximum": 4.633644,
+      "median_playback_speed": 1.143517410864109,
+      "all_faster_than_playback": true
+    }
+  ],
+  "phases": [
+    {
+      "case": "small",
+      "dit_seconds": 26.477,
+      "teacher_seconds": 17.327,
+      "student_seconds": 9.15,
+      "chunks": [
+        {
+          "request": 1,
+          "chunk": 1,
+          "frames": 39,
+          "seconds": 0.213
+        },
+        {
+          "request": 1,
+          "chunk": 2,
+          "frames": 34,
+          "seconds": 0.161
+        },
+        {
+          "request": 1,
+          "chunk": 3,
+          "frames": 34,
+          "seconds": 0.147
+        },
+        {
+          "request": 1,
+          "chunk": 4,
+          "frames": 17,
+          "seconds": 0.143
+        },
+        {
+          "request": 2,
+          "chunk": 1,
+          "frames": 34,
+          "seconds": 0.142
+        },
+        {
+          "request": 2,
+          "chunk": 2,
+          "frames": 34,
+          "seconds": 0.142
+        },
+        {
+          "request": 2,
+          "chunk": 3,
+          "frames": 34,
+          "seconds": 0.143
+        },
+        {
+          "request": 2,
+          "chunk": 4,
+          "frames": 17,
+          "seconds": 0.133
+        }
+      ]
+    },
+    {
+      "case": "full-cold",
+      "dit_seconds": 12.542,
+      "teacher_seconds": 8.148,
+      "student_seconds": 4.394,
+      "chunks": [
+        {
+          "request": 1,
+          "chunk": 1,
+          "frames": 39,
+          "seconds": 0.68
+        },
+        {
+          "request": 1,
+          "chunk": 2,
+          "frames": 34,
+          "seconds": 0.531
+        },
+        {
+          "request": 1,
+          "chunk": 3,
+          "frames": 34,
+          "seconds": 0.549
+        },
+        {
+          "request": 1,
+          "chunk": 4,
+          "frames": 17,
+          "seconds": 0.34
+        },
+        {
+          "request": 2,
+          "chunk": 1,
+          "frames": 34,
+          "seconds": 0.566
+        },
+        {
+          "request": 2,
+          "chunk": 2,
+          "frames": 34,
+          "seconds": 0.569
+        },
+        {
+          "request": 2,
+          "chunk": 3,
+          "frames": 34,
+          "seconds": 0.59
+        },
+        {
+          "request": 2,
+          "chunk": 4,
+          "frames": 17,
+          "seconds": 0.334
+        }
+      ]
+    },
+    {
+      "case": "full-warm",
+      "dit_seconds": 4.672,
+      "teacher_seconds": 0.457,
+      "student_seconds": 4.215,
+      "chunks": [
+        {
+          "request": 1,
+          "chunk": 1,
+          "frames": 39,
+          "seconds": 0.546
+        },
+        {
+          "request": 1,
+          "chunk": 2,
+          "frames": 34,
+          "seconds": 0.511
+        },
+        {
+          "request": 1,
+          "chunk": 3,
+          "frames": 34,
+          "seconds": 0.551
+        },
+        {
+          "request": 1,
+          "chunk": 4,
+          "frames": 17,
+          "seconds": 0.331
+        },
+        {
+          "request": 2,
+          "chunk": 1,
+          "frames": 34,
+          "seconds": 0.566
+        },
+        {
+          "request": 2,
+          "chunk": 2,
+          "frames": 34,
+          "seconds": 0.573
+        },
+        {
+          "request": 2,
+          "chunk": 3,
+          "frames": 34,
+          "seconds": 0.593
+        },
+        {
+          "request": 2,
+          "chunk": 4,
+          "frames": 17,
+          "seconds": 0.327
+        }
+      ]
+    },
+    {
+      "case": "full-host",
+      "dit_seconds": 4.649,
+      "teacher_seconds": 0.456,
+      "student_seconds": 4.193,
+      "chunks": [
+        {
+          "request": 1,
+          "chunk": 1,
+          "frames": 39,
+          "seconds": 0.547
+        },
+        {
+          "request": 1,
+          "chunk": 2,
+          "frames": 34,
+          "seconds": 0.513
+        },
+        {
+          "request": 1,
+          "chunk": 3,
+          "frames": 34,
+          "seconds": 0.553
+        },
+        {
+          "request": 1,
+          "chunk": 4,
+          "frames": 17,
+          "seconds": 0.331
+        },
+        {
+          "request": 2,
+          "chunk": 1,
+          "frames": 34,
+          "seconds": 0.572
+        },
+        {
+          "request": 2,
+          "chunk": 2,
+          "frames": 34,
+          "seconds": 0.58
+        },
+        {
+          "request": 2,
+          "chunk": 3,
+          "frames": 34,
+          "seconds": 0.594
+        },
+        {
+          "request": 2,
+          "chunk": 4,
+          "frames": 17,
+          "seconds": 0.331
+        }
+      ]
+    },
+    {
+      "case": "10s-repeat1",
+      "dit_seconds": 4.643,
+      "teacher_seconds": 0.454,
+      "student_seconds": 4.189,
+      "chunks": [
+        {
+          "request": 1,
+          "chunk": 1,
+          "frames": 39,
+          "seconds": 0.543
+        },
+        {
+          "request": 1,
+          "chunk": 2,
+          "frames": 34,
+          "seconds": 0.516
+        },
+        {
+          "request": 1,
+          "chunk": 3,
+          "frames": 34,
+          "seconds": 0.549
+        },
+        {
+          "request": 1,
+          "chunk": 4,
+          "frames": 17,
+          "seconds": 0.33
+        },
+        {
+          "request": 2,
+          "chunk": 1,
+          "frames": 34,
+          "seconds": 0.57
+        },
+        {
+          "request": 2,
+          "chunk": 2,
+          "frames": 34,
+          "seconds": 0.578
+        },
+        {
+          "request": 2,
+          "chunk": 3,
+          "frames": 34,
+          "seconds": 0.593
+        },
+        {
+          "request": 2,
+          "chunk": 4,
+          "frames": 17,
+          "seconds": 0.331
+        }
+      ]
+    },
+    {
+      "case": "10s-repeat2",
+      "dit_seconds": 4.66,
+      "teacher_seconds": 0.466,
+      "student_seconds": 4.194,
+      "chunks": [
+        {
+          "request": 1,
+          "chunk": 1,
+          "frames": 39,
+          "seconds": 0.544
+        },
+        {
+          "request": 1,
+          "chunk": 2,
+          "frames": 34,
+          "seconds": 0.512
+        },
+        {
+          "request": 1,
+          "chunk": 3,
+          "frames": 34,
+          "seconds": 0.553
+        },
+        {
+          "request": 1,
+          "chunk": 4,
+          "frames": 17,
+          "seconds": 0.334
+        },
+        {
+          "request": 2,
+          "chunk": 1,
+          "frames": 34,
+          "seconds": 0.574
+        },
+        {
+          "request": 2,
+          "chunk": 2,
+          "frames": 34,
+          "seconds": 0.576
+        },
+        {
+          "request": 2,
+          "chunk": 3,
+          "frames": 34,
+          "seconds": 0.597
+        },
+        {
+          "request": 2,
+          "chunk": 4,
+          "frames": 17,
+          "seconds": 0.331
+        }
+      ]
+    },
+    {
+      "case": "5s-cold",
+      "dit_seconds": 9.818,
+      "teacher_seconds": 7.807,
+      "student_seconds": 2.011,
+      "chunks": [
+        {
+          "request": 1,
+          "chunk": 1,
+          "frames": 39,
+          "seconds": 0.538
+        },
+        {
+          "request": 1,
+          "chunk": 2,
+          "frames": 34,
+          "seconds": 0.51
+        },
+        {
+          "request": 1,
+          "chunk": 3,
+          "frames": 34,
+          "seconds": 0.549
+        },
+        {
+          "request": 1,
+          "chunk": 4,
+          "frames": 17,
+          "seconds": 0.328
+        }
+      ]
+    },
+    {
+      "case": "5s-warm1",
+      "dit_seconds": 2.255,
+      "teacher_seconds": 0.229,
+      "student_seconds": 2.026,
+      "chunks": [
+        {
+          "request": 1,
+          "chunk": 1,
+          "frames": 39,
+          "seconds": 0.542
+        },
+        {
+          "request": 1,
+          "chunk": 2,
+          "frames": 34,
+          "seconds": 0.514
+        },
+        {
+          "request": 1,
+          "chunk": 3,
+          "frames": 34,
+          "seconds": 0.551
+        },
+        {
+          "request": 1,
+          "chunk": 4,
+          "frames": 17,
+          "seconds": 0.332
+        }
+      ]
+    },
+    {
+      "case": "5s-warm2",
+      "dit_seconds": 2.262,
+      "teacher_seconds": 0.225,
+      "student_seconds": 2.037,
+      "chunks": [
+        {
+          "request": 1,
+          "chunk": 1,
+          "frames": 39,
+          "seconds": 0.539
+        },
+        {
+          "request": 1,
+          "chunk": 2,
+          "frames": 34,
+          "seconds": 0.514
+        },
+        {
+          "request": 1,
+          "chunk": 3,
+          "frames": 34,
+          "seconds": 0.551
+        },
+        {
+          "request": 1,
+          "chunk": 4,
+          "frames": 17,
+          "seconds": 0.332
+        }
+      ]
+    },
+    {
+      "case": "5s-warm3",
+      "dit_seconds": 2.249,
+      "teacher_seconds": 0.224,
+      "student_seconds": 2.025,
+      "chunks": [
+        {
+          "request": 1,
+          "chunk": 1,
+          "frames": 39,
+          "seconds": 0.54
+        },
+        {
+          "request": 1,
+          "chunk": 2,
+          "frames": 34,
+          "seconds": 0.516
+        },
+        {
+          "request": 1,
+          "chunk": 3,
+          "frames": 34,
+          "seconds": 0.553
+        },
+        {
+          "request": 1,
+          "chunk": 4,
+          "frames": 17,
+          "seconds": 0.331
+        }
+      ]
+    }
+  ]
+}

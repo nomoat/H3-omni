@@ -103,9 +103,11 @@ LoRA down projections use a fixed row tile because cuBLAS otherwise changes
 its accumulation order with the per-GPU row count; this small local change can
 produce a large change after the distilled model's three steps.
 
-`tests/live/resident.sbatch` runs complete audio/video generation on one or two
-H200s. It checks small and 864x480 canvases, repeated resident requests, and
-GPU-versus-host sampling. The last three MP4 files must match byte for byte.
+`tests/live/resident.sbatch` runs complete audio/video generation on the
+requested number of H200s. Set `H3_LIVE_BENCHMARK=1` to add three warm
+measurements each at 124 and 243 frames. It checks small and 864x480 canvases,
+repeated resident requests, and GPU-versus-host sampling. All repetitions at
+the same resolution and duration must match byte for byte.
 Measurements and artifacts are recorded with the completed validation run.
 
 ### H200 result, 2026-10-12
@@ -117,20 +119,60 @@ VAE decoding and MP4 encoding:
 | --- | --- | --- | --- |
 | 1 H200 | 37.41 s | 21.27 s | 21.42 s |
 | 2 H200, Ulysses | 28.46 s | 12.93 s | 13.19 s |
+| 4 H200, Ulysses | 24.25 s | 8.38-8.87 s (three runs) | 8.60 s |
 
-All six full-size MP4 files (cold/warm/host sampler on each GPU count) are
-byte-identical. The small-case video/audio latents and decoded outputs also
+The six full-size MP4 files from one and two GPUs (cold/warm/host sampler)
+are byte-identical. The small-case video/audio latents and decoded outputs also
 match exactly between one and two GPUs. The sample was inspected around
 chunk boundaries and the first request boundary; appearance stayed consistent.
 
 These are individual measurements, not a latency distribution. The initial
 small request includes model loading from shared storage and takes minutes.
-The two-GPU warm result is still slower than playback. This release validates
-chunk generation and continuity; it does not yet provide a real-time broadcast
-service. The current API retains its 362-frame limit (three requests).
+Two GPUs are slower than playback. Four GPUs are faster than playback in
+these short warm runs, but this does not validate a sustained live broadcast.
+The runtime still decodes after latent generation and resets history between
+independent calls; continuous serving needs persistent cross-call history,
+streamed decode/output and buffering. The current API retains its 362-frame limit (three requests).
 
 The regression job passed 69 existing CUDA primitive cases, six rectangular
 attention cases, eight released-adapter projection cases plus the FP32 sampler,
 and 21 exact sharding checks. The three checkpoint modes load successfully,
 and a mismatched `--mode` is rejected. See
 [`tests/live/evidence`](../tests/live/evidence/) for measurements and checks.
+
+### Four-GPU follow-up (job 15202)
+
+The runtime is unchanged from `1a1f588`. On `gpu-h200x8-0`, four H200s and
+32 allocated CPU threads ran ten complete generations in one resident process.
+The benchmark adds three warm runs at each duration:
+
+| Frames / playback | Warm wall time | Median | Playback / generation speed |
+| --- | --- | --- | --- |
+| 124 / 5.167 s | 4.47-4.63 s | 4.52 s | 1.14x |
+| 243 / 10.125 s | 8.38-8.87 s | 8.62 s | 1.17x |
+
+Times include audio guidance, video generation, both VAEs and MP4 encoding.
+The first small request takes 145.21 s including loading; the first full-size
+10-second and 5-second cases take 24.25 s and 19.67 s. Warm speed requires a
+resident, prepared process. Three runs on one prompt are not a long-running
+stability or quality evaluation.
+
+All repetitions within the four-GPU configuration match byte for byte,
+including host-versus-GPU sampling, and all ten MP4 files decode successfully.
+Four-GPU outputs do **not** match the one/two-GPU outputs byte for byte.
+An isolated projection probe reproduces shape-dependent cuBLAS accumulation
+changes in the base MLP FC2 when splitting the small sequence four ways;
+attention split from 56 to 14 heads remains exact. The small-case final audio
+and video latent relative L2 differences are 0.232 and 0.272. End-to-end
+amplification cannot be judged by the small local projection error alone.
+This follow-up records the difference without changing the runtime. Strict
+cross-GPU-count parity for four GPUs remains open. Full-size frame inspection
+around chunk and request boundaries shows consistent appearance in this sample.
+
+Evidence: [`tests/live/evidence/15202`](../tests/live/evidence/15202/).
+To repeat using the documented build cache:
+
+```sh
+sbatch --export=ALL --nodelist=gpu-h200x8-0 tests/live/benchmark.sbatch \
+  /home/cj/h3-live/build-cache-15182.tar /home/cj/h3-live/benchmark-4gpu.tar
+```

@@ -1,0 +1,10 @@
+{"case":"small","width":256,"height":256,"frames":243,"seconds":145.208022}
+{"case":"full-cold","width":864,"height":480,"frames":243,"seconds":24.254079}
+{"case":"full-warm","width":864,"height":480,"frames":243,"seconds":8.870986}
+{"case":"full-host","width":864,"height":480,"frames":243,"seconds":8.598809}
+{"case":"10s-repeat1","width":864,"height":480,"frames":243,"seconds":8.622497}
+{"case":"10s-repeat2","width":864,"height":480,"frames":243,"seconds":8.382720}
+{"case":"5s-cold","width":864,"height":480,"frames":124,"seconds":19.667870}
+{"case":"5s-warm1","width":864,"height":480,"frames":124,"seconds":4.469780}
+{"case":"5s-warm2","width":864,"height":480,"frames":124,"seconds":4.518223}
+{"case":"5s-warm3","width":864,"height":480,"frames":124,"seconds":4.633644}

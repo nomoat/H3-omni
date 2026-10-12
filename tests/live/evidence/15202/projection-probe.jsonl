@@ -1,0 +1,19 @@
+{"k": 5376, "out": 21504, "parts": 2, "tile": 240, "equal": true, "rel": 0.0}
+{"k": 5376, "out": 21504, "parts": 4, "tile": 120, "equal": true, "rel": 0.0}
+{"k": 5376, "out": 21504, "parts": 4, "tile": 256, "equal": true, "rel": 0.0}
+{"k": 7168, "out": 5376, "parts": 2, "tile": 240, "equal": true, "rel": 0.0}
+{"k": 7168, "out": 5376, "parts": 4, "tile": 120, "equal": true, "rel": 0.0}
+{"k": 7168, "out": 5376, "parts": 4, "tile": 256, "equal": true, "rel": 0.0}
+{"k": 5376, "out": 28672, "parts": 2, "tile": 240, "equal": true, "rel": 0.0}
+{"k": 5376, "out": 28672, "parts": 4, "tile": 120, "equal": true, "rel": 0.0}
+{"k": 5376, "out": 28672, "parts": 4, "tile": 256, "equal": true, "rel": 0.0}
+{"k": 14336, "out": 5376, "parts": 2, "tile": 240, "equal": true, "rel": 0.0}
+{"k": 14336, "out": 5376, "parts": 4, "tile": 120, "equal": false, "rel": 0.0002447195292916149}
+{"k": 14336, "out": 5376, "parts": 4, "tile": 256, "equal": false, "rel": 0.00022000662283971906}
+{"attention": [479, 479], "equal": true, "rel": 0.0}
+{"attention": [543, 543], "equal": true, "rel": 0.0}
+{"attention": [7, 7], "equal": true, "rel": 0.0}
+{"attention": [898, 963], "equal": true, "rel": 0.0}
+{"attention": [640, 3100], "equal": true, "rel": 0.0}
+{"attention": [4860, 4925], "equal": true, "rel": 0.0}
+{"attention": [4050, 13188], "equal": true, "rel": 0.0}

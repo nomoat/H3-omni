@@ -216,3 +216,20 @@ both GPU counts produce identical MP4 bytes. This is not yet real-time, and
 the current interface retains the 15-second request limit and whole-sequence
 decode. It does not add a broadcast transport or cross-call stream session.
 See `cuda/LIVE.md` and `tests/live/evidence/` for commands and measurements.
+
+
+### Four H200s, job 15202
+
+Runtime `1a1f588`, unchanged: 864x480 with audio and MP4, three warm GPU-sampler
+runs per duration. 124 frames: 4.470/4.518/4.634 s. 243 frames:
+8.871/8.622/8.383 s. Median speed is 1.14x/1.17x playback. This meets short-run
+real-time throughput with limited margin; persistent live sessions, streaming
+decode/output and long-running stability remain unvalidated.
+
+Four-GPU repeat/host-sampler output is deterministic. Cross-count parity fails:
+small-case audio/video latent relative L2 against two GPUs is 0.232/0.272.
+A one-GPU isolation probe reproduces four-way shape-dependent rounding in base
+MLP FC2 (K=14336, N=5376); 56-to-14-head attention stays exact. The runtime was
+not changed in this benchmark. The full-size sample stays visually continuous,
+but no strict cross-count parity or broad quality claim is made. See
+`tests/live/evidence/15202/` for complete timings, hashes, comparisons and probe.

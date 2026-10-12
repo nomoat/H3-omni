@@ -1,0 +1,14 @@
+{
+  "full_video_decoded_rgb": {
+    "relative_l2": 0.1808019719584848,
+    "mean_abs_8bit": 14.256976730263213,
+    "max_abs_8bit": 223,
+    "changed_fraction": 0.9520966763302512
+  },
+  "full_audio_decoded_pcm": {
+    "equal": false,
+    "relative_l2": 0.34622402699412613
+  },
+  "small_video_latent_relative_l2": 0.2723705402797002,
+  "small_audio_latent_relative_l2": 0.23200365174794352
+}

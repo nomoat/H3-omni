@@ -7,6 +7,7 @@
 #SBATCH --time=01:00:00
 #SBATCH --output=/home/cj/h3-live/resident-%j.log
 # Usage: sbatch resident.sbatch SOURCE_TAR GPU_COUNT [EXISTING_STAGE]
+# Export H3_LIVE_BENCHMARK=1 for repeated warm 5-second and 10-second timings.
 set -euo pipefail
 LIVE_STAGE=${3:-/var/tmp/h3-live-$SLURM_JOB_ID}
 LIVE_RESULT=/home/cj/h3-live/results/$SLURM_JOB_ID
@@ -33,5 +34,12 @@ build-cuda/h3_live_resident /data0/models/h3-taomate/native "$2" > "$2/timing.js
 sha256sum "$2"/*.mp4 | tee "$2/mp4.sha256"
 cmp "$2/full-cold.mp4" "$2/full-warm.mp4"
 cmp "$2/full-warm.mp4" "$2/full-host.mp4"
+if [ -n "${H3_LIVE_BENCHMARK:-}" ]; then
+ cmp "$2/full-warm.mp4" "$2/10s-repeat1.mp4"
+ cmp "$2/full-warm.mp4" "$2/10s-repeat2.mp4"
+ for name in 5s-warm1 5s-warm2 5s-warm3; do
+  cmp "$2/5s-cold.mp4" "$2/$name.mp4"
+ done
+fi
 cat "$2/timing.jsonl"
 RUN

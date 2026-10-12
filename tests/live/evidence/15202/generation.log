@@ -1,0 +1,180 @@
+h3: resident text encoder loaded
+h3: conditioning cache miss; stored exact BF16
+h3: prepared DiT cache miss; model retained
+h3: live audio teacher: 2 requests, 18 forwards, 17.327s
+h3: live clean commit 1: 898 retained media tokens per layer, 14 heads per GPU
+h3: live request 1 chunk 1: 39 frames, 3 noisy + 1 clean, 0.213s
+h3: live clean commit 2: 1652 retained media tokens per layer, 14 heads per GPU
+h3: live request 1 chunk 2: 34 frames, 3 noisy + 1 clean, 0.161s
+h3: live clean commit 3: 2274 retained media tokens per layer, 14 heads per GPU
+h3: live request 1 chunk 3: 34 frames, 3 noisy + 1 clean, 0.147s
+h3: live clean commit 4: 1898 retained media tokens per layer, 14 heads per GPU
+h3: live request 1 chunk 4: 17 frames, 3 noisy + 1 clean, 0.143s
+h3: live clean commit 5: 1898 retained media tokens per layer, 14 heads per GPU
+h3: live request 2 chunk 1: 34 frames, 3 noisy + 1 clean, 0.142s
+h3: live clean commit 6: 2274 retained media tokens per layer, 14 heads per GPU
+h3: live request 2 chunk 2: 34 frames, 3 noisy + 1 clean, 0.142s
+h3: live clean commit 7: 2276 retained media tokens per layer, 14 heads per GPU
+h3: live request 2 chunk 3: 34 frames, 3 noisy + 1 clean, 0.143s
+h3: live clean commit 8: 1898 retained media tokens per layer, 14 heads per GPU
+h3: live request 2 chunk 4: 17 frames, 3 noisy + 1 clean, 0.133s
+h3: live DiT total 26.477s (audio 17.327s, video 9.150s), 8 clean commits
+h3: resident audio VAE loaded
+h3: video VAE cache miss; decoder retained
+h3: conditioning cache hit
+h3: resident DiT rebound to new request
+h3: live audio teacher: 2 requests, 18 forwards, 8.148s
+h3: live clean commit 1: 4990 retained media tokens per layer, 14 heads per GPU
+h3: live request 1 chunk 1: 39 frames, 3 noisy + 1 clean, 0.680s
+h3: live clean commit 2: 9154 retained media tokens per layer, 14 heads per GPU
+h3: live request 1 chunk 2: 34 frames, 3 noisy + 1 clean, 0.531s
+h3: live clean commit 3: 13186 retained media tokens per layer, 14 heads per GPU
+h3: live request 1 chunk 3: 34 frames, 3 noisy + 1 clean, 0.549s
+h3: live clean commit 4: 11105 retained media tokens per layer, 14 heads per GPU
+h3: live request 1 chunk 4: 17 frames, 3 noisy + 1 clean, 0.340s
+h3: live clean commit 5: 11105 retained media tokens per layer, 14 heads per GPU
+h3: live request 2 chunk 1: 34 frames, 3 noisy + 1 clean, 0.566s
+h3: live clean commit 6: 13186 retained media tokens per layer, 14 heads per GPU
+h3: live request 2 chunk 2: 34 frames, 3 noisy + 1 clean, 0.569s
+h3: live clean commit 7: 13188 retained media tokens per layer, 14 heads per GPU
+h3: live request 2 chunk 3: 34 frames, 3 noisy + 1 clean, 0.590s
+h3: live clean commit 8: 11105 retained media tokens per layer, 14 heads per GPU
+h3: live request 2 chunk 4: 17 frames, 3 noisy + 1 clean, 0.334s
+h3: live DiT total 12.542s (audio 8.148s, video 4.394s), 8 clean commits
+h3: video VAE cache hit
+h3: conditioning cache hit
+h3: prepared DiT cache hit
+h3: live audio teacher: 2 requests, 18 forwards, 0.457s
+h3: live clean commit 1: 4990 retained media tokens per layer, 14 heads per GPU
+h3: live request 1 chunk 1: 39 frames, 3 noisy + 1 clean, 0.546s
+h3: live clean commit 2: 9154 retained media tokens per layer, 14 heads per GPU
+h3: live request 1 chunk 2: 34 frames, 3 noisy + 1 clean, 0.511s
+h3: live clean commit 3: 13186 retained media tokens per layer, 14 heads per GPU
+h3: live request 1 chunk 3: 34 frames, 3 noisy + 1 clean, 0.551s
+h3: live clean commit 4: 11105 retained media tokens per layer, 14 heads per GPU
+h3: live request 1 chunk 4: 17 frames, 3 noisy + 1 clean, 0.331s
+h3: live clean commit 5: 11105 retained media tokens per layer, 14 heads per GPU
+h3: live request 2 chunk 1: 34 frames, 3 noisy + 1 clean, 0.566s
+h3: live clean commit 6: 13186 retained media tokens per layer, 14 heads per GPU
+h3: live request 2 chunk 2: 34 frames, 3 noisy + 1 clean, 0.573s
+h3: live clean commit 7: 13188 retained media tokens per layer, 14 heads per GPU
+h3: live request 2 chunk 3: 34 frames, 3 noisy + 1 clean, 0.593s
+h3: live clean commit 8: 11105 retained media tokens per layer, 14 heads per GPU
+h3: live request 2 chunk 4: 17 frames, 3 noisy + 1 clean, 0.327s
+h3: live DiT total 4.672s (audio 0.457s, video 4.215s), 8 clean commits
+h3: video VAE cache hit
+h3: conditioning cache hit
+h3: prepared DiT cache hit
+h3: live audio teacher: 2 requests, 18 forwards, 0.456s
+h3: live clean commit 1: 4990 retained media tokens per layer, 14 heads per GPU
+h3: live request 1 chunk 1: 39 frames, 3 noisy + 1 clean, 0.547s
+h3: live clean commit 2: 9154 retained media tokens per layer, 14 heads per GPU
+h3: live request 1 chunk 2: 34 frames, 3 noisy + 1 clean, 0.513s
+h3: live clean commit 3: 13186 retained media tokens per layer, 14 heads per GPU
+h3: live request 1 chunk 3: 34 frames, 3 noisy + 1 clean, 0.553s
+h3: live clean commit 4: 11105 retained media tokens per layer, 14 heads per GPU
+h3: live request 1 chunk 4: 17 frames, 3 noisy + 1 clean, 0.331s
+h3: live clean commit 5: 11105 retained media tokens per layer, 14 heads per GPU
+h3: live request 2 chunk 1: 34 frames, 3 noisy + 1 clean, 0.572s
+h3: live clean commit 6: 13186 retained media tokens per layer, 14 heads per GPU
+h3: live request 2 chunk 2: 34 frames, 3 noisy + 1 clean, 0.580s
+h3: live clean commit 7: 13188 retained media tokens per layer, 14 heads per GPU
+h3: live request 2 chunk 3: 34 frames, 3 noisy + 1 clean, 0.594s
+h3: live clean commit 8: 11105 retained media tokens per layer, 14 heads per GPU
+h3: live request 2 chunk 4: 17 frames, 3 noisy + 1 clean, 0.331s
+h3: live DiT total 4.649s (audio 0.456s, video 4.193s), 8 clean commits
+h3: video VAE cache hit
+h3: conditioning cache hit
+h3: prepared DiT cache hit
+h3: live audio teacher: 2 requests, 18 forwards, 0.454s
+h3: live clean commit 1: 4990 retained media tokens per layer, 14 heads per GPU
+h3: live request 1 chunk 1: 39 frames, 3 noisy + 1 clean, 0.543s
+h3: live clean commit 2: 9154 retained media tokens per layer, 14 heads per GPU
+h3: live request 1 chunk 2: 34 frames, 3 noisy + 1 clean, 0.516s
+h3: live clean commit 3: 13186 retained media tokens per layer, 14 heads per GPU
+h3: live request 1 chunk 3: 34 frames, 3 noisy + 1 clean, 0.549s
+h3: live clean commit 4: 11105 retained media tokens per layer, 14 heads per GPU
+h3: live request 1 chunk 4: 17 frames, 3 noisy + 1 clean, 0.330s
+h3: live clean commit 5: 11105 retained media tokens per layer, 14 heads per GPU
+h3: live request 2 chunk 1: 34 frames, 3 noisy + 1 clean, 0.570s
+h3: live clean commit 6: 13186 retained media tokens per layer, 14 heads per GPU
+h3: live request 2 chunk 2: 34 frames, 3 noisy + 1 clean, 0.578s
+h3: live clean commit 7: 13188 retained media tokens per layer, 14 heads per GPU
+h3: live request 2 chunk 3: 34 frames, 3 noisy + 1 clean, 0.593s
+h3: live clean commit 8: 11105 retained media tokens per layer, 14 heads per GPU
+h3: live request 2 chunk 4: 17 frames, 3 noisy + 1 clean, 0.331s
+h3: live DiT total 4.643s (audio 0.454s, video 4.189s), 8 clean commits
+h3: video VAE cache hit
+h3: conditioning cache hit
+h3: prepared DiT cache hit
+h3: live audio teacher: 2 requests, 18 forwards, 0.466s
+h3: live clean commit 1: 4990 retained media tokens per layer, 14 heads per GPU
+h3: live request 1 chunk 1: 39 frames, 3 noisy + 1 clean, 0.544s
+h3: live clean commit 2: 9154 retained media tokens per layer, 14 heads per GPU
+h3: live request 1 chunk 2: 34 frames, 3 noisy + 1 clean, 0.512s
+h3: live clean commit 3: 13186 retained media tokens per layer, 14 heads per GPU
+h3: live request 1 chunk 3: 34 frames, 3 noisy + 1 clean, 0.553s
+h3: live clean commit 4: 11105 retained media tokens per layer, 14 heads per GPU
+h3: live request 1 chunk 4: 17 frames, 3 noisy + 1 clean, 0.334s
+h3: live clean commit 5: 11105 retained media tokens per layer, 14 heads per GPU
+h3: live request 2 chunk 1: 34 frames, 3 noisy + 1 clean, 0.574s
+h3: live clean commit 6: 13186 retained media tokens per layer, 14 heads per GPU
+h3: live request 2 chunk 2: 34 frames, 3 noisy + 1 clean, 0.576s
+h3: live clean commit 7: 13188 retained media tokens per layer, 14 heads per GPU
+h3: live request 2 chunk 3: 34 frames, 3 noisy + 1 clean, 0.597s
+h3: live clean commit 8: 11105 retained media tokens per layer, 14 heads per GPU
+h3: live request 2 chunk 4: 17 frames, 3 noisy + 1 clean, 0.331s
+h3: live DiT total 4.660s (audio 0.466s, video 4.194s), 8 clean commits
+h3: video VAE cache hit
+h3: conditioning cache hit
+h3: resident DiT rebound to new request
+h3: live audio teacher: 1 requests, 9 forwards, 7.807s
+h3: live clean commit 1: 4990 retained media tokens per layer, 14 heads per GPU
+h3: live request 1 chunk 1: 39 frames, 3 noisy + 1 clean, 0.538s
+h3: live clean commit 2: 9154 retained media tokens per layer, 14 heads per GPU
+h3: live request 1 chunk 2: 34 frames, 3 noisy + 1 clean, 0.510s
+h3: live clean commit 3: 13186 retained media tokens per layer, 14 heads per GPU
+h3: live request 1 chunk 3: 34 frames, 3 noisy + 1 clean, 0.549s
+h3: live clean commit 4: 11105 retained media tokens per layer, 14 heads per GPU
+h3: live request 1 chunk 4: 17 frames, 3 noisy + 1 clean, 0.328s
+h3: live DiT total 9.818s (audio 7.807s, video 2.011s), 4 clean commits
+h3: video VAE cache hit
+h3: conditioning cache hit
+h3: prepared DiT cache hit
+h3: live audio teacher: 1 requests, 9 forwards, 0.229s
+h3: live clean commit 1: 4990 retained media tokens per layer, 14 heads per GPU
+h3: live request 1 chunk 1: 39 frames, 3 noisy + 1 clean, 0.542s
+h3: live clean commit 2: 9154 retained media tokens per layer, 14 heads per GPU
+h3: live request 1 chunk 2: 34 frames, 3 noisy + 1 clean, 0.514s
+h3: live clean commit 3: 13186 retained media tokens per layer, 14 heads per GPU
+h3: live request 1 chunk 3: 34 frames, 3 noisy + 1 clean, 0.551s
+h3: live clean commit 4: 11105 retained media tokens per layer, 14 heads per GPU
+h3: live request 1 chunk 4: 17 frames, 3 noisy + 1 clean, 0.332s
+h3: live DiT total 2.255s (audio 0.229s, video 2.026s), 4 clean commits
+h3: video VAE cache hit
+h3: conditioning cache hit
+h3: prepared DiT cache hit
+h3: live audio teacher: 1 requests, 9 forwards, 0.225s
+h3: live clean commit 1: 4990 retained media tokens per layer, 14 heads per GPU
+h3: live request 1 chunk 1: 39 frames, 3 noisy + 1 clean, 0.539s
+h3: live clean commit 2: 9154 retained media tokens per layer, 14 heads per GPU
+h3: live request 1 chunk 2: 34 frames, 3 noisy + 1 clean, 0.514s
+h3: live clean commit 3: 13186 retained media tokens per layer, 14 heads per GPU
+h3: live request 1 chunk 3: 34 frames, 3 noisy + 1 clean, 0.551s
+h3: live clean commit 4: 11105 retained media tokens per layer, 14 heads per GPU
+h3: live request 1 chunk 4: 17 frames, 3 noisy + 1 clean, 0.332s
+h3: live DiT total 2.262s (audio 0.225s, video 2.037s), 4 clean commits
+h3: video VAE cache hit
+h3: conditioning cache hit
+h3: prepared DiT cache hit
+h3: live audio teacher: 1 requests, 9 forwards, 0.224s
+h3: live clean commit 1: 4990 retained media tokens per layer, 14 heads per GPU
+h3: live request 1 chunk 1: 39 frames, 3 noisy + 1 clean, 0.540s
+h3: live clean commit 2: 9154 retained media tokens per layer, 14 heads per GPU
+h3: live request 1 chunk 2: 34 frames, 3 noisy + 1 clean, 0.516s
+h3: live clean commit 3: 13186 retained media tokens per layer, 14 heads per GPU
+h3: live request 1 chunk 3: 34 frames, 3 noisy + 1 clean, 0.553s
+h3: live clean commit 4: 11105 retained media tokens per layer, 14 heads per GPU
+h3: live request 1 chunk 4: 17 frames, 3 noisy + 1 clean, 0.331s
+h3: live DiT total 2.249s (audio 0.224s, video 2.025s), 4 clean commits
+h3: video VAE cache hit
