@@ -1,4 +1,9 @@
-# H3-omni: H200 backend details
+# H3-omni: CUDA backend details
+
+This backend runs native H3 inference on NVIDIA GPUs. The recorded validation
+and benchmarks use H200. The current FA3 and VSA kernels target Hopper; see
+[hardware compatibility](../README.md#hardware-compatibility) before using
+another GPU architecture.
 
 [FastH3 Preview v1 support](FASTH3.md) is available as the optional `VSA=1`
 build, with its own converted checkpoint and four-step schedule.

@@ -14,9 +14,11 @@ live stream. The model logic, sampling, and session state live in C; GPU work
 uses CUDA and native libraries. The inference executable needs no Python,
 PyTorch, or libtorch runtime.
 
-The maintained backend targets **Linux and NVIDIA H200**, on one node with
-one or more GPUs. Recorded tests cover 1, 2, 4, and 8 H200s. The inherited Metal
-backend remains in the tree; its documentation is in [METAL.md](METAL.md).
+The CUDA backend is for **NVIDIA GPUs on Linux**, with single- and multi-GPU
+execution. We test and benchmark on H200, with recorded runs on 1, 2, 4, and
+8 GPUs. See [hardware compatibility](#hardware-compatibility) for the current
+kernel requirements. The inherited Metal backend remains in the tree; its
+documentation is in [METAL.md](METAL.md).
 
 ## Why this project exists
 
@@ -130,6 +132,14 @@ every part's timings, playback stalls, hashes, and source revisions.
 [Four-GPU short-clip timings](tests/live/evidence/15202/README.md) and
 [50-second continuity checks](tests/live/evidence/15225/README.md) are also available.
 
+## Hardware compatibility
+
+H200 is our test platform. The current optimized attention kernels target the
+NVIDIA Hopper architecture: FlashAttention-3 is compiled for `sm_90a`, and the
+FastH3 VSA adapter explicitly requires compute capability 9.x. Other NVIDIA
+architectures need compatible attention kernels and validation; changing
+`CUDA_ARCH` alone does not provide that support.
+
 ## Dependencies
 
 The core is written in C, with C++ and CUDA adapters for native libraries.
@@ -138,7 +148,7 @@ the GPU, tokenizer, and media libraries listed below.
 
 | Component | Required for |
 | --- | --- |
-| Linux, NVIDIA driver, CUDA 12.8 toolchain | Building and running the H200 backend |
+| Linux, NVIDIA driver, CUDA 12.8 toolchain | Building and running the CUDA backend |
 | C11 and C++17 compilers; C++20 for VSA | Native engine and GPU adapters |
 | cuBLAS / cuBLASLt, cuDNN 9, NCCL | GPU math and communication |
 | FlashAttention and CUTLASS headers | Compiled attention kernels |
@@ -155,10 +165,11 @@ path. Source preparation scripts verify downloaded archives by hash.
 
 ## Build and generate
 
-Install the native dependencies above, then build all three modes:
+Install the native dependencies above. This is the build configuration tested
+on H200 for all three modes:
 
 ```sh
-git clone https://github.com/zeroxaa/h3.c-cuda.git H3-omni
+git clone https://github.com/zeroxaa/H3-omni.git
 cd H3-omni
 
 python3 cuda/prepare_flash.py
