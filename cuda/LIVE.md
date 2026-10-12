@@ -238,8 +238,11 @@ prompt and seed over 49.79 seconds, not a long-running interactive broadcast.
 
 `h3_generate_live` uses the resident context, one prompt and 1–12 connected
 requests. `serve/live_server.py` exposes exactly 12 requests at `POST /v1/live`
-with the existing bearer-key scheme. `serve/h3-live.sbatch` starts the two-H200
-pilot on port 18961. A separate endpoint/key keeps it independent of FastH3.
+with the existing bearer-key scheme. `serve/h3-live.sbatch` starts the eight-H200
+pilot on port 18961. GPU count follows the Slurm allocation; smaller runs can
+override the partition, GPU, CPU and memory requests at submission. The adapter
+logs generation, prefix decode and encoding time for every returned part.
+A separate endpoint/key keeps it independent of FastH3.
 The response is a growing fragmented MP4 with H.264 constrained baseline 3.1
 and AAC-LC. One FFmpeg process spans all parts, with keyframes every second.
 Clients can append bytes to a browser MediaSource before generation completes.
@@ -269,3 +272,30 @@ cc -std=c11 -g -fsanitize=address,undefined -I. \
   tests/live/stream_lengths.c h3_live_stream.c -lm -o /tmp/h3-live-lengths-test
 /tmp/h3-live-lengths-test
 ```
+
+## Eight-GPU live service acceptance
+
+On 2026-10-12, job 15253 replaced the two-GPU service with eight H200s on
+`gpu-h200x8-2`, using source `1567d06`. The old FastH3 allocation (job 15140)
+was retired to free these GPUs; old live job 15243 was released after switching.
+The worker uses all eight devices and reports seven attention heads per GPU.
+
+Two complete browser sessions returned all 1,433 frames and decoded without
+errors. The first request after the single-part startup warmup became playable
+at 18.59 seconds and completed at 83.60 seconds. A repeated prompt became
+playable at 2.37 seconds and completed at 60.04 seconds. Browser acceptance
+also checked Stop and mobile layout. Auth0 was mocked only in a loopback
+fixture; this was Chromium on Linux, not an iPhone hardware test.
+
+Warm generation averages about 1.54 seconds per part, but prefix decoding
+grows from about 0.5 seconds to 5.55 seconds. The final part takes 7.61 seconds
+including generation and encoding. The warm browser session still stalls
+twice, near video seconds 48 and 53, for 3.84 seconds total. Eight GPUs improve
+throughput substantially but do not eliminate the repeated-decode bottleneck.
+The older two-GPU acceptance took 173.99 seconds; different cache state and
+random seeds mean this is not a controlled scaling benchmark.
+
+The [acceptance record](../tests/live/evidence/15253/acceptance.json) includes
+every part's generation/decode/encode timing, source and archive checksums,
+download hashes, browser results and deployment provenance. Recorded MP4s and
+browser traces remain at the artifact directory listed in that record.

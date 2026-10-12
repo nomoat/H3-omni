@@ -1,0 +1,311 @@
+{
+  "date": "2026-10-12",
+  "gpu_source": "1567d069e49b8f5ca19aee930ce34b5716d140c0",
+  "api_web_source": "51faeec",
+  "image": "sha256:97156713f7a80d0d8e5e8fc505f6291944faee17ffe442c7c2c2124b374220b4",
+  "job": 15253,
+  "node": "gpu-h200x8-2",
+  "partition": "train",
+  "gpus": 8,
+  "cpus": 32,
+  "memory_gib": 600,
+  "gpu_evidence": "Slurm assigns GPUs 0-7, worker opens all eight devices, native runtime reports 7 attention heads per GPU (56 total). An overlapping diagnostic Slurm step saw a four-GPU subset; that is not the serving process.",
+  "overlay_sha256": "7f04571b35063502fed47cbacd97cead98438980049adde9fbb8042bf9be4c1a",
+  "cache_sha256": "a2a5baf02db88f2810f8782c58d0eab35531ee74c8fbbfe2e703a8691fbdf3df",
+  "retired_jobs": [
+    15140,
+    15243
+  ],
+  "preserved_jobs": [
+    11232,
+    11233
+  ],
+  "baseline_two_gpu": {
+    "first_playable_seconds": 20.789,
+    "complete_seconds": 173.985,
+    "scope": "Prior first-request browser acceptance, same prompt and duration; random seeds and cache state differ. Not a controlled scaling benchmark."
+  },
+  "runs": [
+    {
+      "first_playable_seconds": 18.58631282299757,
+      "complete_seconds": 83.5977814970538,
+      "first_playable_before_complete": true,
+      "media": {
+        "duration": 59.740396,
+        "currentTime": 53.326165,
+        "width": 864,
+        "height": 480,
+        "error": null
+      },
+      "download_bytes": 17205874,
+      "stop_ui_passed": true,
+      "mobile_no_overflow": true,
+      "browser_errors": [],
+      "auth": "loopback fixture; production Auth0 not exercised",
+      "label": "first_after_single_part_warmup",
+      "stalls": [
+        {
+          "media_seconds": 3.936085,
+          "duration_seconds": 6.5157
+        },
+        {
+          "media_seconds": 42.94408,
+          "duration_seconds": 0.4396
+        },
+        {
+          "media_seconds": 47.936068,
+          "duration_seconds": 2.0321
+        },
+        {
+          "media_seconds": 52.960071,
+          "duration_seconds": 2.5532
+        }
+      ],
+      "stall_seconds": 11.5406,
+      "phases": [
+        {
+          "part": 1,
+          "generate_seconds": 9.458,
+          "decode_seconds": 0.521,
+          "encode_seconds": 0.337,
+          "total_seconds": 10.316,
+          "emitted_frames": 100
+        },
+        {
+          "part": 2,
+          "generate_seconds": 9.456,
+          "decode_seconds": 0.975,
+          "encode_seconds": 0.329,
+          "total_seconds": 10.759,
+          "emitted_frames": 219
+        },
+        {
+          "part": 3,
+          "generate_seconds": 1.531,
+          "decode_seconds": 1.423,
+          "encode_seconds": 0.319,
+          "total_seconds": 3.273,
+          "emitted_frames": 338
+        },
+        {
+          "part": 4,
+          "generate_seconds": 1.555,
+          "decode_seconds": 1.881,
+          "encode_seconds": 0.356,
+          "total_seconds": 3.792,
+          "emitted_frames": 457
+        },
+        {
+          "part": 5,
+          "generate_seconds": 1.543,
+          "decode_seconds": 2.345,
+          "encode_seconds": 0.367,
+          "total_seconds": 4.255,
+          "emitted_frames": 576
+        },
+        {
+          "part": 6,
+          "generate_seconds": 1.522,
+          "decode_seconds": 2.793,
+          "encode_seconds": 0.373,
+          "total_seconds": 4.688,
+          "emitted_frames": 695
+        },
+        {
+          "part": 7,
+          "generate_seconds": 1.532,
+          "decode_seconds": 3.271,
+          "encode_seconds": 0.381,
+          "total_seconds": 5.184,
+          "emitted_frames": 814
+        },
+        {
+          "part": 8,
+          "generate_seconds": 1.54,
+          "decode_seconds": 3.72,
+          "encode_seconds": 0.363,
+          "total_seconds": 5.623,
+          "emitted_frames": 933
+        },
+        {
+          "part": 9,
+          "generate_seconds": 1.526,
+          "decode_seconds": 4.197,
+          "encode_seconds": 0.398,
+          "total_seconds": 6.121,
+          "emitted_frames": 1052
+        },
+        {
+          "part": 10,
+          "generate_seconds": 1.535,
+          "decode_seconds": 4.642,
+          "encode_seconds": 0.359,
+          "total_seconds": 6.536,
+          "emitted_frames": 1171
+        },
+        {
+          "part": 11,
+          "generate_seconds": 1.547,
+          "decode_seconds": 5.108,
+          "encode_seconds": 0.317,
+          "total_seconds": 6.972,
+          "emitted_frames": 1290
+        },
+        {
+          "part": 12,
+          "generate_seconds": 1.526,
+          "decode_seconds": 5.556,
+          "encode_seconds": 0.46,
+          "total_seconds": 7.543,
+          "emitted_frames": 1433
+        }
+      ],
+      "download_sha256": "dd2f64a6addc6dabccd0ee488428114bcb5bdaa37f687965c2c1a7e0cccdb524",
+      "decoded_frames": 1433,
+      "decode_errors_bytes": 0
+    },
+    {
+      "first_playable_seconds": 2.3704859064891934,
+      "complete_seconds": 60.03806508984417,
+      "first_playable_before_complete": true,
+      "media": {
+        "duration": 59.740396,
+        "currentTime": 53.704862,
+        "width": 864,
+        "height": 480,
+        "error": null
+      },
+      "download_bytes": 18399944,
+      "stop_ui_passed": true,
+      "mobile_no_overflow": true,
+      "browser_errors": [],
+      "auth": "loopback fixture; production Auth0 not exercised",
+      "label": "warm_same_prompt",
+      "stalls": [
+        {
+          "media_seconds": 47.936074,
+          "duration_seconds": 1.4377
+        },
+        {
+          "media_seconds": 52.960068,
+          "duration_seconds": 2.4047
+        }
+      ],
+      "stall_seconds": 3.8424,
+      "phases": [
+        {
+          "part": 1,
+          "generate_seconds": 1.471,
+          "decode_seconds": 0.519,
+          "encode_seconds": 0.339,
+          "total_seconds": 2.329,
+          "emitted_frames": 100
+        },
+        {
+          "part": 2,
+          "generate_seconds": 1.551,
+          "decode_seconds": 0.961,
+          "encode_seconds": 0.351,
+          "total_seconds": 2.863,
+          "emitted_frames": 219
+        },
+        {
+          "part": 3,
+          "generate_seconds": 1.565,
+          "decode_seconds": 1.428,
+          "encode_seconds": 0.401,
+          "total_seconds": 3.394,
+          "emitted_frames": 338
+        },
+        {
+          "part": 4,
+          "generate_seconds": 1.55,
+          "decode_seconds": 1.878,
+          "encode_seconds": 0.4,
+          "total_seconds": 3.828,
+          "emitted_frames": 457
+        },
+        {
+          "part": 5,
+          "generate_seconds": 1.54,
+          "decode_seconds": 2.341,
+          "encode_seconds": 0.358,
+          "total_seconds": 4.239,
+          "emitted_frames": 576
+        },
+        {
+          "part": 6,
+          "generate_seconds": 1.549,
+          "decode_seconds": 2.79,
+          "encode_seconds": 0.372,
+          "total_seconds": 4.712,
+          "emitted_frames": 695
+        },
+        {
+          "part": 7,
+          "generate_seconds": 1.542,
+          "decode_seconds": 3.256,
+          "encode_seconds": 0.357,
+          "total_seconds": 5.155,
+          "emitted_frames": 814
+        },
+        {
+          "part": 8,
+          "generate_seconds": 1.54,
+          "decode_seconds": 3.738,
+          "encode_seconds": 0.349,
+          "total_seconds": 5.628,
+          "emitted_frames": 933
+        },
+        {
+          "part": 9,
+          "generate_seconds": 1.548,
+          "decode_seconds": 4.172,
+          "encode_seconds": 0.383,
+          "total_seconds": 6.103,
+          "emitted_frames": 1052
+        },
+        {
+          "part": 10,
+          "generate_seconds": 1.539,
+          "decode_seconds": 4.649,
+          "encode_seconds": 0.438,
+          "total_seconds": 6.626,
+          "emitted_frames": 1171
+        },
+        {
+          "part": 11,
+          "generate_seconds": 1.526,
+          "decode_seconds": 5.111,
+          "encode_seconds": 0.335,
+          "total_seconds": 6.971,
+          "emitted_frames": 1290
+        },
+        {
+          "part": 12,
+          "generate_seconds": 1.542,
+          "decode_seconds": 5.552,
+          "encode_seconds": 0.519,
+          "total_seconds": 7.613,
+          "emitted_frames": 1433
+        }
+      ],
+      "download_sha256": "4a7760af3ba314099a1dc0473ab8ee2be0903595089732e1a6ab7f358fafe2f9",
+      "decoded_frames": 1433,
+      "decode_errors_bytes": 0
+    }
+  ],
+  "checks": {
+    "adapter_asan_ubsan": "all 12 endpoints and cancellation passed",
+    "gpu_service_cpu_tests": 3,
+    "api_live_proxy_tests": 5,
+    "api_typecheck": "passed",
+    "public_assets_match_source": true,
+    "public_health_ready": true,
+    "public_live_without_auth": 401,
+    "fast_video_tunnel": "disabled and inactive",
+    "deferred_model_selection_change": "not deployed"
+  },
+  "scope": "Two complete browser sessions with real eight-GPU generation, repeated fixed prompt and different random seeds. Auth0 mocked only in a loopback fixture. Linux Chromium, not iPhone hardware. Playback stalls exclude initial startup and are observed until response completion. No broad quality or sustained real-time claim.",
+  "artifact_directory": "/home/homo/model/srp/AutoGrad-lb/run/h3-live-8gpu"
+}
