@@ -1,0 +1,11 @@
+h3-cuda 0.1.0-dev
+Device: NVIDIA H200 (CUDA sm_90)
+  physical memory       1889.8 GiB
+  recommended GPU set   139.8 GiB
+  GPU memory            139.8 GiB
+Native checkpoint inventory (header-only):
+  Qwen3-VL encoder   14 files  1058 tensors   62.133 GiB
+  FL2VA DiT          14 files   951 tensors   62.884 GiB
+  Ref2VA DiT         13 files   535 tensors   61.728 GiB
+  video VAE           1 files   560 tensors    9.700 GiB
+  audio VAE           1 files  1087 tensors    0.564 GiB

@@ -31,7 +31,7 @@ class Native:
             return C.c_void_p
         return {"int": C.c_int, "float": C.c_float, "size_t": C.c_size_t,
                 "uint32_t": C.c_uint32, "uint64_t": C.c_uint64,
-                "h3_gpu_dtype": C.c_int, "void": None}[t]
+                "long long": C.c_longlong, "h3_gpu_dtype": C.c_int, "void": None}[t]
 
     def call(self, name, *args):
         result = getattr(self.lib, "h3_gpu_" + name)(self.gpu, *args)

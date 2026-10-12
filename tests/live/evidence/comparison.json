@@ -1,0 +1,123 @@
+{
+  "single_job": 15191,
+  "dual_job": 15192,
+  "arrays": [
+    {
+      "name": "audio_latent.f32",
+      "elements": 25920,
+      "equal": true,
+      "relative_l2": 0.0,
+      "max_abs": 0.0
+    },
+    {
+      "name": "audio_pcm.f32",
+      "elements": 648000,
+      "equal": true,
+      "relative_l2": 0.0,
+      "max_abs": 0.0
+    },
+    {
+      "name": "video_latent.f32",
+      "elements": 442368,
+      "equal": true,
+      "relative_l2": 0.0,
+      "max_abs": 0.0
+    },
+    {
+      "name": "video_rgb.f32",
+      "elements": 47775744,
+      "equal": true,
+      "relative_l2": 0.0,
+      "max_abs": 0.0
+    }
+  ],
+  "files": [
+    {
+      "name": "small",
+      "single_sha256": "91d63cc8dbde8f71adf4d34e91464bd9b7210e728143c291b62b74035ed2cbb5",
+      "dual_sha256": "91d63cc8dbde8f71adf4d34e91464bd9b7210e728143c291b62b74035ed2cbb5",
+      "equal": true
+    },
+    {
+      "name": "full-cold",
+      "single_sha256": "7523129a3511f06fdd02936622dd49f9f1d7d23eb040fcc57ef6538276df748c",
+      "dual_sha256": "7523129a3511f06fdd02936622dd49f9f1d7d23eb040fcc57ef6538276df748c",
+      "equal": true
+    },
+    {
+      "name": "full-warm",
+      "single_sha256": "7523129a3511f06fdd02936622dd49f9f1d7d23eb040fcc57ef6538276df748c",
+      "dual_sha256": "7523129a3511f06fdd02936622dd49f9f1d7d23eb040fcc57ef6538276df748c",
+      "equal": true
+    },
+    {
+      "name": "full-host",
+      "single_sha256": "7523129a3511f06fdd02936622dd49f9f1d7d23eb040fcc57ef6538276df748c",
+      "dual_sha256": "7523129a3511f06fdd02936622dd49f9f1d7d23eb040fcc57ef6538276df748c",
+      "equal": true
+    }
+  ],
+  "timings": {
+    "15191": [
+      {
+        "case": "small",
+        "width": 256,
+        "height": 256,
+        "frames": 243,
+        "seconds": 225.328187
+      },
+      {
+        "case": "full-cold",
+        "width": 864,
+        "height": 480,
+        "frames": 243,
+        "seconds": 37.41254
+      },
+      {
+        "case": "full-warm",
+        "width": 864,
+        "height": 480,
+        "frames": 243,
+        "seconds": 21.267521
+      },
+      {
+        "case": "full-host",
+        "width": 864,
+        "height": 480,
+        "frames": 243,
+        "seconds": 21.418877
+      }
+    ],
+    "15192": [
+      {
+        "case": "small",
+        "width": 256,
+        "height": 256,
+        "frames": 243,
+        "seconds": 128.788296
+      },
+      {
+        "case": "full-cold",
+        "width": 864,
+        "height": 480,
+        "frames": 243,
+        "seconds": 28.461501
+      },
+      {
+        "case": "full-warm",
+        "width": 864,
+        "height": 480,
+        "frames": 243,
+        "seconds": 12.934466
+      },
+      {
+        "case": "full-host",
+        "width": 864,
+        "height": 480,
+        "frames": 243,
+        "seconds": 13.188805
+      }
+    ]
+  },
+  "decoded_all_mp4": true
+}

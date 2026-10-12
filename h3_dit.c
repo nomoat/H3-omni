@@ -1,5 +1,6 @@
 #include "h3_dit.h"
 #include "h3_fasth3.h"
+#include "h3_live.h"
 #ifdef H3_CUDA
 #include "cuda/h3_cuda.h"
 #endif
@@ -34,6 +35,7 @@ enum {
 };
 
 typedef struct {
+    h3_gpu_tensor *lora_a[4], *lora_b[4];
     h3_gpu_tensor *norm1;
     h3_gpu_tensor *vsa_gate;
     h3_gpu_tensor *norm2;
@@ -72,7 +74,23 @@ typedef struct {
     h3_dit_stream_source sources[STREAM_MATRICES];
 } h3_dit_stream_layer;
 
+typedef struct {
+    h3_gpu_tensor *key, *value;
+    uint32_t rows, audio, skip;
+} h3_live_kv;
+
 struct h3_dit {
+    int live, live_adapter, live_attention, live_stage;
+    unsigned live_commits;
+    h3_dit_schedule *live_schedules[3];
+    h3_sigma_schedule live_sigmas[3];
+    h3_gpu_tensor *lora_mid, *lora_update;
+    size_t lora_scratch_rows;
+    h3_live_kv live_sink[H3_DIT_BLOCKS];
+    h3_live_kv live_recent[2][H3_DIT_BLOCKS];
+    h3_live_kv live_pending[H3_DIT_BLOCKS];
+    h3_gpu_tensor *live_concat_k, *live_concat_v;
+    size_t live_concat_elements;
     h3_gpu *gpu;
     h3_fasth3_config fasth3;
 #ifdef H3_VSA
@@ -379,7 +397,7 @@ static int validate_layout(h3_dit *dit, const h3_text_embedding *text,
         !layout->segments || layout->segment_count < 3 ||
         layout->segments[0].kind != H3_SEG_TEXT ||
         layout->segments[layout->segment_count - 1].kind != H3_SEG_VIDEO ||
-        layout->signature[1] < 1 || layout->signature[2] < 2 ||
+        (layout->signature[1] < 1 && !(dit->live && layout->signature[1] == 0)) || layout->signature[2] < 2 ||
         layout->signature[3] < 2 || layout->signature[4] < 1 ||
         layout->signature[2] % 2 || layout->signature[3] % 2 ||
         layout->seq_len > UINT32_MAX || text->tokens > UINT32_MAX ||
@@ -587,6 +605,8 @@ static uint32_t token_reduced_parent(const h3_dit *dit, uint32_t full_row) {
            (local % spatial_width) / 2;
 }
 
+#include "h3_dit_live.inc"
+
 static int load_block(h3_dit *dit, h3_dit_block *block, const char *prefix,
                       char *error, size_t error_size) {
     char name[160];
@@ -612,6 +632,18 @@ static int load_block(h3_dit *dit, h3_dit_block *block, const char *prefix,
         LOAD2(vsa_gate, "attn.to_gate_compress.weight", INNER, HIDDEN);
 #undef LOAD1
 #undef LOAD2
+    if (dit->live) {
+        const char *targets[] = {"attn.qkv_proj", "attn.out_proj", "mlp.fc1", "mlp.fc2"};
+        const unsigned in[] = {HIDDEN, INNER, HIDDEN, FFN};
+        const unsigned out[] = {INNER*3, HIDDEN, FFN*2, HIDDEN};
+        for (int i = 0; i < 4; i++) {
+            snprintf(name, sizeof(name), "%s%s.lora_a", prefix, targets[i]);
+            block->lora_a[i] = bf2(dit, name, 128, in[i], error, error_size);
+            snprintf(name, sizeof(name), "%s%s.lora_b", prefix, targets[i]);
+            block->lora_b[i] = bf2(dit, name, out[i], 128, error, error_size);
+            if (!block->lora_a[i] || !block->lora_b[i]) return 0;
+        }
+    }
     return 1;
 }
 
@@ -633,6 +665,9 @@ static int load_block_norms(h3_dit *dit, h3_dit_block *block,
 }
 
 static void free_block(h3_dit_block *block) {
+    for (int i = 0; i < 4; i++) {
+        free_tensor(&block->lora_a[i]); free_tensor(&block->lora_b[i]);
+    }
     free_tensor(&block->vsa_gate);
     free_tensor(&block->norm1);
     free_tensor(&block->norm2);
@@ -866,6 +901,7 @@ static int run_refiner_block(h3_dit *dit, const h3_dit_block *weight,
                              HIDDEN, 1e-5f), "refiner attention norm");
     OP(h3_gpu_linear_bf16(dit->gpu, qkv, norm, weight->qkv, NULL, rows,
                            HIDDEN, INNER * 3), "refiner QKV");
+    OP(live_lora(dit, weight, 0, qkv, norm, rows, HIDDEN, INNER*3), "refiner QKV LoRA");
     OP(h3_gpu_grouped_qkv_rope_bf16(
                              dit->gpu, query, key, value, qkv, weight->q_norm,
                              weight->k_norm, weight->q_norm, weight->q_norm,
@@ -884,16 +920,19 @@ static int run_refiner_block(h3_dit *dit, const h3_dit_block *weight,
        "refiner attention");
     OP(h3_gpu_linear_bf16(dit->gpu, branch, heads, weight->out, NULL, rows,
                            INNER, HIDDEN), "refiner attention output");
+    OP(live_lora(dit, weight, 1, branch, heads, rows, INNER, HIDDEN), "refiner output LoRA");
     OP(h3_gpu_add_bf16(dit->gpu, hidden, hidden, branch, rows * HIDDEN),
        "refiner attention residual");
     OP(h3_gpu_rms_norm_bf16(dit->gpu, norm, hidden, weight->norm2, rows,
                              HIDDEN, 1e-5f), "refiner MLP norm");
     OP(h3_gpu_linear_bf16(dit->gpu, fc1, norm, weight->fc1, NULL, rows,
                            HIDDEN, FFN * 2), "refiner MLP input");
+    OP(live_lora(dit, weight, 2, fc1, norm, rows, HIDDEN, FFN*2), "refiner FC1 LoRA");
     OP(h3_gpu_swiglu_bf16(dit->gpu, activated, fc1, rows, FFN),
        "refiner SwiGLU");
     OP(h3_gpu_linear_bf16(dit->gpu, branch, activated, weight->fc2, NULL,
                            rows, FFN, HIDDEN), "refiner MLP output");
+    OP(live_lora(dit, weight, 3, branch, activated, rows, FFN, HIDDEN), "refiner FC2 LoRA");
     OP(h3_gpu_add_bf16(dit->gpu, hidden, hidden, branch, rows * HIDDEN),
        "refiner MLP residual");
 #undef OP
@@ -1839,6 +1878,11 @@ static int bind_request(h3_dit *dit, const h3_text_embedding *text,
                           (uint32_t)dit->world;
     }
 #endif
+    if (dit->live && (active_blocks != 50 || core_reuse_interval != 1 ||
+        token_reduction || dit->ssd_streaming)) {
+        fail(error,error_size,"live mode requires all 50 resident blocks without token reduction");
+        return 0;
+    }
     if (dit->fasth3.kind) {
         h3_sigma_schedule expected;
         if (wanted_video_condition || wanted_audio_condition || active_blocks != 50 ||
@@ -1878,7 +1922,23 @@ static int bind_request(h3_dit *dit, const h3_text_embedding *text,
     schedule_progress schedule_state = {progress, progress_opaque};
     int visual_condition = dit->video_condition_rows != 0;
     int audio_condition = dit->audio_condition_rows != 0;
-    if (dit->schedule_cache &&
+    if (dit->live) {
+        /* Teacher, teacher with a frozen audio tail, and Stage3 each keep
+         * their own AdaLN table. Switching phases must not reread 26 GB. */
+        int slot = sigmas->steps == 4 ? 2 : audio_condition ? 1 : 0;
+        if (dit->live_schedules[slot] && !same_sigmas(&dit->live_sigmas[slot],sigmas)) {
+            h3_dit_schedule_free(dit->live_schedules[slot]);
+            dit->live_schedules[slot] = NULL;
+        }
+        if (!dit->live_schedules[slot]) {
+            dit->live_schedules[slot] = h3_dit_schedule_precompute(
+                dit->weights,dit->gpu,sigmas,visual_condition,audio_condition,
+                schedule_report,&schedule_state,error,error_size);
+            dit->live_sigmas[slot] = *sigmas;
+        }
+        dit->schedule = dit->live_schedules[slot];
+        dit->schedule_cache = dit->schedule; /* Non-owning alias for rebind. */
+    } else if (dit->schedule_cache &&
         dit->schedule_cache_visual_condition == visual_condition &&
         dit->schedule_cache_audio_condition == audio_condition &&
         dit->schedule_cache_active_blocks == active_blocks &&
@@ -2050,7 +2110,13 @@ static h3_dit *load_dit_rank(const dit_load_args *args, int rank, int world,
     dit->weights = h3_weight_store_open(weight_directory, error, error_size);
     if (!dit->weights) goto failed;
 #ifdef H3_CUDA
-    if (!h3_fasth3_config_read(weight_directory, &dit->fasth3, error, error_size)) goto failed;
+    if (!h3_fasth3_config_read(weight_directory, &dit->fasth3, error, error_size) ||
+        !h3_live_config_read(weight_directory, &dit->live, error, error_size)) goto failed;
+    if (dit->live && dit->fasth3.kind) {
+        fail(error, error_size, "live and FastH3 weights cannot be combined"); goto failed;
+    }
+    dit->live_adapter = dit->live;
+    if (dit->live) { dit->fused_mlp = 0; dit->resident = 1; }
     int has_vsa_gate = h3_weight_find(dit->weights, "blocks.0.attn.to_gate_compress.weight", NULL) != NULL;
     if (has_vsa_gate != (dit->fasth3.kind == H3_FASTH3_VSA)) {
         fail(error, error_size, "VSA gate weights and FastH3 manifest disagree");
@@ -2385,6 +2451,16 @@ static int run_block(h3_dit *dit, unsigned index, int step,
         OP(h3_gpu_adaln_bf16(dit->gpu, dit->mod_attention, dit->hidden,
             weight->norm1, modulation, row_map, rows, HIDDEN, SLOTS,
             0, 1, 1e-5f), "DiT attention AdaLN");
+    if (dit->live_adapter) {
+        OP(h3_gpu_linear_bf16(dit->gpu, dit->qkv, dit->mod_attention,
+            weight->qkv, NULL, rows, HIDDEN, INNER*3), "live QKV projection");
+        OP(live_lora(dit, weight, 0, dit->qkv, dit->mod_attention, rows,
+                     HIDDEN, INNER*3), "live QKV LoRA");
+        OP(h3_gpu_grouped_qkv_rope_bf16(dit->gpu, dit->query, dit->key,
+            dit->value, dit->qkv, weight->q_norm, weight->k_norm,
+            rope_cos, rope_sin, rows, HEADS, HEAD_DIM, ROPE_HALF, 1e-5f),
+           "live QKV norm/RoPE");
+    } else
     if (dit->int8_qkv && !getenv("H3_DISABLE_INT8_QKV")) {
         OP(h3_gpu_grouped_qkv_linear_rope_int8(
             dit->gpu, dit->query, dit->key, dit->value,
@@ -2410,6 +2486,11 @@ static int run_block(h3_dit *dit, unsigned index, int step,
         !dit->use_slower_row_major_attention_output &&
         !dit->use_slower_uncached_int8_scales &&
         !getenv("H3_DISABLE_HEAD_MAJOR_ATTENTION_OUTPUT");
+#ifdef H3_CUDA
+    if (dit->live_attention) {
+        OP(live_attention(dit, index, error, error_size), "live cached attention");
+    } else
+#endif
 #ifdef H3_VSA
     if (dit->vsa) {
         OP(h3_gpu_linear_bf16(dit->gpu, dit->vsa_gate_values, dit->mod_attention,
@@ -2493,6 +2574,8 @@ static int run_block(h3_dit *dit, unsigned index, int step,
             dit->attention_heads, weight->out, NULL, rows, INNER, HIDDEN),
            "DiT attention output");
     }
+    OP(live_lora(dit, weight, 1, dit->attention_output, dit->attention_heads,
+                 rows, INNER, HIDDEN), "live attention output LoRA");
     int fused_int8_mlp_input = dit->int8_mlp &&
         !dit->use_slower_unfused_int8_inputs &&
         !getenv("H3_DISABLE_FUSED_INT8_MLP_INPUT") &&
@@ -2548,11 +2631,15 @@ static int run_block(h3_dit *dit, unsigned index, int step,
     } else {
         OP(h3_gpu_linear_bf16(dit->gpu, dit->fc1, dit->mod_mlp, weight->fc1,
             NULL, rows, HIDDEN, FFN * 2), "DiT MLP input");
+        OP(live_lora(dit, weight, 2, dit->fc1, dit->mod_mlp, rows,
+                     HIDDEN, FFN*2), "live FC1 LoRA");
         OP(h3_gpu_swiglu_bf16(dit->gpu, dit->activated, dit->fc1, rows, FFN),
            "DiT SwiGLU");
         OP(h3_gpu_linear_bf16(dit->gpu, mlp_output, dit->activated,
             weight->fc2, NULL, rows, FFN, HIDDEN), "DiT MLP output");
     }
+    OP(live_lora(dit, weight, 3, mlp_output, dit->activated, rows,
+                 FFN, HIDDEN), "live FC2 LoRA");
     if (fuse_next_attention) {
         h3_dit_block *next_weight = &dit->blocks[next_index];
         const h3_gpu_tensor *next_modulation = h3_dit_schedule_block(
@@ -2613,6 +2700,7 @@ static int encode_forward(h3_dit *dit, int step, int begin, int submit,
         for (size_t index = 0; index < dit->layout.segment_count; index++) {
             const h3_segment *segment = &dit->layout.segments[index];
             size_t segment_rows = segment->stop - segment->start;
+            if (!segment_rows) continue;
             size_t destination = segment->start * HIDDEN;
             if (segment->kind == H3_SEG_TEXT) {
                 OP(h3_gpu_copy_bf16(dit->gpu, dit->hidden, destination,
@@ -2899,6 +2987,10 @@ static int encode_forward(h3_dit *dit, int step, int begin, int submit,
     }
 #endif
     dit->core_forward_count++;
+    if (dit->live_stage) {
+        if (submit) OP(h3_gpu_submit(dit->gpu), "submit clean live KV forward");
+        return 1;
+    }
     const h3_gpu_tensor *final = h3_dit_schedule_final(dit->schedule);
 #ifdef H3_CUDA
     OP(h3_gpu_final_heads_f32(dit->gpu, dit->video_output, dit->audio_output,
@@ -3056,9 +3148,9 @@ static int dit_forward(h3_dit *dit, int step,
         free(video_f32); free(audio_f32);
         return 0;
     }
-    int ok = h3_dit_patchify_video(video_latent, VIDEO_CHANNELS,
+    int ok = (!video_row_elements || h3_dit_patchify_video(video_latent, VIDEO_CHANNELS,
         dit->latent_t, dit->latent_h, dit->latent_w, video_rows,
-        video_row_elements) &&
+        video_row_elements)) &&
         h3_dit_pack_audio(audio_latent, AUDIO_CHANNELS, dit->audio_t,
                           audio_rows, audio_row_elements) &&
         h3_gpu_tensor_write_f32_range(
@@ -3071,6 +3163,11 @@ static int dit_forward(h3_dit *dit, int step,
             audio_rows, audio_row_elements);
     if (!ok) fail(error, error_size, "cannot pack/write DiT input latents");
     if (ok) ok = encode_forward(dit, step, 1, 1, 0, error, error_size);
+    if (dit->live_stage) {
+        free(video_rows); free(audio_rows); free(video_out); free(audio_out);
+        free(video_f32); free(audio_f32);
+        return ok;
+    }
 #ifdef H3_CUDA
     if (ok) ok = h3_gpu_tensor_read_f32(dit->video_output, video_f32,
                                         video_row_elements) &&
@@ -3094,9 +3191,9 @@ static int dit_forward(h3_dit *dit, int step,
         }
     }
 #endif
-    if (ok) ok = h3_dit_unpatchify_video(video_f32, VIDEO_CHANNELS,
+    if (ok) ok = (!video_row_elements || h3_dit_unpatchify_video(video_f32, VIDEO_CHANNELS,
         dit->latent_t, dit->latent_h, dit->latent_w, video_velocity,
-        h3_dit_video_elements(dit)) &&
+        h3_dit_video_elements(dit))) &&
         h3_dit_unpack_audio(audio_f32, AUDIO_CHANNELS, dit->audio_t,
                             audio_velocity, h3_dit_audio_elements(dit));
     if (!ok && (!error || !*error)) fail(error, error_size, "cannot unpack DiT output");
@@ -3104,6 +3201,8 @@ static int dit_forward(h3_dit *dit, int step,
     free(video_f32); free(audio_f32);
     return ok;
 }
+
+#include "h3_dit_live_sampler.inc"
 
 int h3_dit_get_gpu_stats(const h3_dit *dit, h3_gpu_stats *stats) {
     return dit && h3_gpu_get_stats(dit->gpu, stats);
@@ -3802,7 +3901,12 @@ static void dit_free(h3_dit *dit) {
     if (!dit) return;
     free_request_state(dit);
     free_refiner(dit);
-    h3_dit_schedule_free(dit->schedule_cache);
+    live_history_free(dit);
+    free_tensor(&dit->lora_mid); free_tensor(&dit->lora_update);
+    free_tensor(&dit->live_concat_k); free_tensor(&dit->live_concat_v);
+    if (dit->live) {
+        for (int i=0;i<3;i++) h3_dit_schedule_free(dit->live_schedules[i]);
+    } else h3_dit_schedule_free(dit->schedule_cache);
     free_tensor(&dit->video_patch_w); free_tensor(&dit->video_patch_b);
     free_tensor(&dit->audio_patch_w); free_tensor(&dit->audio_patch_b);
     for (unsigned block = 0; block < H3_DIT_BLOCKS; block++)
@@ -4127,7 +4231,8 @@ static int reset_rank(h3_dit_group *group, int rank, void *opaque,
 /* Sampler calls: rank 0 works on the caller's latents (and outputs); the
  * other ranks on copies, so all end with the same values. */
 typedef struct {
-    int kind; /* 0 forward, 1 RES denoise, 2 Euler denoise */
+    int kind; /* 0 forward, 1 RES, 2 Euler, 3 live chunk */
+    const float *const *milestones;
     int step;
     int reuse_interval;
     float *video[MAX_GPUS];
@@ -4146,6 +4251,9 @@ static int sampler_rank(h3_dit_group *group, int rank, void *opaque,
     h3_dit *dit = group->ranks[rank];
     h3_dit_progress progress = rank ? NULL : job->progress;
     void *progress_opaque = rank ? NULL : job->progress_opaque;
+    if (job->kind == 3)
+        return live_chunk_device(dit, job->video[rank], job->audio[rank],
+                                  job->milestones, error, error_size);
     if (job->kind == 0)
         return dit_forward(dit, job->step, job->video[rank], job->audio[rank],
                            job->video_out[rank], job->audio_out[rank],
@@ -4331,3 +4439,96 @@ static h3_dit *load_dit(const dit_load_args *args, h3_dit_progress progress,
                          error_size);
 }
 #endif
+
+#ifdef H3_CUDA
+typedef struct { int adapter, attention, stage, reset, commit, clear_audio; } live_control;
+static int live_control_rank(h3_dit_group *group, int rank, void *opaque,
+                              char *error, size_t error_size) {
+    h3_dit *d = group->ranks[rank];
+    live_control *c = opaque;
+    if (!d->live) { fail(error, error_size, "live controls require a TaoMate export"); return 0; }
+    if (c->reset) live_history_free(d);
+    if (c->commit) {
+        for (unsigned i = 0; i < H3_DIT_BLOCKS; i++) {
+            if (!d->live_pending[i].key || !d->live_pending[i].value) {
+                fail(error, error_size, "incomplete live clean commit at layer %u", i); return 0;
+            }
+        }
+        if (!d->live_commits) {
+            size_t width = INNER / (d->world > 1 ? d->world : 1);
+            for (unsigned i = 0; i < H3_DIT_BLOCKS; i++) {
+                h3_live_kv *p = &d->live_pending[i], *sink = &d->live_sink[i];
+                size_t n = (size_t)(p->rows - p->audio) * width;
+                sink->rows = p->rows - p->audio;
+                sink->key = h3_gpu_tensor_new_bf16(d->gpu, n);
+                sink->value = h3_gpu_tensor_new_bf16(d->gpu, n);
+                if (!sink->key || !sink->value ||
+                    !h3_gpu_copy_bf16(d->gpu, sink->key, 0, p->key, (size_t)p->audio*width, n) ||
+                    !h3_gpu_copy_bf16(d->gpu, sink->value, 0, p->value, (size_t)p->audio*width, n)) {
+                    fail(error, error_size, "cannot retain live video sink: %s", h3_gpu_error(d->gpu)); return 0;
+                }
+            }
+        }
+        if (!h3_gpu_submit(d->gpu)) {
+            fail(error, error_size, "cannot finish live commit: %s", h3_gpu_error(d->gpu)); return 0;
+        }
+        for (unsigned i = 0; i < H3_DIT_BLOCKS; i++) {
+            live_pair_free(&d->live_recent[0][i]);
+            d->live_recent[0][i] = d->live_recent[1][i];
+            d->live_recent[1][i] = d->live_pending[i];
+            memset(&d->live_pending[i], 0, sizeof(d->live_pending[i]));
+        }
+        d->live_commits++;
+        if (!rank) {
+            unsigned tokens = d->live_recent[1][0].rows - d->live_recent[1][0].skip;
+            if (d->live_commits > 1) tokens += d->live_recent[0][0].rows - d->live_recent[0][0].skip;
+            if (d->live_commits > 2) tokens += d->live_sink[0].rows;
+            fprintf(stderr,"h3: live clean commit %u: %u retained media tokens per layer, %d heads per GPU\n",
+                    d->live_commits,tokens,HEADS/(d->world > 1 ? d->world : 1));
+        }
+    }
+    if (c->clear_audio)
+        for (unsigned i = 0; i < H3_DIT_BLOCKS; i++)
+            for (int j = 0; j < 2; j++)
+                d->live_recent[j][i].skip = d->live_recent[j][i].audio;
+    d->live_adapter = c->adapter;
+    d->live_attention = c->attention;
+    d->live_stage = c->stage;
+    return 1;
+}
+#endif
+
+int h3_dit_live_control(h3_dit *dit, int adapter, int attention, int stage,
+                        int reset, int commit, int clear_audio,
+                        char *error, size_t error_size) {
+#ifdef H3_CUDA
+    if (!dit) return 0;
+    live_control c = {adapter, attention, stage, reset, commit, clear_audio};
+    if (dit->group) return run_ranks(dit->group, live_control_rank, &c, error, error_size);
+    h3_dit_group singleton = {.world = 1, .ranks = {dit}};
+    return live_control_rank(&singleton, 0, &c, error, error_size);
+#else
+    (void)dit; (void)adapter; (void)attention; (void)stage;
+    (void)reset; (void)commit; (void)clear_audio;
+    fail(error, error_size, "live mode requires CUDA"); return 0;
+#endif
+}
+
+int h3_dit_live_chunk(h3_dit *dit, float *video, float *audio,
+                       const float *const milestones[3], char *error, size_t capacity) {
+#ifdef H3_CUDA
+    if (!dit || !dit->live_adapter || !dit->live_attention || dit->live_stage ||
+        dit->sigmas.steps != 4 || !milestones || !milestones[0] ||
+        !milestones[1] || !milestones[2]) {
+        fail(error,capacity,"invalid live chunk sampler state"); return 0;
+    }
+    if (dit->group) {
+        sampler_job job = {.kind=3, .milestones=milestones};
+        return run_sampler(dit,&job,video,audio,NULL,NULL,error,capacity);
+    }
+    return live_chunk_device(dit,video,audio,milestones,error,capacity);
+#else
+    (void)dit; (void)video; (void)audio; (void)milestones;
+    fail(error,capacity,"live mode requires CUDA"); return 0;
+#endif
+}

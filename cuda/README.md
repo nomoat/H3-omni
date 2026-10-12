@@ -2,6 +2,8 @@
 
 [FastH3 Preview v1 support](FASTH3.md) is available as the optional `VSA=1`
 build, with its own converted checkpoint and four-step schedule.
+[TaoMate-H3 live mode](LIVE.md) adds three-step chunk generation and historical
+KV using the original H3 base plus its released adapter.
 
 This backend keeps h3.c's C model code and uses CUDA, cuBLAS, cuDNN and the
 FlashAttention forward kernel bundled with the pinned PyTorch reference. The

@@ -1,0 +1,49 @@
+{
+  "passed": true,
+  "cases": [
+    {
+      "projection": "blocks.0.attn.qkv_proj",
+      "relative_l2": 3.1762119760969654e-05,
+      "passed": true
+    },
+    {
+      "projection": "blocks.0.attn.out_proj",
+      "relative_l2": 0.0,
+      "passed": true
+    },
+    {
+      "projection": "blocks.0.mlp.fc1",
+      "relative_l2": 4.396765507408418e-05,
+      "passed": true
+    },
+    {
+      "projection": "blocks.0.mlp.fc2",
+      "relative_l2": 4.9987993406830356e-05,
+      "passed": true
+    },
+    {
+      "projection": "token_refiner.blocks.1.attn.qkv_proj",
+      "relative_l2": 5.480172694660723e-05,
+      "passed": true
+    },
+    {
+      "projection": "token_refiner.blocks.1.attn.out_proj",
+      "relative_l2": 4.4803822675021365e-05,
+      "passed": true
+    },
+    {
+      "projection": "token_refiner.blocks.1.mlp.fc1",
+      "relative_l2": 0.00021320261294022202,
+      "passed": true
+    },
+    {
+      "projection": "token_refiner.blocks.1.mlp.fc2",
+      "relative_l2": 1.1945502592425328e-05,
+      "passed": true
+    },
+    {
+      "projection": "GPU sampler FP32 order",
+      "passed": true
+    }
+  ]
+}

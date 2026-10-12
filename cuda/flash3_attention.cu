@@ -18,8 +18,9 @@ template void run_mha_fwd_<90, cutlass::half_t, 64, 64, false, false, false, fal
 template <typename Element, int D>
 static cudaError_t flash3(void *output, const void *query, const void *key, const void *value,
                           float *logsumexp, unsigned batch, unsigned sequence, unsigned heads,
-                          unsigned kv_heads, float scale, cudaStream_t stream) {
-    static int sm_count = 0;
+                          unsigned kv_heads, float scale, cudaStream_t stream, unsigned key_sequence = 0) {
+    if (!key_sequence) key_sequence = sequence;
+    static thread_local int sm_count = 0;
     if (!sm_count) {
         int device = 0;
         cudaError_t error = cudaGetDevice(&device);
@@ -40,13 +41,16 @@ static cudaError_t flash3(void *output, const void *query, const void *key, cons
     p.q_head_stride = p.k_head_stride = p.v_head_stride = p.o_head_stride = D;
     p.v_dim_stride = 1;
     p.q_batch_stride = p.o_batch_stride = int64_t(sequence) * heads * D;
-    p.k_batch_stride = p.v_batch_stride = int64_t(sequence) * kv_heads * D;
+    p.k_batch_stride = p.v_batch_stride = int64_t(key_sequence) * kv_heads * D;
     p.b = p.b_k = int(batch);
     p.h = int(heads);
     p.h_k = int(kv_heads);
-    p.seqlen_q = p.seqlen_k = int(sequence);
-    p.seqlen_q_rounded = p.seqlen_k_rounded = int((sequence + 127) / 128 * 128);
-    p.total_q = p.total_k = int(batch * sequence);
+    p.seqlen_q = int(sequence);
+    p.seqlen_k = int(key_sequence);
+    p.seqlen_q_rounded = int((sequence + 127) / 128 * 128);
+    p.seqlen_k_rounded = int((key_sequence + 127) / 128 * 128);
+    p.total_q = int(batch * sequence);
+    p.total_k = int(batch * key_sequence);
     p.d = p.d_rounded = p.dv = p.dv_rounded = D;
     p.scale_softmax = scale;
     p.softcap = 0.0f;
@@ -55,8 +59,8 @@ static cudaError_t flash3(void *output, const void *query, const void *key, cons
     p.rp_dropout = 1.0f;
     p.is_causal = false;
     p.is_local = false;
-    p.window_size_left = int(sequence) - 1;
-    p.window_size_right = int(sequence) - 1;
+    p.window_size_left = int(key_sequence) - 1;
+    p.window_size_right = int(key_sequence) - 1;
     p.attention_chunk = 0;
     p.page_size = 1;
     p.num_splits = 1;
@@ -80,4 +84,11 @@ cudaError_t h3_flash3_f16_d64(void *output, const void *query, const void *key,
                               cudaStream_t stream) {
     return flash3<cutlass::half_t, 64>(output, query, key, value, logsumexp, batch, sequence,
                                        heads, heads, scale, stream);
+}
+
+cudaError_t h3_flash3_cross_bf16(void *output, const void *query, const void *key,
+    const void *value, float *lse, unsigned query_rows, unsigned key_rows,
+    unsigned heads, float scale, cudaStream_t stream) {
+    return flash3<cutlass::bfloat16_t, 128>(output, query, key, value, lse, 1,
+        query_rows, heads, heads, scale, stream, key_rows);
 }

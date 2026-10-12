@@ -2,8 +2,9 @@
 
 **A specialized inference engine for MiniMax-H3, in C and CUDA, for H200.**
 
-h3.cu runs one model family: MiniMax-H3 text-to-video+audio and the four-step FastH3 Preview v1 distillation. It is
-written for one target: Hopper GPUs (H200, `sm_90`), one node, 1 to 8 GPUs,
+h3.cu runs one model family in three checkpoint modes: original MiniMax-H3
+text-to-video+audio, four-step FastH3 Preview v1, and TaoMate-H3 live chunk
+generation. It is written for one target: Hopper GPUs (H200, `sm_90`), one node, 1 to 8 GPUs,
 in a long-lived serving process.
 
 It is not a general framework and not a local, portable tool. There is no
@@ -107,7 +108,9 @@ build-cuda/h3 -d /path/to/MiniMax-H3 --gpus 8 \
 
 Without `-p` the binary starts an interactive session that keeps every model
 resident between prompts. FastH3 needs a converted checkpoint; see
-[cuda/FASTH3.md](cuda/FASTH3.md).
+[cuda/FASTH3.md](cuda/FASTH3.md). The third checkpoint mode,
+`--mode live`, uses the released TaoMate adapter, three-step chunk sampling and
+history KV; see [cuda/LIVE.md](cuda/LIVE.md).
 
 ## HTTP service
 

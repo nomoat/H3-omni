@@ -50,3 +50,31 @@ extern "C" int h3_fasth3_config_read(const char *directory, h3_fasth3_config *ou
         return 0;
     }
 }
+
+extern "C" int h3_live_config_read(const char *directory, int *enabled,
+                                   char *error, size_t capacity) {
+    *enabled = 0;
+    std::string path = std::string(directory) + "/h3_live.json";
+    struct stat st{};
+    if (stat(path.c_str(), &st)) {
+        if (errno == ENOENT) return 1;
+        if (error && capacity) snprintf(error, capacity, "cannot read live manifest: %s", strerror(errno));
+        return 0;
+    }
+    try {
+        if (st.st_size <= 0 || st.st_size > 65536) throw std::runtime_error("invalid manifest size");
+        std::ifstream file(path);
+        auto j = nlohmann::json::parse(file);
+        if (j.at("format") != "h3.c-live-v1" || j.at("model") != "TaoMate-H3" ||
+            j.at("rank") != 128 || j.at("alpha") != 128 ||
+            j.at("qkv_layout") != "head-qkv-dim" ||
+            j.at("state_indices") != nlohmann::json({0,16,33,49}) ||
+            j.at("video_shift") != 12 || j.at("audio_shift") != 3)
+            throw std::runtime_error("unsupported TaoMate-H3 contract");
+        *enabled = 1;
+        return 1;
+    } catch (const std::exception &e) {
+        if (error && capacity) snprintf(error, capacity, "invalid live manifest: %s", e.what());
+        return 0;
+    }
+}

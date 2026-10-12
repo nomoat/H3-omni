@@ -1,3 +1,4 @@
+#include "h3_live.h"
 #include "h3_internal.h"
 #include "h3_audio_vae.h"
 #include "h3_host.h"
@@ -475,8 +476,12 @@ h3_ctx *h3_load_dir(const char *model_dir) {
 #ifdef H3_CUDA
     char *fasth3_path = h3_path(model_dir, "FL2VA/transformer");
     int fasth3_ok = fasth3_path && h3_fasth3_config_read(
-        fasth3_path, &ctx->fasth3, ctx->error, sizeof(ctx->error));
+        fasth3_path, &ctx->fasth3, ctx->error, sizeof(ctx->error)) &&
+        h3_live_config_read(fasth3_path, &ctx->live, ctx->error, sizeof(ctx->error));
     free(fasth3_path);
+    if (ctx->live && ctx->fasth3.kind) {
+        h3_set_error(ctx, "live and FastH3 manifests cannot be combined"); fasth3_ok = 0;
+    }
 #ifndef H3_VSA
     if (ctx->fasth3.kind == H3_FASTH3_VSA) {
         h3_set_error(ctx, "FastH3 VSA requires a CUDA build with VSA=1");
@@ -492,8 +497,11 @@ h3_ctx *h3_load_dir(const char *model_dir) {
     char *fasth3_manifest = h3_path(model_dir, "FL2VA/transformer/h3_fasth3.json");
     int has_fasth3_manifest = fasth3_manifest && h3_is_file(fasth3_manifest);
     free(fasth3_manifest);
-    if (has_fasth3_manifest) {
-        h3_set_error(NULL, "FastH3 exports require the CUDA backend");
+    char *live_manifest = h3_path(model_dir, "FL2VA/transformer/h3_live.json");
+    int has_live_manifest = live_manifest && h3_is_file(live_manifest);
+    free(live_manifest);
+    if (has_fasth3_manifest || has_live_manifest) {
+        h3_set_error(NULL, "FastH3 and live exports require the CUDA backend");
         h3_free(ctx);
         return NULL;
     }
@@ -573,7 +581,11 @@ const h3_model_info *h3_model(const h3_ctx *ctx) {
 }
 
 int h3_model_default_steps(const h3_ctx *ctx) {
-    return ctx && ctx->fasth3.kind ? ctx->fasth3.steps : H3_DEFAULT_STEPS;
+    return ctx && ctx->live ? 3 : ctx && ctx->fasth3.kind ? ctx->fasth3.steps : H3_DEFAULT_STEPS;
+}
+
+const char *h3_model_mode(const h3_ctx *ctx) {
+    return ctx && ctx->live ? "live" : ctx && ctx->fasth3.kind ? "fast" : "original";
 }
 
 static int h3_valid_params(h3_ctx *ctx, const h3_params *params) {
@@ -615,6 +627,12 @@ static int h3_valid_params(h3_ctx *ctx, const h3_params *params) {
     }
     if (params->steps < 2 || params->steps > H3_MAX_STEPS) {
         h3_set_error(ctx, "denoising steps must be in [2, 1000]");
+        return 0;
+    }
+    if (ctx->live && (params->steps != 3 || params->first_frame || params->last_frame ||
+        params->reference_count || params->preview_denoise ||
+        (h3_align_frame_count(params->frames) - 5) % 119 || params->frames < 120)) {
+        h3_set_error(ctx, "live mode requires 3 steps, text-only input, and 124/243/362 frames; step previews are unavailable");
         return 0;
     }
     if (ctx->fasth3.kind && (params->steps != 4 || params->first_frame ||
@@ -1780,8 +1798,14 @@ h3_result *h3_generate(h3_ctx *ctx, const char *prompt,
         goto cleanup;
     }
     h3_sigma_schedule sigmas;
+    if (ctx->live) {
+        /* Initial residency needs only the audio teacher's small sequence. */
+        h3_segment *last = &layout.segments[layout.segment_count-1];
+        last->stop = last->start; layout.seq_len = last->start;
+        layout.img_target_rows = 0; layout.signature[1] = 0;
+    }
     if (!(ctx->fasth3.kind ? h3_fasth3_schedule_build(&ctx->fasth3, &sigmas) :
-          h3_serving_schedule_build(params->steps, &sigmas))) {
+          h3_serving_schedule_build(ctx->live ? 9 : params->steps, &sigmas))) {
         h3_set_error(ctx, "cannot construct the requested sigma schedule");
         goto cleanup;
     }
@@ -1913,7 +1937,7 @@ h3_result *h3_generate(h3_ctx *ctx, const char *prompt,
             fprintf(stderr, "h3: prepared DiT cache miss; model retained\n");
         }
     }
-    h3_text_embedding_free(&text);
+    if (!ctx->live) h3_text_embedding_free(&text);
     free(condition_video_rows);
     condition_video_rows = NULL;
     free(condition_audio_rows);
@@ -1941,8 +1965,8 @@ h3_result *h3_generate(h3_ctx *ctx, const char *prompt,
         live_preview.output_height = params->height;
         if (progress.cancelled) goto cleanup;
     }
-    size_t video_count = h3_dit_video_elements(dit);
-    size_t audio_count = h3_dit_audio_elements(dit);
+    size_t video_count = ctx->live ? (size_t)24*temporal.video_t*latent_h*latent_w : h3_dit_video_elements(dit);
+    size_t audio_count = ctx->live ? (size_t)64*temporal.audio_t : h3_dit_audio_elements(dit);
     video = malloc(video_count * sizeof(*video));
     audio = malloc(audio_count * sizeof(*audio));
     if (!video || !audio) {
@@ -1954,14 +1978,27 @@ h3_result *h3_generate(h3_ctx *ctx, const char *prompt,
     h3_rng video_rng, audio_rng;
     h3_rng_seed(&video_rng, params->seed);
     h3_rng_seed(&audio_rng, params->seed);
-    h3_rng_fill_normal(&video_rng, video, video_count);
-    h3_rng_fill_normal(&audio_rng, audio, audio_count);
-    if (!h3_dit_denoise_euler_preview(
+    if (!ctx->live) {
+        h3_rng_fill_normal(&video_rng, video, video_count);
+        h3_rng_fill_normal(&audio_rng, audio, audio_count);
+    }
+    int denoise_ok;
+    if (ctx->live) {
+#ifdef H3_CUDA
+        denoise_ok = h3_live_generate(dit, &text, temporal.video_t, latent_h, latent_w,
+            temporal.audio_t, params->seed, video, audio, h3_dit_progress_bridge,
+            &progress, detail, sizeof(detail));
+#else
+        denoise_ok = 0;
+#endif
+        h3_text_embedding_free(&text);
+    } else denoise_ok = h3_dit_denoise_euler_preview(
             dit, video, audio, params->denoise_reuse,
             h3_dit_progress_bridge, &progress,
             preview_decoder ? h3_deliver_denoise_preview : NULL,
             preview_decoder ? &live_preview : NULL,
-            detail, sizeof(detail))) {
+            detail, sizeof(detail));
+    if (!denoise_ok) {
         if (!live_preview.failed) h3_set_error(ctx, "%s", detail);
         if (dit_is_cached) {
             ctx->dit = NULL;

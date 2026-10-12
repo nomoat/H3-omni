@@ -15,6 +15,7 @@ struct h3_audio_vae_decoder;
 
 struct h3_ctx {
     h3_fasth3_config fasth3;
+    int live;
     char *model_dir;
     char error[512];
     /* Why ordered references cannot run, when Ref2VA/ exists but is incomplete. */

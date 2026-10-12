@@ -27,7 +27,8 @@ static void usage(const char *program) {
         "      --render-height N  Lower internal model height (optional)\n"
         "      --frames N         Requested frames (default: 56)\n"
         "      --seconds N        Requested duration at 24 fps (instead of --frames)\n"
-        "      --steps N          Denoising passes (H3: 20; FastH3: 4)\n"
+        "      --mode NAME        Check checkpoint mode: original, fast, live\n"
+        "      --steps N          Denoising passes (H3: 20; FastH3: 4; live: 3)\n"
         "      --reuse N          Denoiser reuse: 1 close, 2 fast, 3 aggressive\n"
         "      --layers N         DiT blocks: 50 exact, 45 fast, 40 aggressive\n"
         "      --core-reuse N     Core refresh: 1 exact, 4 fast, 6 aggressive\n"
@@ -265,8 +266,9 @@ int main(int argc, char **argv) {
            OPT_FIRST, OPT_LAST, OPT_REF_IMAGE, OPT_REF_IMAGE_SIZE,
            OPT_REF_VIDEO, OPT_REF_SILENT_VIDEO, OPT_REF_VIDEO_AUDIO,
            OPT_REF_AUDIO, OPT_FRAMES_DIR, OPT_SHOW, OPT_ZOOM,
-           OPT_PROFILE, OPT_INFO, OPT_RESIDENT_WEIGHTS, OPT_GPUS };
+           OPT_PROFILE, OPT_INFO, OPT_RESIDENT_WEIGHTS, OPT_GPUS, OPT_MODE };
     static const struct option options[] = {
+        {"mode", required_argument, NULL, OPT_MODE},
         {"model-dir", required_argument, NULL, 'd'},
         {"prompt", required_argument, NULL, 'p'},
         {"output", required_argument, NULL, 'o'},
@@ -328,6 +330,7 @@ int main(int argc, char **argv) {
     const char *output = "outputs/h3.mp4";
     h3_params params = H3_PARAMS_DEFAULT;
     int steps_given = 0;
+    const char *requested_mode = NULL;
     h3_reference references[12];
     size_t reference_count = 0;
     cli_state cli = {{0}, 0, -1, -1, H3_TERM_NONE, 0, NULL, 0};
@@ -361,6 +364,7 @@ int main(int argc, char **argv) {
                 params.frames = frames_from_seconds(optarg);
                 seconds_given = 1;
                 break;
+            case OPT_MODE: requested_mode = optarg; break;
             case OPT_STEPS: params.steps = parse_int(optarg, "steps"); steps_given = 1; break;
             case OPT_REUSE:
                 params.denoise_reuse = parse_int(optarg, "reuse");
@@ -518,6 +522,11 @@ int main(int argc, char **argv) {
     if (!ctx) {
         fprintf(stderr, "h3: %s\n", h3_last_error(NULL));
         return 1;
+    }
+    if (requested_mode && strcmp(requested_mode, h3_model_mode(ctx))) {
+        fprintf(stderr, "h3: --mode %s does not match checkpoint mode %s\n",
+                requested_mode, h3_model_mode(ctx));
+        h3_free(ctx); return 1;
     }
     if (!steps_given) params.steps = h3_model_default_steps(ctx);
     if (resident_weights >= 0)

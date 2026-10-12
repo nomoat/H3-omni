@@ -15,3 +15,6 @@ extern "C" cudaError_t h3_flash3_f16_d64(void *output, const void *query, const 
                         const void *value, float *logsumexp, unsigned batch,
                         unsigned sequence, unsigned heads, float scale,
                         cudaStream_t stream);
+
+extern "C" cudaError_t h3_flash3_cross_bf16(void *, const void *, const void *,
+    const void *, float *, unsigned, unsigned, unsigned, float, cudaStream_t);

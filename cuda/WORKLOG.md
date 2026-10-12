@@ -191,3 +191,28 @@ passes them. Visual check: `/home/homo/model/h3-samples/compare/`, user review
   activations of the whole sequence although it uses 1/N of the rows.
 - Lossy options (not started): step reuse, fewer layers, token reduction,
   FP8 GEMMs, sparse attention; multi-GPU sequence parallelism.
+
+
+## TaoMate-H3 live mode, 2026-10-12
+
+The third checkpoint mode, `live`, uses original FL2VA weights with the
+released rank-128 TaoMate adapter. It implements audio-teacher guidance,
+three noisy evaluations plus a clean KV commit per chunk, bounded historical
+attention, and request-continuation positions. It shares the existing resident
+weights, FA3, Ulysses/NCCL, GPU sampler, concurrent VAEs and MP4 encoding.
+FastH3 VSA remains specific to FastH3 weights.
+
+A sharding test found that cuBLAS chose different accumulation orders for the
+narrow LoRA down projection when the token row count changed. The initial
+single/two-GPU small-video comparison had relative L2 0.424 despite matching
+audio. Fixing the LoRA down GEMM to 512-row tiles removed the difference.
+All 21 projection/attention sharding cases now match exactly. The independent
+released-adapter projection checks still pass (worst relative L2 0.000214).
+
+Jobs 15191 (one H200), 15192 (two H200s), and 15195 (regression) completed.
+The 864x480, 243-frame warm request took 21.27 s on one H200 and 12.93 s on
+two, including audio, VAE and MP4. Repeated GPU sampling, host sampling and
+both GPU counts produce identical MP4 bytes. This is not yet real-time, and
+the current interface retains the 15-second request limit and whole-sequence
+decode. It does not add a broadcast transport or cross-call stream session.
+See `cuda/LIVE.md` and `tests/live/evidence/` for commands and measurements.

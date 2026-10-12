@@ -4,6 +4,19 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
+/* Fixed-row LoRA down projection. Shape-dependent cuBLAS reduction order in
+ * this narrow matrix otherwise changes results when token rows are sharded. */
+int h3_gpu_lora_down_bf16(h3_gpu *gpu, h3_gpu_tensor *output,
+    const h3_gpu_tensor *input, const h3_gpu_tensor *weight,
+    uint32_t rows, uint32_t input_dim);
+/* TaoMate's clean-estimate/sigma-ratio update, preserving FP32 order. */
+int h3_gpu_taomate_step_f32(h3_gpu *gpu, h3_gpu_tensor *sample,
+    const h3_gpu_tensor *velocity, size_t count, float sigma, float next);
+/* Rectangular FA3 over contiguous BF16 row slices (head dimension 128). */
+int h3_gpu_cross_attention_bf16(h3_gpu *gpu, h3_gpu_tensor *out,
+    size_t out_row, const h3_gpu_tensor *q, size_t q_row,
+    const h3_gpu_tensor *k, const h3_gpu_tensor *v, size_t kv_row,
+    uint32_t query_rows, uint32_t key_rows, uint32_t heads);
 /* Multi-GPU (cuda/parallel.cuh). A thread selects its device before it
  * creates or uses an h3_gpu. One NCCL communicator per device 0..count-1.
  * Ulysses: scatter_heads turns this rank's [rows][heads][dim] rows into all

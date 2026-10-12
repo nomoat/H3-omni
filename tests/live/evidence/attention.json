@@ -1,0 +1,59 @@
+{
+  "passed": true,
+  "cases": [
+    {
+      "heads": 28,
+      "text": 7,
+      "media": 19,
+      "history": 0,
+      "relative_l2": 0.0019587408751249313,
+      "max_abs": 0.008522748947143555,
+      "passed": true
+    },
+    {
+      "heads": 28,
+      "text": 23,
+      "media": 263,
+      "history": 517,
+      "relative_l2": 0.002085694344714284,
+      "max_abs": 0.004721522331237793,
+      "passed": true
+    },
+    {
+      "heads": 28,
+      "text": 128,
+      "media": 129,
+      "history": 131,
+      "relative_l2": 0.002168071223422885,
+      "max_abs": 0.0026487112045288086,
+      "passed": true
+    },
+    {
+      "heads": 56,
+      "text": 7,
+      "media": 19,
+      "history": 0,
+      "relative_l2": 0.0019747449550777674,
+      "max_abs": 0.0075130462646484375,
+      "passed": true
+    },
+    {
+      "heads": 56,
+      "text": 23,
+      "media": 263,
+      "history": 517,
+      "relative_l2": 0.0020858647767454386,
+      "max_abs": 0.005214810371398926,
+      "passed": true
+    },
+    {
+      "heads": 56,
+      "text": 128,
+      "media": 129,
+      "history": 131,
+      "relative_l2": 0.0021698668133467436,
+      "max_abs": 0.0036095380783081055,
+      "passed": true
+    }
+  ]
+}

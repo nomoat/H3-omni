@@ -891,9 +891,9 @@ extern "C" int h3_gpu_final_heads_f32(h3_gpu *g, h3_gpu_tensor *video_output,
         ok = launch_ok(g) &&
             h3_gpu_adaln_bf16(g, normalized, hidden, norm, modulation, map, rows, width, 2, 0, 1, 1e-5f) &&
             h3_gpu_cast_bf16_to_f32(g, f32, normalized, rows * width) &&
-            h3_gpu_linear_f32(g, video, f32, video_weight, video_bias, rows, width, 96) &&
+            (!video_rows || h3_gpu_linear_f32(g, video, f32, video_weight, video_bias, rows, width, 96)) &&
             h3_gpu_linear_f32(g, audio, f32, audio_weight, audio_bias, rows, width, 32) &&
-            h3_gpu_copy_f32(g, video_output, 0, video, size_t(video_start) * 96, size_t(video_rows) * 96) &&
+            (!video_rows || h3_gpu_copy_f32(g, video_output, 0, video, size_t(video_start) * 96, size_t(video_rows) * 96)) &&
             h3_gpu_copy_f32(g, audio_output, 0, audio, size_t(audio_start) * 32, size_t(audio_rows) * 32);
     }
     for (auto *tensor : {map, normalized, f32, video, audio}) h3_gpu_tensor_free(tensor);
@@ -1218,6 +1218,27 @@ extern "C" int h3_gpu_sdpa_bf16(h3_gpu *g, h3_gpu_tensor *y, const h3_gpu_tensor
                                 uint d, float s) {
     return sdpa(g, y, q, k, v, 1, n, h, h, d, s, false);
 }
+extern "C" int h3_gpu_cross_attention_bf16(h3_gpu *g, h3_gpu_tensor *y,
+    size_t yo, const h3_gpu_tensor *q, size_t qo, const h3_gpu_tensor *k,
+    const h3_gpu_tensor *v, size_t ko, uint nq, uint nk, uint heads) {
+    size_t width = size_t(heads) * 128;
+    if (!nq || !nk || !heads || !h3_gpu_require_elements(g, y, (yo+nq)*width, "live output") ||
+        !h3_gpu_require_elements(g, q, (qo+nq)*width, "live query") ||
+        !h3_gpu_require_elements(g, k, (ko+nk)*width, "live key") ||
+        !h3_gpu_require_elements(g, v, (ko+nk)*width, "live value")) return 0;
+    for (auto *t : {static_cast<const h3_gpu_tensor *>(y), q, k, v})
+        if (t->dtype != H3_GPU_BF16) { h3_gpu_set_error(g, "live attention requires BF16"); return 0; }
+    auto *lse = allocate(g, size_t(nq) * heads, H3_GPU_F32);
+    if (!lse) return 0;
+    int ok = cuda_ok(g, h3_flash3_cross_bf16(static_cast<ushort *>(y->data)+yo*width,
+        static_cast<const ushort *>(q->data)+qo*width,
+        static_cast<const ushort *>(k->data)+ko*width,
+        static_cast<const ushort *>(v->data)+ko*width,
+        static_cast<float *>(lse->data), nq, nk, heads, 1.0f/sqrtf(128.0f), g->stream));
+    h3_gpu_tensor_free(lse);
+    ++g->stats.mps_sdpa_dispatches;
+    return ok;
+}
 extern "C" int h3_gpu_sdpa_fa2_bf16(h3_gpu *g, h3_gpu_tensor *y, const h3_gpu_tensor *q,
                                     const h3_gpu_tensor *k, const h3_gpu_tensor *v,
                                     uint n, uint h, uint d, float s) {
@@ -1457,3 +1478,54 @@ extern "C" int h3_gpu_vsa_bf16(h3_gpu_vsa *, h3_gpu_tensor *, const h3_gpu_tenso
                                  const h3_gpu_tensor *, const h3_gpu_tensor *, const h3_gpu_tensor *) { return 0; }
 #endif
 #include "unsupported.inc"
+
+__global__ void taomate_step_kernel(float *x, const float *v, size_t n,
+                                   float sigma_t, float ratio, float one_minus) {
+    size_t i = (size_t)blockIdx.x*blockDim.x + threadIdx.x;
+    if (i < n) {
+        float clean = x[i] + sigma_t*v[i];
+        x[i] = ratio*x[i] + one_minus*clean;
+    }
+}
+extern "C" int h3_gpu_taomate_step_f32(h3_gpu *g, h3_gpu_tensor *x,
+    const h3_gpu_tensor *v, size_t n, float sigma, float next) {
+    if (!n || !(sigma > 0) || next < 0 || next >= sigma ||
+        x->dtype != H3_GPU_F32 || v->dtype != H3_GPU_F32 ||
+        !h3_gpu_require_elements(g,x,n,"live sample") ||
+        !h3_gpu_require_elements(g,v,n,"live velocity")) return 0;
+    float ratio = next/sigma;
+    taomate_step_kernel<<<(n+255)/256,256,0,g->stream>>>(
+        (float *)x->data, (const float *)v->data, n, 1.0f-(1.0f-sigma), ratio, 1.0f-ratio);
+    return launch_ok(g);
+}
+
+extern "C" int h3_gpu_lora_down_bf16(h3_gpu *g, h3_gpu_tensor *y,
+    const h3_gpu_tensor *x, const h3_gpu_tensor *w, uint rows, uint in) {
+    constexpr uint tile = 512, rank = 128;
+    if (!rows || !in || !h3_gpu_require_bf16(g,x,size_t(rows)*in,"LoRA input") ||
+        !h3_gpu_require_bf16(g,y,size_t(rows)*rank,"LoRA down output")) return 0;
+    h3_gpu_tensor *padded = nullptr, *tail = nullptr;
+    int ok = 1;
+    if (rows % tile) {
+        padded = allocate(g,size_t(tile)*in,H3_GPU_BF16);
+        tail = allocate(g,size_t(tile)*rank,H3_GPU_BF16);
+        ok = padded && tail && h3_gpu_zero(g,padded);
+    }
+    for (uint start=0; ok && start<rows; start+=tile) {
+        uint count = std::min(tile,rows-start);
+        if (count == tile) {
+            h3_gpu_tensor xv=*x, yv=*y;
+            xv.data=(ushort *)x->data+size_t(start)*in;
+            yv.data=(ushort *)y->data+size_t(start)*rank;
+            xv.elements=size_t(tile)*in; yv.elements=size_t(tile)*rank;
+            xv.bytes=xv.elements*2; yv.bytes=yv.elements*2;
+            ok=h3_gpu_linear_bf16(g,&yv,&xv,w,nullptr,tile,in,rank);
+        } else {
+            ok=h3_gpu_copy_bf16(g,padded,0,x,size_t(start)*in,size_t(count)*in) &&
+               h3_gpu_linear_bf16(g,tail,padded,w,nullptr,tile,in,rank) &&
+               h3_gpu_copy_bf16(g,y,size_t(start)*rank,tail,0,size_t(count)*rank);
+        }
+    }
+    h3_gpu_tensor_free(padded); h3_gpu_tensor_free(tail);
+    return ok;
+}
