@@ -1,6 +1,14 @@
 #ifndef H3_LIVE_H
 #define H3_LIVE_H
 #include "h3_dit.h"
+#include "h3.h"
+
+struct h3_video_vae_decoder;
+struct h3_audio_vae_decoder;
+int h3_live_stream_generate(h3_dit *dit, const h3_text_embedding *text,
+    struct h3_video_vae_decoder *video_decoder,
+    struct h3_audio_vae_decoder *audio_decoder, const h3_params *params,
+    int requests, char *error, size_t error_size);
 
 /* Released TaoMate-H3 rank-128 adapter and Stage3 sampling contract. */
 int h3_live_config_read(const char *directory, int *enabled,

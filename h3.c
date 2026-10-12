@@ -1156,8 +1156,8 @@ static float *h3_extract_vision_pair(const float *pixels, int frames,
     return pair;
 }
 
-h3_result *h3_generate(h3_ctx *ctx, const char *prompt,
-                       const h3_params *params) {
+static h3_result *generate(h3_ctx *ctx, const char *prompt,
+                            const h3_params *params, int live_requests) {
     if (!ctx) return NULL;
     ctx->error[0] = '\0';
     if (!prompt || !*prompt) {
@@ -1965,6 +1965,31 @@ h3_result *h3_generate(h3_ctx *ctx, const char *prompt,
         live_preview.output_height = params->height;
         if (progress.cancelled) goto cleanup;
     }
+    if (live_requests) {
+#ifdef H3_CUDA
+        preview_decoder = h3_acquire_video_decoder(ctx, decoder_key, vae_path,
+            latent_h, latent_w, h3_vae_progress_bridge, &progress,
+            &decoder_is_cached, detail, sizeof(detail));
+        h3_audio_vae_decoder *decoder = h3_acquire_audio_decoder(
+            ctx, audio_vae_path, detail, sizeof(detail));
+        if (!preview_decoder || !decoder || !h3_live_stream_generate(
+                dit, &text, preview_decoder, decoder, params, live_requests,
+                detail, sizeof(detail))) {
+            h3_set_error(ctx, "%s", detail);
+            if (strcmp(detail, "generation cancelled")) {
+                if (dit_is_cached) h3_resident_dit_clear(ctx);
+                else h3_dit_free(dit);
+                dit = NULL;
+            }
+            goto cleanup;
+        }
+        result = calloc(1, sizeof(*result));
+        if (!result) { h3_set_error(ctx, "cannot allocate live result"); goto cleanup; }
+        *result = (h3_result){params->width, params->height, 5+119*live_requests,
+                             H3_FPS, H3_AUDIO_VAE_SAMPLE_RATE, params->seed};
+#endif
+        goto cleanup;
+    }
     size_t video_count = ctx->live ? (size_t)24*temporal.video_t*latent_h*latent_w : h3_dit_video_elements(dit);
     size_t audio_count = ctx->live ? (size_t)64*temporal.audio_t : h3_dit_audio_elements(dit);
     video = malloc(video_count * sizeof(*video));
@@ -2253,6 +2278,29 @@ cleanup:
     h3_video_frames_free(&frames);
     h3_audio_waveform_free(&waveform);
     return result;
+}
+
+h3_result *h3_generate(h3_ctx *ctx, const char *prompt, const h3_params *params) {
+    return generate(ctx, prompt, params, 0);
+}
+
+h3_result *h3_generate_live(h3_ctx *ctx, const char *prompt,
+                           const h3_params *params, int requests) {
+    if (!ctx) return NULL;
+    if (!params || !ctx->live || !ctx->cache_enabled || !ctx->resident_weights ||
+        requests < 1 || requests > 12 || !params->output_path || !*params->output_path ||
+        params->render_width || params->render_height) {
+        h3_set_error(ctx, "live streaming requires resident live weights, an output path, 1..12 requests and the native canvas");
+        return NULL;
+    }
+#ifndef H3_CUDA
+    h3_set_error(ctx, "live streaming requires CUDA");
+    return NULL;
+#else
+    h3_params first = *params;
+    first.frames = 124;
+    return generate(ctx, prompt, &first, requests);
+#endif
 }
 
 void h3_result_free(h3_result *result) {

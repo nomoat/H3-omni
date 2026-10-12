@@ -233,3 +233,25 @@ and nine output seams found no obvious identity or background switch.
 See [the session evidence](../tests/live/evidence/15225/README.md) for the
 measurements, inspection scope and limitations. This validates one fixed
 prompt and seed over 49.79 seconds, not a long-running interactive broadcast.
+
+## Finite HTTP live pilot
+
+`h3_generate_live` uses the resident context, one prompt and 1–12 connected
+requests. `serve/live_server.py` exposes exactly 12 requests at `POST /v1/live`
+with the existing bearer-key scheme. `serve/h3-live.sbatch` starts the two-H200
+pilot on port 18961. A separate endpoint/key keeps it independent of FastH3.
+The response is a growing fragmented MP4 with H.264 constrained baseline 3.1
+and AAC-LC. One FFmpeg process spans all parts, with keyframes every second.
+Clients can append bytes to a browser MediaSource before generation completes.
+
+The fixed public session produces 1,433 frames (59.7083 seconds). The decoder
+retains the tested one-second output holdback and repeated-prefix decode;
+its maximum memory and work are bounded by the 12-request cap. No sustained
+real-time claim is made. The service admits one active session, rejects a
+second with 429, and notices disconnects while waiting or writing. It requests
+cancellation through a private file; the worker stops at the next phase
+boundary and resets KV for the next independent session. Resident weights stay.
+
+CPU checks: `tests/live/stream_encoder.c` proves media exists before encoder
+finish; `python3 -m unittest discover -s tests/live -p test_live_server.py -v`
+checks incremental delivery, admission, limits and disconnect cancellation.

@@ -15,6 +15,7 @@
  *
  * Usage: h3_worker MODEL_DIR */
 #include "h3.h"
+#include <unistd.h>
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -35,6 +36,17 @@ static void print_json_string(const char *text) {
         else putchar(*c);
     }
     putchar('"');
+}
+
+typedef struct { const char *id; char cancel[4096]; } live_progress;
+static int live_update(const char *phase, int completed, int total, void *opaque) {
+    live_progress *p=opaque;
+    if (!access(p->cancel,F_OK)) return 1;
+    if (!strcmp(phase,"live part")) {
+        printf("{\"event\":\"part\",\"id\":"); print_json_string(p->id);
+        printf(",\"part\":%d,\"parts\":%d}\n",completed,total); fflush(stdout);
+    }
+    return 0;
 }
 
 static void reply_error(const char *id, const char *message) {
@@ -100,7 +112,14 @@ int main(int argc, char **argv) {
         params.seed = strtoull(fields[5], NULL, 10);
         params.output_path = fields[6];
         double request_started = now();
-        h3_result *result = h3_generate(ctx, fields[7], &params);
+        /* Negative frame count denotes the bounded live request count.
+         * This private protocol is written only by the authenticated server. */
+        int live=params.frames<0;
+        live_progress progress={.id=fields[0]};
+        snprintf(progress.cancel,sizeof(progress.cancel),"%s.cancel",params.output_path);
+        if (live) { params.on_progress=live_update; params.callback_opaque=&progress; }
+        h3_result *result = live ? h3_generate_live(ctx,fields[7],&params,-params.frames) :
+                                  h3_generate(ctx, fields[7], &params);
         if (!result) {
             reply_error(fields[0], h3_last_error(ctx));
             continue;

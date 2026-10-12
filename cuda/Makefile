@@ -14,7 +14,7 @@ TK_ROOT ?= $(ROOT)/.deps/thunderkittens
 VSA ?= 0
 CFLAGS := -O2 -g -std=c11 -ffp-contract=off -D_GNU_SOURCE -DH3_CUDA -I$(ROOT) -fPIC -MMD -MP
 NVFLAGS := -O2 -lineinfo -std=c++17 -arch=$(CUDA_ARCH) --fmad=false -Xcompiler=-fPIC -I$(ROOT) -I$(ROOT)/cuda -I$(CUDNN_ROOT)/include
-LIB_C := h3 h3_live h3_host h3_safetensors h3_weights h3_text_encoder h3_dit_schedule h3_dit h3_video_vae h3_video_encoder h3_audio_vae h3_ffmpeg h3_terminal h3_vision_encoder h3_multimodal
+LIB_C := h3 h3_live h3_live_stream h3_host h3_safetensors h3_weights h3_text_encoder h3_dit_schedule h3_dit h3_video_vae h3_video_encoder h3_audio_vae h3_ffmpeg h3_terminal h3_vision_encoder h3_multimodal
 GPU_OBJ := $(BUILD)/h3_gpu_cuda.o $(BUILD)/flash_attention.o $(BUILD)/flash3_attention.o
 ifeq ($(VSA),1)
 CFLAGS += -DH3_VSA

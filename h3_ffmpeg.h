@@ -68,4 +68,15 @@ int h3_ffmpeg_av_stream_finish(h3_ffmpeg_av_stream *stream,
                                char *error, size_t error_size);
 void h3_ffmpeg_av_stream_abort(h3_ffmpeg_av_stream *stream);
 
+/* Incremental A/V input, one encoder for the full session. Output is fragmented
+ * MP4 (H.264 baseline level 3.1 / AAC-LC) and can be read before finish.
+ * push consumes both buffers before returning. finish/abort free the handle. */
+typedef struct h3_ffmpeg_live h3_ffmpeg_live;
+h3_ffmpeg_live *h3_ffmpeg_live_open(const char *path, int width, int height,
+                                   char *error, size_t error_size);
+int h3_ffmpeg_live_push(h3_ffmpeg_live *stream, const uint8_t *rgb, int frames,
+                        const float *pcm, int samples, char *error, size_t error_size);
+int h3_ffmpeg_live_finish(h3_ffmpeg_live *stream, char *error, size_t error_size);
+void h3_ffmpeg_live_abort(h3_ffmpeg_live *stream);
+
 #endif

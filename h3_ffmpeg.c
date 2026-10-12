@@ -1034,3 +1034,93 @@ int h3_ffmpeg_write_av_rgb24_f32(const char *path, const uint8_t *frames,
                              (size_t)frame_count * (size_t)width * (size_t)height * 3);
     return h3_ffmpeg_av_stream_finish(stream, error, error_size);
 }
+
+struct h3_ffmpeg_live {
+    pid_t child;
+    int video, audio;
+    size_t frame_bytes;
+    struct sigaction previous_sigpipe;
+};
+
+h3_ffmpeg_live *h3_ffmpeg_live_open(const char *path, int width, int height,
+                                   char *error, size_t capacity) {
+    int vp[2]={-1,-1},ap[2]={-1,-1};
+    h3_ffmpeg_live *s=calloc(1,sizeof(*s));
+    if (!s || !path || width<32 || height<32 || width%2 || height%2) {
+        free(s); fail(error,capacity,"invalid live encoder arguments"); return NULL;
+    }
+    if (pipe(vp) || pipe(ap)) {
+        for(int i=0;i<2;i++) { if(vp[i]>=0) close(vp[i]); if(ap[i]>=0) close(ap[i]); }
+        free(s); fail(error,capacity,"cannot create live encoder pipes"); return NULL;
+    }
+    int target=ap[1]+1;
+    if (target<=vp[1]) target=vp[1]+1;
+    char size[64],input[32];
+    snprintf(size,sizeof(size),"%dx%d",width,height);
+    snprintf(input,sizeof(input),"pipe:%d",target);
+    char *args[]={"ffmpeg","-y","-loglevel","error",
+        "-thread_queue_size","512","-probesize","32","-analyzeduration","1","-f","rawvideo","-pixel_format","rgb24",
+        "-video_size",size,"-framerate","24","-i","pipe:0",
+        "-thread_queue_size","512","-probesize","32","-analyzeduration","1","-f","f32le","-ar","32000","-ac","2","-i",input,
+        "-map","0:v:0","-map","1:a:0","-c:v","libx264","-preset","fast","-crf","18",
+        "-tune","zerolatency","-profile:v","baseline","-level:v","3.1",
+        "-g","24","-keyint_min","24","-sc_threshold","0","-pix_fmt","yuv420p",
+        "-c:a","aac","-b:a","192k","-movflags","+empty_moov+default_base_moof+frag_keyframe",
+        "-flush_packets","1","-f","mp4",(char *)path,NULL};
+    posix_spawn_file_actions_t actions;
+    int code=posix_spawn_file_actions_init(&actions);
+    if (!code) code=posix_spawn_file_actions_adddup2(&actions,vp[0],STDIN_FILENO);
+    if (!code) code=posix_spawn_file_actions_adddup2(&actions,ap[0],target);
+    int fds[]={vp[0],vp[1],ap[0],ap[1]};
+    for(int i=0;!code && i<4;i++) code=close_action(&actions,fds[i],STDIN_FILENO,target);
+    if (!code) code=posix_spawnp(&s->child,ffmpeg_program(),&actions,NULL,args,environ);
+    posix_spawn_file_actions_destroy(&actions);
+    close(vp[0]); close(ap[0]);
+    if (code) {
+        close(vp[1]); close(ap[1]); free(s);
+        fail(error,capacity,"cannot start live encoder: %s",strerror(code)); return NULL;
+    }
+    s->video=vp[1]; s->audio=ap[1]; s->frame_bytes=(size_t)width*height*3;
+    struct sigaction ignore={0}; ignore.sa_handler=SIG_IGN; sigemptyset(&ignore.sa_mask);
+    sigaction(SIGPIPE,&ignore,&s->previous_sigpipe);
+    return s;
+}
+
+int h3_ffmpeg_live_push(h3_ffmpeg_live *s,const uint8_t *rgb,int frames,
+    const float *pcm,int samples,char *error,size_t capacity) {
+    if (!s || !rgb || !pcm || frames<1 || samples<1) {
+        fail(error,capacity,"invalid live media buffers"); return 0;
+    }
+    float *interleaved=interleave_pcm(pcm,samples,2);
+    if (!interleaved) { fail(error,capacity,"cannot interleave live audio"); return 0; }
+    int fd=dup(s->audio);
+    stream_writer writer={fd,(uint8_t *)interleaved,(size_t)samples*2*sizeof(float),0};
+    pthread_t thread;
+    int code=fd<0?errno:pthread_create(&thread,NULL,stream_thread,&writer);
+    if (code) {
+        if(fd>=0) close(fd);
+        free(interleaved);
+        fail(error,capacity,"cannot start live audio writer: %s",strerror(code)); return 0;
+    }
+    int ok=write_all(s->video,rgb,(size_t)frames*s->frame_bytes,error,capacity);
+    if (!ok) kill(s->child,SIGTERM);
+    pthread_join(thread,NULL); free(interleaved);
+    if (writer.error) { fail(error,capacity,"live audio pipe: %s",strerror(writer.error)); ok=0; }
+    return ok;
+}
+
+static int live_encoder_close(h3_ffmpeg_live *s,int aborting,char *error,size_t capacity) {
+    if (!s) return 0;
+    if (aborting) kill(s->child,SIGTERM);
+    close(s->video); close(s->audio);
+    int status=0; pid_t waited;
+    do waited=waitpid(s->child,&status,0); while(waited<0 && errno==EINTR);
+    sigaction(SIGPIPE,&s->previous_sigpipe,NULL); free(s);
+    int ok=waited>0 && WIFEXITED(status) && WEXITSTATUS(status)==0;
+    if (!ok && !aborting) fail(error,capacity,"live FFmpeg did not finish successfully");
+    return ok;
+}
+int h3_ffmpeg_live_finish(h3_ffmpeg_live *s,char *error,size_t capacity) {
+    return live_encoder_close(s,0,error,capacity);
+}
+void h3_ffmpeg_live_abort(h3_ffmpeg_live *s) { if(s) live_encoder_close(s,1,NULL,0); }

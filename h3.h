@@ -204,6 +204,11 @@ void h3_cache_get_info(const h3_ctx *ctx, h3_cache_info *info);
 /* Generate media, delivering decoded frames incrementally through on_frame. */
 h3_result *h3_generate(h3_ctx *ctx, const char *prompt,
                        const h3_params *params);
+/* Finite live stream: 1..12 connected requests to a growing fragmented MP4.
+ * Requires a live checkpoint and resident caches. on_progress may cancel.
+ * The caller can tail output_path while this synchronous call is running. */
+h3_result *h3_generate_live(h3_ctx *ctx, const char *prompt,
+                           const h3_params *params, int requests);
 void h3_result_free(h3_result *result);
 
 #ifdef __cplusplus
