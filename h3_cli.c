@@ -774,7 +774,7 @@ int h3_cli_run(h3_ctx *ctx, const char *model_dir,
     linenoiseHistorySetMaxLen(500);
     linenoiseSetMultiLine(1);
 
-    printf("H3 Interactive Mode\nModel: %s\nOutputs: %s\n", model_dir,
+    printf(H3_PROJECT_NAME " Interactive Mode\nModel: %s\nOutputs: %s\n", model_dir,
            state.output_dir);
     if (show && state.terminal == H3_TERM_NONE)
         puts("Display unavailable in this terminal.");
@@ -782,7 +782,7 @@ int h3_cli_run(h3_ctx *ctx, const char *model_dir,
     print_status(&state);
 
     char *line;
-    while ((line = linenoise("h3> ")) != NULL) {
+    while ((line = linenoise(H3_PROJECT_NAME "> ")) != NULL) {
         trim_trailing(line);
         char *input = skip_spaces(line);
         if (*input) {

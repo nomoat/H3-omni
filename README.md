@@ -1,8 +1,8 @@
-# h3.cu
+# H3-omni
 
 **A specialized inference engine for MiniMax-H3, in C and CUDA, for H200.**
 
-h3.cu runs one model family in three checkpoint modes: original MiniMax-H3
+H3-omni runs one model family in three checkpoint modes: original MiniMax-H3
 text-to-video+audio, four-step FastH3 Preview v1, and TaoMate-H3 live chunk
 generation. It is written for one target: Hopper GPUs (H200, `sm_90`), one node, 1 to 8 GPUs,
 in a long-lived serving process.
@@ -145,7 +145,7 @@ start takes about 2 minutes to load the weights; the warm-up absorbs it.
 
 ## Origin and license
 
-h3.cu started from [antirez/h3.c](https://github.com/antirez/h3.c), a native
+H3-omni started from [antirez/h3.c](https://github.com/antirez/h3.c), a native
 MiniMax-H3 implementation for Apple Silicon. The model code in C is shared;
 the CUDA backend, multi-GPU support, serving path and FastH3 support are added
 here. The Metal code is still in the tree but is not maintained by this fork.

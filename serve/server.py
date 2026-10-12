@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""HTTP front end for the resident h3 worker (serve/h3_worker.c).
+"""H3-omni HTTP front end for the resident worker (serve/h3_worker.c).
 
 One worker process holds the model on all GPUs of the job and runs one
 request at a time; requests wait in a short queue. Python standard library
@@ -113,7 +113,7 @@ def make_handler(worker, key, work_dir, max_waiting, model_name, gpus):
 
     class Handler(BaseHTTPRequestHandler):
         protocol_version = "HTTP/1.1"
-        server_version = "h3-video"
+        server_version = "H3-omni"
 
         def log_message(self, fmt, *args):
             sys.stderr.write("%s %s\n" % (time.strftime("%Y-%m-%dT%H:%M:%S"), fmt % args))

@@ -1,4 +1,4 @@
-/* Public API for the h3-metal MiniMax-H3 inference engine. */
+/* Public API for the H3-omni MiniMax-H3 inference engine. */
 #ifndef H3_H
 #define H3_H
 
@@ -9,6 +9,7 @@
 extern "C" {
 #endif
 
+#define H3_PROJECT_NAME "H3-omni"
 #define H3_VERSION "0.1.0-dev"
 #define H3_DEFAULT_WIDTH 864
 #define H3_DEFAULT_HEIGHT 480

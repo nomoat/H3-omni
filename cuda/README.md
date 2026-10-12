@@ -1,4 +1,4 @@
-# h3.cu: H200 backend details
+# H3-omni: H200 backend details
 
 [FastH3 Preview v1 support](FASTH3.md) is available as the optional `VSA=1`
 build, with its own converted checkpoint and four-step schedule.

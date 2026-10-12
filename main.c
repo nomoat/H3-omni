@@ -14,6 +14,7 @@
 
 static void usage(const char *program) {
     fprintf(stderr,
+        H3_PROJECT_NAME " — MiniMax-H3 inference engine\n\n"
         "Usage: %s -d MODEL_DIR [options]              # interactive\n"
         "       %s -d MODEL_DIR -p PROMPT [-o OUTPUT] [options]\n"
         "       %s -d MODEL_DIR --info\n\n"
@@ -134,9 +135,9 @@ static void print_info(const h3_ctx *ctx) {
     const h3_device_info *device = h3_device(ctx);
     const h3_model_info *model = h3_model(ctx);
 #ifdef H3_CUDA
-    printf("h3-cuda %s\n", H3_VERSION);
+    printf(H3_PROJECT_NAME " %s (CUDA)\n", H3_VERSION);
 #else
-    printf("h3-metal %s\n", H3_VERSION);
+    printf(H3_PROJECT_NAME " %s (Metal)\n", H3_VERSION);
 #endif
     printf("Device: %s (%s)\n", device->name, device->architecture);
     printf("  physical memory       %.1f GiB\n", gib(device->physical_memory));
